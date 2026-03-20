@@ -31,3 +31,9 @@ F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\LoginWindow.baml
 F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\RegisterWindow.baml
 F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\LoginWindow.g.cs
 F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\RegisterWindow.g.cs
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Controls\WorkCard.baml
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Controls\WorkCard.g.cs
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\WorksView.g.cs
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\GeneratedInternalTypeHelper.g.cs
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\AniTechou_MarkupCompile.lref
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\WorksView.baml

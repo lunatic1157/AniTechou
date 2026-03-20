@@ -1,20 +1,20 @@
 ﻿AniTechou
-1.0.0.0
+
 
 winexe
 C#
 .cs
-f:\AniTechou\AniTechou\obj\Debug\net8.0-windows\
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\
 AniTechou
 none
 false
-TRACE;DEBUG;NET;NET8_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
-f:\AniTechou\AniTechou\App.xaml
-3-1041084437
+TRACE;DEBUG;NET;NET8_0;NETCOREAPP
+F:\AniTechou\AniTechou\App.xaml
+5-1662693630
 
-101747427518
+11-1091291715
 2001211484205
-LoginWindow.xaml;MainWindow.xaml;RegisterWindow.xaml;
+Controls\WorkCard.xaml;LoginWindow.xaml;MainWindow.xaml;RegisterWindow.xaml;Views\WorksView.xaml;
 
 False
 
