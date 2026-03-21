@@ -101,16 +101,7 @@ namespace AniTechou
             };
             RecentList.ItemsSource = recent;
         }
-
-        private void LoadMainContent()
-        {
-            string accountName = _accountManager.CurrentAccount?.UserName ?? "default";
-            var worksView = new Views.WorksView(accountName, "all", "all");
-            MainContentArea.Content = worksView;
-            ContentPlaceholder.Visibility = Visibility.Collapsed;
-            MainContentArea.Visibility = Visibility.Visible;
-        }
-
+        
         private void ShowLoginWindow()
         {
             var loginWindow = new LoginWindow(_accountManager);
@@ -140,19 +131,19 @@ namespace AniTechou
             string tag = button.Tag?.ToString() ?? "";
             string type = "all";
             string status = "all";
-            
+
             switch (tag)
             {
-                case "anime": type = "anime"; break;
-                case "manga": type = "manga"; break;
-                case "lightnovel": type = "lightnovel"; break;
-                case "game": type = "game"; break;
+                case "anime": type = "Anime"; break;      // 改成大写
+                case "manga": type = "Manga"; break;      // 改成大写
+                case "lightnovel": type = "LightNovel"; break;  // 改成大写
+                case "game": type = "Game"; break;        // 改成大写
                 case "wish": status = "wish"; break;
                 case "doing": status = "doing"; break;
                 case "done": status = "done"; break;
                 case "all": type = "all"; break;
                 case "notes":
-                case "tags":
+            case "tags":
                     ContentPlaceholder.Text = $"当前选择：{button.Content}";
                     MainContentArea.Content = null;
                     return;
@@ -274,6 +265,59 @@ namespace AniTechou
             {
                 return $"收到你的问题：\"{userMessage}\"\n\n我正在学习中，后续会接入AI服务为你提供更准确的回答。你可以尝试问一些关于动漫推荐的问题。";
             }
+        }
+
+        // 添加成员变量
+        private string _currentAccountName;
+
+        // 在 LoadMainContent 中保存当前账号名
+        private void LoadMainContent()
+        {
+            _currentAccountName = _accountManager.CurrentAccount?.UserName ?? "default";
+            var worksView = new Views.WorksView(_currentAccountName, "all", "all");
+            MainContentArea.Content = worksView;
+            ContentPlaceholder.Visibility = Visibility.Collapsed;
+            MainContentArea.Visibility = Visibility.Visible;
+        }
+
+        // 显示添加作品选择界面
+        public void ShowAddWorkOptions()
+        {
+            var addWorkView = new Views.AddWorkChoiceView();
+            addWorkView.AIAddRequested += () =>
+            {
+                // 展开AI面板
+                if (!_isAIPanelVisible)
+                {
+                    ToggleAIPanel_Click(AIAssistantButton, null);
+                }
+                AIChatInputBox.Focus();
+                AIChatInputBox.Text = "";
+                AIChatInputBox.ToolTip = "输入作品名称，AI帮你搜索";
+
+                // 返回主内容
+                RefreshCurrentView();
+            };
+            addWorkView.ManualAddRequested += () =>
+            {
+                var addForm = new Views.AddWorkForm(_currentAccountName);
+                addForm.WorkAdded += () => RefreshCurrentView();
+                MainContentArea.Content = addForm;
+                ContentPlaceholder.Visibility = Visibility.Collapsed;
+                MainContentArea.Visibility = Visibility.Visible;
+            };
+
+            MainContentArea.Content = addWorkView;
+            ContentPlaceholder.Visibility = Visibility.Collapsed;
+            MainContentArea.Visibility = Visibility.Visible;
+        }
+
+        // 刷新当前视图
+        private void RefreshCurrentView()
+        {
+            // 重新加载作品列表
+            var worksView = new Views.WorksView(_currentAccountName, "all", "all");
+            MainContentArea.Content = worksView;
         }
     }
 }

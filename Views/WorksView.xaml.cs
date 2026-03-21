@@ -42,10 +42,10 @@ namespace AniTechou.Views
             var typeMap = new Dictionary<string, string>
             {
                 { "all", "全部作品" },
-                { "anime", "动画" },
-                { "manga", "漫画" },
-                { "lightnovel", "轻小说" },
-                { "game", "游戏" }
+                { "Anime", "动画" },      // 改成大写
+                { "Manga", "漫画" },
+                { "LightNovel", "轻小说" },
+                { "Game", "游戏" }
             };
             
             // 状态映射
@@ -143,6 +143,12 @@ namespace AniTechou.Views
             // 切换面板模板
             WorksItemsControl.ItemsPanel = (ItemsPanelTemplate)FindResource("ListPanel");
             UpdateButtonStyles();
+        }
+
+        private void AddWork_Click(object sender, RoutedEventArgs e)
+        {
+            var mainWindow = Application.Current.MainWindow as MainWindow;
+            mainWindow?.ShowAddWorkOptions();
         }
     }
 }

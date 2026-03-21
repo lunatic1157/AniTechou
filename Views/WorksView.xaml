@@ -65,17 +65,33 @@
                                VerticalAlignment="Bottom" 
                                Margin="8,0,0,5"/>
                 </StackPanel>
-
-                <!-- 视图切换按钮 -->
+                
+                <!-- 右侧按钮区域 -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Content="➕ 添加作品"
+                            Width="100"
+                            Height="30"
+                            Background="#5C4E3D"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            Click="AddWork_Click"/>
                     <Button x:Name="GridButton" 
                             Content="▦" 
-                            Style="{StaticResource ViewToggleButton}"
+                            Width="30" 
+                            Height="30"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Cursor="Hand"
                             Click="SetGridView_Click"
-                            Background="#E0D5C0"/>
+                            Margin="5,0,0,0"/>
                     <Button x:Name="ListButton" 
                             Content="☰" 
-                            Style="{StaticResource ViewToggleButton}"
+                            Width="30" 
+                            Height="30"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Cursor="Hand"
                             Click="SetListView_Click"/>
                 </StackPanel>
             </Grid>

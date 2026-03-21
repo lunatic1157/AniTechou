@@ -10,11 +10,11 @@ none
 false
 TRACE;DEBUG;NET;NET8_0;NETCOREAPP
 F:\AniTechou\AniTechou\App.xaml
-5-1662693630
+7-1783491083
 
-11-1091291715
+131917389874
 2001211484205
-Controls\WorkCard.xaml;LoginWindow.xaml;MainWindow.xaml;RegisterWindow.xaml;Views\WorksView.xaml;
+Controls\WorkCard.xaml;LoginWindow.xaml;MainWindow.xaml;RegisterWindow.xaml;Views\AddWorkChoiceView.xaml;Views\AddWorkForm.xaml;Views\WorksView.xaml;
 
 False
 
