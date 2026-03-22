@@ -41,3 +41,7 @@ F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\AddWorkChoiceView.baml
 F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\AddWorkChoiceView.g.cs
 F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\AddWorkForm.baml
 F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\AddWorkForm.g.cs
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\WorkDetailView.baml
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\WorkDetailView.g.cs
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Windows\EditWorkInfoWindow.baml
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Windows\EditWorkInfoWindow.g.cs

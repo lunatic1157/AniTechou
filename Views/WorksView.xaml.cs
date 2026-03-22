@@ -47,7 +47,7 @@ namespace AniTechou.Views
                 { "LightNovel", "轻小说" },
                 { "Game", "游戏" }
             };
-            
+
             // 状态映射
             var statusMap = new Dictionary<string, string>
             {
@@ -120,11 +120,19 @@ namespace AniTechou.Views
             var card = sender as WorkCard;
             if (card != null)
             {
-                // TODO: 打开作品详情页
-                MessageBox.Show($"打开作品：{card.Title}");
+                // 获取完整的作品信息
+                var work = _workService.GetWorkById(card.WorkId);
+                var userWork = _workService.GetUserWorkByWorkId(card.WorkId);
+
+                if (work != null && userWork != null)
+                {
+                    var detailView = new WorkDetailView(card.WorkId, userWork.Id, _workService.GetCurrentAccount());
+                    var mainWindow = Application.Current.MainWindow as MainWindow;
+                    mainWindow?.ShowDetailView(detailView);
+                }
             }
         }
-
+        
         private void SetGridView_Click(object sender, RoutedEventArgs e)
         {
             if (_isGridView) return;

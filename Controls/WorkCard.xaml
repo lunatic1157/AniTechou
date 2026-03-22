@@ -5,8 +5,8 @@
              Cursor="Hand">
     
     <UserControl.Resources>
-        <!-- 卡片边框样式 -->
-        <Style TargetType="Border">
+        <!-- 卡片样式 -->
+        <Style TargetType="Border" x:Key="CardBorder">
             <Setter Property="Background" Value="White"/>
             <Setter Property="BorderBrush" Value="#E0D5C0"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -15,12 +15,13 @@
         </Style>
         
         <!-- 悬停效果 -->
-        <Style TargetType="Grid">
+        <Style TargetType="Border" BasedOn="{StaticResource CardBorder}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=IsMouseOver}" Value="True">
+                    <Setter Property="BorderBrush" Value="#C4B9A8"/>
                     <Setter Property="Effect">
                         <Setter.Value>
-                            <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.3"/>
+                            <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.2"/>
                         </Setter.Value>
                     </Setter>
                 </DataTrigger>
@@ -28,72 +29,79 @@
         </Style>
     </UserControl.Resources>
 
-    <Border>
+    <Border Style="{StaticResource CardBorder}">
         <Grid Margin="10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="80"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- 封面占位区 -->
+            <!-- 封面区域 -->
             <Border Grid.Column="0" 
-                    Background="#F0E9DD"
+                    Width="70" Height="100" 
+                    Background="#F0E9DD" 
                     CornerRadius="4"
-                    Width="70" Height="100"
                     HorizontalAlignment="Left">
-                <TextBlock Text="📖" 
-                           FontSize="40" 
-                           HorizontalAlignment="Center" 
-                           VerticalAlignment="Center"/>
+                <Grid>                          
+                    <Image x:Name="CoverImage" 
+                        Stretch="Uniform"
+                        Source="{Binding CoverPath}"
+                        Visibility="Collapsed"/>
+                    <TextBlock x:Name="CoverPlaceholder" 
+                            Text="📖" 
+                            FontSize="40" 
+                            HorizontalAlignment="Center" 
+                            VerticalAlignment="Center"/>
+                </Grid>                         
             </Border>
 
             <!-- 作品信息 -->
             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                 <!-- 标题 -->
-                <TextBlock x:Name="TitleText" 
-                           Text="{Binding Title}"
-                           FontSize="14" 
-                           FontWeight="Bold"
-                           Foreground="#5C4E3D"
-                           TextWrapping="Wrap"
-                           MaxHeight="40"/>
-                
+                <TextBlock x:Name="TitleTextBlock" 
+                        Text="{Binding Title}"
+                        FontSize="14" 
+                        FontWeight="Bold"
+                        Foreground="#5C4E3D"
+                        TextWrapping="Wrap"
+                        MaxHeight="40"/>
+
                 <!-- 年份和制作公司 -->
-                <TextBlock x:Name="InfoText" 
-                           Text="{Binding Info}"
-                           FontSize="11" 
-                           Foreground="#A89F91"
-                           Margin="0,4,0,0"/>
+                <TextBlock x:Name="InfoTextBlock" 
+                        Text="{Binding Info}"
+                        FontSize="11" 
+                        Foreground="#A89F91"
+                        Margin="0,4,0,0"/>
                 
-                <!-- 进度条 -->
+                <!-- 进度条区域 -->
                 <Grid Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-    
+                    
                     <ProgressBar x:Name="ProgressBar"
                                  Grid.Column="0"
                                  Height="6"
                                  Background="#E0D5C0"
                                  Foreground="#A8D8EA"
                                  Value="{Binding ProgressValue}"
-                                Maximum="100"/>
-    
+                                 Maximum="100"/>
+                    
                     <TextBlock x:Name="ProgressTextBlock"
-                               Grid.Column="1"
-                               Text="{Binding ProgressText}"
-                               FontSize="10"
-                               Foreground="#7F6E5A"
-                               Margin="5,0,0,0"/>
+                            Grid.Column="1"
+                            Text="{Binding ProgressText}"
+                            FontSize="10"
+                            Foreground="#7F6E5A"
+                            Margin="5,0,0,0"/>
                 </Grid>
                 
                 <!-- 评分 -->
-                <TextBlock x:Name="RatingText" 
-                           Text="{Binding RatingDisplay}"
-                           FontSize="12"
-                           Foreground="#F4B942"
-                           Margin="0,4,0,0"/>
+                <TextBlock x:Name="RatingTextBlock" 
+                        Text="{Binding RatingDisplay}"
+                        FontSize="12"
+                        Foreground="#F4B942"
+                        Margin="0,4,0,0"/>
             </StackPanel>
         </Grid>
     </Border>

@@ -1,0 +1,121 @@
+<UserControl x:Class="AniTechou.Views.WorkDetailView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="White">
+    
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20">
+            <!-- 返回按钮 -->
+            <Button Content="← 返回" 
+                    Width="80" Height="30"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    HorizontalAlignment="Left"
+                    Click="Back_Click"/>
+            
+            <!-- 标题 -->
+            <TextBlock x:Name="TitleText" 
+                       FontSize="24" 
+                       FontWeight="Bold" 
+                       Foreground="#5C4E3D"
+                       HorizontalAlignment="Center"
+                       Margin="0,10,0,10"/>
+            
+            <!-- 封面和基本信息区域（带编辑按钮） -->
+            <Grid Margin="0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                
+                <!-- 封面 -->
+                <Border Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                        Width="150" Height="200" 
+                        Background="#F0E9DD" 
+                        CornerRadius="8">
+                    <Image x:Name="CoverImage" Stretch="Uniform"/>
+                </Border>
+                
+                <!-- 基本信息 -->
+                <StackPanel Grid.Row="0" Grid.Column="1" Margin="15,0,0,0">
+                    <TextBlock x:Name="OriginalTitleText" FontSize="14" Foreground="#A89F91"/>
+                    <TextBlock x:Name="TypeText" Margin="0,5,0,0"/>
+                    <TextBlock x:Name="CompanyText"/>
+                    <TextBlock x:Name="YearText"/>
+                    <TextBlock x:Name="EpisodesText"/>
+                </StackPanel>
+                
+                <!-- 编辑按钮 -->
+                <Button Grid.Row="0" Grid.Column="2" 
+                        Content="编辑" 
+                        Width="60" Height="30"
+                        Background="#5C4E3D" 
+                        Foreground="White"
+                        VerticalAlignment="Top"
+                        HorizontalAlignment="Right"
+                        Click="EditInfo_Click"/>
+            </Grid>
+            
+            <!-- 简介 -->
+            <TextBlock Text="简介" FontSize="16" FontWeight="Bold" Foreground="#5C4E3D" Margin="0,20,0,10"/>
+            <TextBlock x:Name="SynopsisTextBlock" TextWrapping="Wrap" Foreground="#7F6E5A"/>
+            
+            <!-- 个人状态区域 -->
+            <Border Background="#F0E9DD" CornerRadius="8" Padding="15" Margin="0,15">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <TextBlock Grid.Column="0" Text="状态：" Foreground="#5C4E3D" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="StatusBox" Grid.Column="1" Width="80" Margin="5,0" SelectedIndex="0">
+                            <ComboBoxItem Content="想看"/>
+                            <ComboBoxItem Content="在看"/>
+                            <ComboBoxItem Content="看过"/>
+                        </ComboBox>
+                        
+                        <TextBlock Grid.Column="2" Text="进度：" Foreground="#5C4E3D" VerticalAlignment="Center" Margin="15,0,0,0"/>
+                        <TextBox x:Name="ProgressBox" Grid.Column="3" Width="80" Margin="5,0"/>
+                    </Grid>
+                    
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="评分：" Foreground="#5C4E3D" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="RatingBox" Grid.Column="1" Width="120" Margin="5,0" SelectedIndex="0">
+                            <ComboBoxItem Content="未评分"/>
+                            <ComboBoxItem Content="★☆☆☆☆ (1-2分)"/>
+                            <ComboBoxItem Content="★★☆☆☆ (3-4分)"/>
+                            <ComboBoxItem Content="★★★☆☆ (5-6分)"/>
+                            <ComboBoxItem Content="★★★★☆ (7-8分)"/>
+                            <ComboBoxItem Content="★★★★★ (9-10分)"/>
+                        </ComboBox>
+                    </Grid>
+                    
+                    <Button Content="更新" 
+                            Width="60" Height="30"
+                            Background="#5C4E3D" 
+                            Foreground="White"
+                            HorizontalAlignment="Right"
+                            Margin="0,10,0,0"
+                            Click="Update_Click"/>
+                </StackPanel>
+            </Border>
+            
+            <!-- 关联笔记（待开发） -->
+            <TextBlock Text="关联笔记" FontSize="16" FontWeight="Bold" Foreground="#5C4E3D" Margin="0,20,0,10"/>
+            <TextBlock Text="暂无笔记" Foreground="#A89F91" Margin="0,5"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

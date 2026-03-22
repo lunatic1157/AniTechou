@@ -63,12 +63,8 @@ namespace AniTechou.Views
                 };
 
                 // 年份季度
-                string yearSeason = YearBox.Text.Trim();
+                string year = YearBox.Text.Trim();
                 string season = ((ComboBoxItem)SeasonBox.SelectedItem).Content.ToString();
-                if (!string.IsNullOrEmpty(season) && !string.IsNullOrEmpty(yearSeason))
-                {
-                    yearSeason = $"{yearSeason}{season}";
-                }
 
                 var workService = new WorkService(_accountName);
 
@@ -77,7 +73,8 @@ namespace AniTechou.Views
                     OriginalTitleBox.Text.Trim(),
                     typeEn,                    // 英文类型
                     CompanyBox.Text.Trim(),
-                    yearSeason,
+                    year,
+                    season,
                     EpisodesBox.Text.Trim(),
                     ProgressBox.Text.Trim(),
                     statusEn,                  // 英文状态

@@ -108,6 +108,7 @@
                             WorkId="{Binding Id}"
                             Title="{Binding Title}"
                             Info="{Binding Info}"
+                            CoverPath="{Binding CoverPath}"
                             ProgressValue="{Binding ProgressValue}"
                             ProgressText="{Binding ProgressText}"
                             RatingDisplay="{Binding RatingDisplay}"

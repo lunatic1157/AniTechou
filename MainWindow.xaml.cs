@@ -313,11 +313,19 @@ namespace AniTechou
         }
 
         // 刷新当前视图
-        private void RefreshCurrentView()
+        public void RefreshCurrentView()
         {
-            // 重新加载作品列表
             var worksView = new Views.WorksView(_currentAccountName, "all", "all");
             MainContentArea.Content = worksView;
+            ContentPlaceholder.Visibility = Visibility.Collapsed;
+            MainContentArea.Visibility = Visibility.Visible;
+        }
+
+        public void ShowDetailView(UserControl detailView)
+        {
+            MainContentArea.Content = detailView;
+            ContentPlaceholder.Visibility = Visibility.Collapsed;
+            MainContentArea.Visibility = Visibility.Visible;
         }
     }
 }

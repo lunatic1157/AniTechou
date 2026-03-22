@@ -1,34 +1,30 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media.Imaging;
 
 namespace AniTechou.Controls
 {
-    /// <summary>
-    /// 作品卡片控件
-    /// </summary>
     public partial class WorkCard : UserControl
     {
-        // 依赖属性：作品ID
+        // 依赖属性
         public static readonly DependencyProperty WorkIdProperty =
             DependencyProperty.Register("WorkId", typeof(int), typeof(WorkCard), new PropertyMetadata(0));
         
-        // 依赖属性：标题
         public static readonly DependencyProperty TitleProperty =
             DependencyProperty.Register("Title", typeof(string), typeof(WorkCard), new PropertyMetadata(""));
         
-        // 依赖属性：信息（年份+制作公司）
         public static readonly DependencyProperty InfoProperty =
             DependencyProperty.Register("Info", typeof(string), typeof(WorkCard), new PropertyMetadata(""));
         
-        // 依赖属性：进度值（0-100）
+        public static readonly DependencyProperty CoverPathProperty =
+            DependencyProperty.Register("CoverPath", typeof(string), typeof(WorkCard), new PropertyMetadata("", OnCoverPathChanged));
+        
         public static readonly DependencyProperty ProgressValueProperty =
             DependencyProperty.Register("ProgressValue", typeof(double), typeof(WorkCard), new PropertyMetadata(0.0));
         
-        // 依赖属性：进度文本
         public static readonly DependencyProperty ProgressTextProperty =
             DependencyProperty.Register("ProgressText", typeof(string), typeof(WorkCard), new PropertyMetadata(""));
         
-        // 依赖属性：评分显示
         public static readonly DependencyProperty RatingDisplayProperty =
             DependencyProperty.Register("RatingDisplay", typeof(string), typeof(WorkCard), new PropertyMetadata("未评分"));
 
@@ -50,6 +46,12 @@ namespace AniTechou.Controls
             set { SetValue(InfoProperty, value); }
         }
 
+        public string CoverPath
+        {
+            get { return (string)GetValue(CoverPathProperty); }
+            set { SetValue(CoverPathProperty, value); }
+        }
+
         public double ProgressValue
         {
             get { return (double)GetValue(ProgressValueProperty); }
@@ -68,7 +70,38 @@ namespace AniTechou.Controls
             set { SetValue(RatingDisplayProperty, value); }
         }
 
-        // 点击事件
+        // 封面路径变化时更新图片
+        private static void OnCoverPathChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var card = d as WorkCard;
+            var path = e.NewValue as string;
+            card?.UpdateCover(path);
+        }
+
+        private void UpdateCover(string path)
+        {
+            if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
+            {
+                try
+                {
+                    var bitmap = new BitmapImage(new Uri(path));
+                    CoverImage.Source = bitmap;
+                    CoverImage.Visibility = Visibility.Visible;
+                    CoverPlaceholder.Visibility = Visibility.Collapsed;
+                }
+                catch
+                {
+                    CoverImage.Visibility = Visibility.Collapsed;
+                    CoverPlaceholder.Visibility = Visibility.Visible;
+                }
+            }
+            else
+            {
+                CoverImage.Visibility = Visibility.Collapsed;
+                CoverPlaceholder.Visibility = Visibility.Visible;
+            }
+        }
+
         public event RoutedEventHandler Click;
 
         public WorkCard()
