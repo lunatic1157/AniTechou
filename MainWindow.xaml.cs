@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -120,14 +120,18 @@ namespace AniTechou
         // ========== 侧边栏功能 ==========
         private void QuickNote_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("打开快速笔记窗口");
+            // 打开空白笔记编辑器
+            var editor = new Views.NoteEditor(_currentAccountName, null, Views.EditorSource.QuickNote);
+            editor.NoteSaved += () => RefreshCurrentView();
+            editor.NoteCancelled += () => RefreshCurrentView();
+            ShowDetailView(editor);
         }
 
         private void SidebarMenu_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
             if (button == null) return;
-            
+
             string tag = button.Tag?.ToString() ?? "";
             string type = "all";
             string status = "all";
@@ -143,7 +147,10 @@ namespace AniTechou
                 case "done": status = "done"; break;
                 case "all": type = "all"; break;
                 case "notes":
-            case "tags":
+                    var notesView = new Views.NotesView(_currentAccountName);
+                    ShowDetailView(notesView);
+                    return;
+                case "tags":
                     ContentPlaceholder.Text = $"当前选择：{button.Content}";
                     MainContentArea.Content = null;
                     return;
@@ -317,6 +324,15 @@ namespace AniTechou
         {
             var worksView = new Views.WorksView(_currentAccountName, "all", "all");
             MainContentArea.Content = worksView;
+            ContentPlaceholder.Visibility = Visibility.Collapsed;
+            MainContentArea.Visibility = Visibility.Visible;
+        }
+
+        // 显示笔记列表
+        public void ShowNotesView()
+        {
+            var notesView = new Views.NotesView(_currentAccountName);
+            MainContentArea.Content = notesView;
             ContentPlaceholder.Visibility = Visibility.Collapsed;
             MainContentArea.Visibility = Visibility.Visible;
         }

@@ -112,9 +112,23 @@
                             Click="Update_Click"/>
                 </StackPanel>
             </Border>
-            
-            <!-- 关联笔记（待开发） -->
-            <TextBlock Text="关联笔记" FontSize="16" FontWeight="Bold" Foreground="#5C4E3D" Margin="0,20,0,10"/>
+
+            <!-- 关联笔记 -->
+            <Grid Margin="0,20,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="关联笔记" FontSize="16" FontWeight="Bold" Foreground="#5C4E3D"/>
+                <Button Grid.Column="1"
+                        Content="写笔记"
+                        Width="70" Height="28"
+                        Background="#5C4E3D"
+                        Foreground="White"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        Click="WriteNote_Click"/>
+            </Grid>
             <TextBlock Text="暂无笔记" Foreground="#A89F91" Margin="0,5"/>
         </StackPanel>
     </ScrollViewer>

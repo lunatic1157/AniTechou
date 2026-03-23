@@ -206,7 +206,7 @@ namespace AniTechou.Services
                 SaveAccountInfo(account);
 
                 // 创建对应的数据库
-                DatabaseHelper.CreateNewDatabase(DatabaseHelper.GetDatabasePath(userName));
+                DatabaseHelper.InitializeForAccount(userName);
 
                 message = "创建成功";
                 AccountListUpdated?.Invoke(this, GetAllAccounts());
@@ -248,6 +248,9 @@ namespace AniTechou.Services
             _currentAccount = account;
             SaveLastAccount(userName);
 
+            // 初始化数据库（迁移旧数据库）
+            DatabaseHelper.InitializeForAccount(userName);
+
             message = "登录成功";
             AccountSwitched?.Invoke(this, account);
             return true;
@@ -267,6 +270,10 @@ namespace AniTechou.Services
 
             _currentAccount = account;
             AccountSwitched?.Invoke(this, account);
+
+            // 初始化数据库（迁移旧数据库）
+            DatabaseHelper.InitializeForAccount(lastAccount);
+
             return true;
         }
 

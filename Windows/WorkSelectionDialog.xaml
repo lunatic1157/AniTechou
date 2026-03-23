@@ -1,0 +1,25 @@
+<Window x:Class="AniTechou.Windows.WorkSelectionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="选择关联作品"
+        Width="400" Height="500"
+        WindowStartupLocation="CenterOwner"
+        Background="#F8F4E9">
+    
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <TextBlock Text="选择要关联的作品" FontSize="16" FontWeight="Bold" Foreground="#5C4E3D" Margin="5"/>
+        
+        <ListBox x:Name="WorksList" Grid.Row="1" Margin="0,10" SelectionMode="Multiple" DisplayMemberPath="Title"/>
+        
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10">
+            <Button Content="确定" Width="80" Height="30" Background="#5C4E3D" Foreground="White" Click="OK_Click" Margin="0,0,10,0"/>
+            <Button Content="取消" Width="80" Height="30" Click="Cancel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

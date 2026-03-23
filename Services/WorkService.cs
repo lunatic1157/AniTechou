@@ -387,8 +387,322 @@ namespace AniTechou.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"UpdateWorkInfo error: {ex.Message}");
-                return false;
+                        return false;
             }
         }
+
+        /// <summary>
+        /// 笔记信息
+        /// </summary>
+        public class NoteInfo
+        {
+            public int Id { get; set; }
+            public string Title { get; set; } = "";
+            public string Content { get; set; } = "";
+            public DateTime CreatedTime { get; set; }
+            public DateTime ModifiedTime { get; set; }
+            public List<int> WorkIds { get; set; } = new List<int>();
+            public List<string> Tags { get; set; } = new List<string>();
+        }
+
+        /// <summary>
+        /// 笔记列表项
+        /// </summary>
+        public class NoteListItem
+        {
+            public int Id { get; set; }
+            public string Title { get; set; } = "";
+            public string Content { get; set; } = "";
+            public string Preview { get; set; } = "";
+            public DateTime CreatedTime { get; set; }
+            public string Tags { get; set; } = "";
+            public int WorkCount { get; set; }
+            public List<string> WorkTitles { get; set; } = new List<string>();
+
+            // 显示属性
+            public string DisplayTitle => string.IsNullOrEmpty(Title) ? "无标题" : Title;
+            public string DisplayContent => string.IsNullOrEmpty(Content) ? "" :
+                (Content.Length > 80 ? Content.Substring(0, 80) + "..." : Content);
+            public string CreatedTimeDisplay { get; set; } = "";
+            public string TagsDisplay { get; set; } = "";
+            public bool HasTags { get; set; }
+            public string WorkTitlesDisplay { get; set; } = "";
+        }
+
+        /// <summary>
+        /// 获取所有笔记
+        /// </summary>
+        public List<NoteListItem> GetAllNotes()
+        {
+            var notes = new List<NoteListItem>();
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = @"
+                    SELECT n.Id, COALESCE(n.Title, '') as Title, n.Content, n.CreatedTime,
+                           GROUP_CONCAT(DISTINCT nt.TagName) as Tags,
+                           COUNT(DISTINCT nw.WorkId) as WorkCount
+                    FROM Notes n
+                    LEFT JOIN NoteTags nt ON n.Id = nt.NoteId
+                    LEFT JOIN NoteWorks nw ON n.Id = nw.NoteId
+                    GROUP BY n.Id
+                    ORDER BY n.CreatedTime DESC";
+
+                using (var cmd = new SQLiteCommand(sql, conn))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        string title = SafeGetString(reader, 1);
+                        string content = SafeGetString(reader, 2);
+                        string preview = content.Length > 100 ? content.Substring(0, 100) + "..." : content;
+                        int noteId = SafeGetInt(reader, 0);
+                        int workCount = SafeGetInt(reader, 5);
+
+                        // 获取关联作品标题
+                        var workTitles = new List<string>();
+                        if (workCount > 0)
+                        {
+                            using (var cmdWorks = new SQLiteCommand("SELECT w.Title FROM Works w INNER JOIN NoteWorks nw ON w.Id = nw.WorkId WHERE nw.NoteId = @NoteId", conn))
+                            {
+                                cmdWorks.Parameters.AddWithValue("@NoteId", noteId);
+                                using (var readerWorks = cmdWorks.ExecuteReader())
+                                {
+                                    while (readerWorks.Read())
+                                    {
+                                        workTitles.Add(SafeGetString(readerWorks, 0));
+                                    }
+                                }
+                            }
+                        }
+
+                        notes.Add(new NoteListItem
+                        {
+                            Id = noteId,
+                            Title = title,
+                            Content = content,
+                            Preview = preview,
+                            CreatedTime = DateTime.Parse(SafeGetString(reader, 3)),
+                            Tags = SafeGetString(reader, 4) ?? "",
+                            WorkCount = workCount,
+                            WorkTitles = workTitles
+                        });
+                    }
+                }
+            }
+            return notes;
+        }
+
+        /// <summary>
+        /// 获取单个笔记
+        /// </summary>
+        public NoteInfo GetNoteById(int noteId)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+
+                // 获取笔记内容
+                string sqlNote = "SELECT Id, COALESCE(Title, '') as Title, Content, CreatedTime, ModifiedTime FROM Notes WHERE Id = @Id";
+                NoteInfo note = null;
+                using (var cmd = new SQLiteCommand(sqlNote, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Id", noteId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            note = new NoteInfo
+                            {
+                                Id = SafeGetInt(reader, 0),
+                                Title = SafeGetString(reader, 1),
+                                Content = SafeGetString(reader, 2),
+                                CreatedTime = DateTime.Parse(SafeGetString(reader, 3)),
+                                ModifiedTime = DateTime.Parse(SafeGetString(reader, 4))
+                            };
+                        }
+                    }
+                }
+
+                if (note == null) return null;
+
+                // 获取关联的作品
+                string sqlWorks = "SELECT WorkId FROM NoteWorks WHERE NoteId = @NoteId";
+                using (var cmd = new SQLiteCommand(sqlWorks, conn))
+                {
+                    cmd.Parameters.AddWithValue("@NoteId", noteId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            note.WorkIds.Add(SafeGetInt(reader, 0));
+                        }
+                    }
+                }
+
+                // 获取标签
+                string sqlTags = "SELECT TagName FROM NoteTags WHERE NoteId = @NoteId";
+                using (var cmd = new SQLiteCommand(sqlTags, conn))
+                {
+                    cmd.Parameters.AddWithValue("@NoteId", noteId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            note.Tags.Add(SafeGetString(reader, 0));
+                        }
+                    }
+                }
+
+                return note;
+            }
+        }
+
+        /// <summary>
+        /// 保存笔记（新增或更新）
+        /// </summary>
+        public int SaveNote(NoteInfo note)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                using (var transaction = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        int noteId;
+
+                        if (note.Id == 0)
+                        {
+                            // 新增
+                            string insertSql = @"
+                        INSERT INTO Notes (Title, Content, CreatedTime, ModifiedTime)
+                        VALUES (@Title, @Content, @CreatedTime, @ModifiedTime);
+                        SELECT last_insert_rowid();";
+                            using (var cmd = new SQLiteCommand(insertSql, conn))
+                            {
+                                cmd.Parameters.AddWithValue("@Title", note.Title ?? "");
+                                cmd.Parameters.AddWithValue("@Content", note.Content);
+                                cmd.Parameters.AddWithValue("@CreatedTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                                cmd.Parameters.AddWithValue("@ModifiedTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                                noteId = Convert.ToInt32(cmd.ExecuteScalar());
+                            }
+                        }
+                        else
+                        {
+                            // 更新
+                            string updateSql = @"
+                        UPDATE Notes SET Title = @Title, Content = @Content, ModifiedTime = @ModifiedTime WHERE Id = @Id";
+                            using (var cmd = new SQLiteCommand(updateSql, conn))
+                            {
+                                cmd.Parameters.AddWithValue("@Title", note.Title ?? "");
+                                cmd.Parameters.AddWithValue("@Content", note.Content);
+                                cmd.Parameters.AddWithValue("@ModifiedTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                                cmd.Parameters.AddWithValue("@Id", note.Id);
+                                cmd.ExecuteNonQuery();
+                            }
+                            noteId = note.Id;
+
+                            // 删除旧的关联和标签
+                            using (var cmd = new SQLiteCommand("DELETE FROM NoteWorks WHERE NoteId = @NoteId", conn))
+                            {
+                                cmd.Parameters.AddWithValue("@NoteId", noteId);
+                                cmd.ExecuteNonQuery();
+                            }
+                            using (var cmd = new SQLiteCommand("DELETE FROM NoteTags WHERE NoteId = @NoteId", conn))
+                            {
+                                cmd.Parameters.AddWithValue("@NoteId", noteId);
+                                cmd.ExecuteNonQuery();
+                            }
+                        }
+
+                        // 插入作品关联
+                        foreach (int workId in note.WorkIds)
+                        {
+                            using (var cmd = new SQLiteCommand("INSERT INTO NoteWorks (NoteId, WorkId) VALUES (@NoteId, @WorkId)", conn))
+                            {
+                                cmd.Parameters.AddWithValue("@NoteId", noteId);
+                                cmd.Parameters.AddWithValue("@WorkId", workId);
+                                cmd.ExecuteNonQuery();
+                            }
+                        }
+
+                        // 插入标签
+                        foreach (string tag in note.Tags)
+                        {
+                            if (!string.IsNullOrWhiteSpace(tag))
+                            {
+                                using (var cmd = new SQLiteCommand("INSERT INTO NoteTags (NoteId, TagName) VALUES (@NoteId, @TagName)", conn))
+                                {
+                                    cmd.Parameters.AddWithValue("@NoteId", noteId);
+                                    cmd.Parameters.AddWithValue("@TagName", tag.Trim());
+                                    cmd.ExecuteNonQuery();
+                                }
+                            }
+                        }
+
+                        transaction.Commit();
+                        return noteId;
+                    }
+                    catch
+                    {
+                        transaction.Rollback();
+                        return 0;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 删除笔记
+        /// </summary>
+        public bool DeleteNote(int noteId)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "DELETE FROM Notes WHERE Id = @Id";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Id", noteId);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 获取作品列表（用于选择关联作品）
+        /// </summary>
+        public List<WorkListItem> GetWorksForSelection()
+        {
+            var works = new List<WorkListItem>();
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "SELECT Id, Title FROM Works ORDER BY Title";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        works.Add(new WorkListItem
+                        {
+                            Id = SafeGetInt(reader, 0),
+                            Title = SafeGetString(reader, 1)
+                        });
+                    }
+                }
+            }
+            return works;
+        }
+
+        /// <summary>
+        /// 作品列表项
+        /// </summary>
+        public class WorkListItem
+        {
+            public int Id { get; set; }
+            public string Title { get; set; } = "";
+        }
     }
-}    
+}

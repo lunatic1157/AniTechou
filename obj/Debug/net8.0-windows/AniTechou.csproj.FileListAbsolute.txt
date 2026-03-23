@@ -45,3 +45,9 @@ F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\WorkDetailView.baml
 F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\WorkDetailView.g.cs
 F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Windows\EditWorkInfoWindow.baml
 F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Windows\EditWorkInfoWindow.g.cs
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\NoteEditor.baml
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Windows\WorkSelectionDialog.baml
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\NoteEditor.g.cs
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Windows\WorkSelectionDialog.g.cs
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\NotesView.baml
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\NotesView.g.cs

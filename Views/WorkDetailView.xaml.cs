@@ -226,6 +226,17 @@ namespace AniTechou.Views
             }
         }
 
+        private void WriteNote_Click(object sender, RoutedEventArgs e)
+        {
+            var editor = new NoteEditor(_accountName, null, EditorSource.WorkDetail, _workId);
+            // 自动关联当前作品
+            editor.PreSelectWork(_workId);
+            editor.NoteSaved += () => LoadData();
+            editor.NoteCancelled += () => LoadData();
+            var mainWindow = Application.Current.MainWindow as MainWindow;
+            mainWindow?.ShowDetailView(editor);
+        }
+
         private void Back_Click(object sender, RoutedEventArgs e)
         {
             var mainWindow = Application.Current.MainWindow as MainWindow;

@@ -102,6 +102,7 @@ namespace AniTechou.Services
                         -- 笔记表
                         CREATE TABLE Notes (
                             Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            Title TEXT,
                             Content TEXT NOT NULL,
                             CreatedTime DATETIME DEFAULT CURRENT_TIMESTAMP,
                             ModifiedTime DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -161,10 +162,71 @@ namespace AniTechou.Services
         /// <param name="accountName">账号名</param>
         public static void InitializeForAccount(string accountName)
         {
+            System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] InitializeForAccount called for: {accountName}");
+
             string dbPath = GetDatabasePath(accountName);
             if (!File.Exists(dbPath))
             {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Creating new database for: {accountName}");
                 CreateNewDatabase(dbPath);
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Database exists, running migration for: {accountName}");
+                // 迁移：为已有数据库添加缺失的列
+                MigrateDatabase(accountName);
+            }
+        }
+
+        /// <summary>
+        /// 数据库迁移：为旧版本添加新列
+        /// </summary>
+        private static void MigrateDatabase(string accountName)
+        {
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Running migration for account: {accountName}");
+
+                using (var conn = GetConnection(accountName))
+                {
+                    conn.Open();
+
+                    // 检查 Notes 表是否有 Title 列
+                    string checkSql = "PRAGMA table_info(Notes)";
+                    using (var cmd = new SQLiteCommand(checkSql, conn))
+                    {
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            bool hasTitleColumn = false;
+                            while (reader.Read())
+                            {
+                                string columnName = reader.GetString(1);
+                                if (columnName == "Title")
+                                {
+                                    hasTitleColumn = true;
+                                    break;
+                                }
+                            }
+
+                            System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Notes table has Title column: {hasTitleColumn}");
+
+                            if (!hasTitleColumn)
+                            {
+                                // 添加 Title 列
+                                System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding Title column to Notes table...");
+                                using (var cmdAdd = new SQLiteCommand("ALTER TABLE Notes ADD COLUMN Title TEXT", conn))
+                                {
+                                    cmdAdd.ExecuteNonQuery();
+                                }
+                                System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Title column added successfully!");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Migration error: {ex.Message}");
             }
         }
     }
