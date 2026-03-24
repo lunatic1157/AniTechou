@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:AniTechou.Controls"
              Background="White">
-    
+
     <UserControl.Resources>
         <!-- 视图切换按钮样式 -->
         <Style x:Key="ViewToggleButton" TargetType="Button">
@@ -19,14 +19,29 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-        
+
+        <!-- 筛选按钮样式 -->
+        <Style x:Key="FilterButton" TargetType="Button">
+            <Setter Property="Background" Value="#F0E9DD"/>
+            <Setter Property="Foreground" Value="#5C4E3D"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="0,0,5,5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E0D5C0"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- 卡片面板样式（网格布局） -->
         <ItemsPanelTemplate x:Key="GridPanel">
-            <WrapPanel Orientation="Horizontal" 
+            <WrapPanel Orientation="Horizontal"
                        Width="{Binding RelativeSource={RelativeSource AncestorType=ScrollViewer}, Path=ActualWidth}"
                        ItemWidth="290"/>
         </ItemsPanelTemplate>
-        
+
         <!-- 列表面板样式（垂直布局） -->
         <ItemsPanelTemplate x:Key="ListPanel">
             <StackPanel Orientation="Vertical"/>
@@ -39,62 +54,182 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- 顶部工具栏 -->
-        <Border Grid.Row="0" 
-                Background="White" 
-                BorderBrush="#E0D5C0" 
+        <!-- 筛选栏 -->
+        <Border Grid.Row="0"
+                Background="White"
+                BorderBrush="#E0D5C0"
                 BorderThickness="0,0,0,1"
                 Padding="15,10">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+            <StackPanel>
+                <!-- 第一行：类型/状态切换 -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="全部作品"
+                            Tag="all"
+                            Style="{StaticResource FilterButton}"
+                            Click="TypeFilter_Click"
+                            x:Name="AllButton"/>
+                    <Button Content="动画"
+                            Tag="Anime"
+                            Style="{StaticResource FilterButton}"
+                            Click="TypeFilter_Click"
+                            x:Name="AnimeButton"/>
+                    <Button Content="漫画"
+                            Tag="Manga"
+                            Style="{StaticResource FilterButton}"
+                            Click="TypeFilter_Click"
+                            x:Name="MangaButton"/>
+                    <Button Content="轻小说"
+                            Tag="LightNovel"
+                            Style="{StaticResource FilterButton}"
+                            Click="TypeFilter_Click"
+                            x:Name="LightNovelButton"/>
+                    <Button Content="游戏"
+                            Tag="Game"
+                            Style="{StaticResource FilterButton}"
+                            Click="TypeFilter_Click"
+                            x:Name="GameButton"/>
+                </StackPanel>
 
-                <!-- 标题和计数 -->
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock x:Name="TitleText" 
-                               Text="全部作品" 
-                               FontSize="18" 
-                               FontWeight="Bold" 
-                               Foreground="#5C4E3D"/>
-                    <TextBlock x:Name="CountText" 
-                               Text="(0)" 
-                               FontSize="14" 
-                               Foreground="#A89F91" 
-                               VerticalAlignment="Bottom" 
-                               Margin="8,0,0,5"/>
+                <!-- 第二行：状态筛选 -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="全部状态"
+                            Tag="all"
+                            Style="{StaticResource FilterButton}"
+                            Click="StatusFilter_Click"
+                            x:Name="AllStatusButton"/>
+                    <Button Content="想看"
+                            Tag="wish"
+                            Style="{StaticResource FilterButton}"
+                            Click="StatusFilter_Click"
+                            x:Name="WishButton"/>
+                    <Button Content="在看"
+                            Tag="doing"
+                            Style="{StaticResource FilterButton}"
+                            Click="StatusFilter_Click"
+                            x:Name="DoingButton"/>
+                    <Button Content="看过"
+                            Tag="done"
+                            Style="{StaticResource FilterButton}"
+                            Click="StatusFilter_Click"
+                            x:Name="DoneButton"/>
                 </StackPanel>
-                
-                <!-- 右侧按钮区域 -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Content="➕ 添加作品"
-                            Width="100"
-                            Height="30"
-                            Background="#5C4E3D"
-                            Foreground="White"
+
+                <!-- 第三行：年份/季度/原作类型/制作 -->
+                <WrapPanel Margin="0,0,0,10">
+                    <ComboBox x:Name="YearFilter"
+                              Width="80"
+                              Height="28"
+                              Margin="0,0,10,5"
+                              SelectionChanged="YearFilter_Changed">
+                        <ComboBoxItem Content="全部年份" IsSelected="True"/>
+                    </ComboBox>
+
+                    <ComboBox x:Name="SeasonFilter"
+                              Width="70"
+                              Height="28"
+                              Margin="0,0,10,5"
+                              SelectionChanged="SeasonFilter_Changed">
+                        <ComboBoxItem Content="全部季节" IsSelected="True"/>
+                        <ComboBoxItem Content="春"/>
+                        <ComboBoxItem Content="夏"/>
+                        <ComboBoxItem Content="秋"/>
+                        <ComboBoxItem Content="冬"/>
+                    </ComboBox>
+
+                    <ComboBox x:Name="SourceTypeFilter"
+                              Width="90"
+                              Height="28"
+                              Margin="0,0,10,5"
+                              SelectionChanged="SourceTypeFilter_Changed">
+                        <ComboBoxItem Content="全部原作" IsSelected="True"/>
+                        <ComboBoxItem Content="原创"/>
+                        <ComboBoxItem Content="漫改"/>
+                        <ComboBoxItem Content="小说改"/>
+                        <ComboBoxItem Content="游戏改"/>
+                        <ComboBoxItem Content="其他"/>
+                    </ComboBox>
+
+                    <ComboBox x:Name="StudioFilter"
+                              Width="120"
+                              Height="28"
+                              Margin="0,0,10,5"
+                              SelectionChanged="StudioFilter_Changed">
+                        <ComboBoxItem Content="全部制作" IsSelected="True"/>
+                    </ComboBox>
+
+                    <ComboBox x:Name="RatingFilter"
+                              Width="100"
+                              Height="28"
+                              Margin="0,0,10,5"
+                              SelectionChanged="RatingFilter_Changed">
+                        <ComboBoxItem Content="全部评分" IsSelected="True"/>
+                        <ComboBoxItem Content="★ 1-2分"/>
+                        <ComboBoxItem Content="★★ 3-4分"/>
+                        <ComboBoxItem Content="★★★ 5-6分"/>
+                        <ComboBoxItem Content="★★★★ 7-8分"/>
+                        <ComboBoxItem Content="★★★★★ 9-10分"/>
+                    </ComboBox>
+                </WrapPanel>
+
+                <!-- 第四行：标签筛选 -->
+                <WrapPanel x:Name="TagsFilterPanel" Margin="0,0,0,10">
+                    <!-- 标签按钮动态添加 -->
+                </WrapPanel>
+
+                <!-- 第五行：视图切换和添加按钮 -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 清除筛选按钮 -->
+                    <Button Grid.Column="0"
+                            Content="清除筛选"
+                            Width="80" Height="28"
+                            Background="#E0D5C0"
+                            Foreground="#5C4E3D"
                             BorderThickness="0"
-                            Cursor="Hand"
-                            Click="AddWork_Click"/>
-                    <Button x:Name="GridButton" 
-                            Content="▦" 
-                            Width="30" 
-                            Height="30"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Cursor="Hand"
-                            Click="SetGridView_Click"
-                            Margin="5,0,0,0"/>
-                    <Button x:Name="ListButton" 
-                            Content="☰" 
-                            Width="30" 
-                            Height="30"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Cursor="Hand"
-                            Click="SetListView_Click"/>
-                </StackPanel>
-            </Grid>
+                            Click="ClearFilters_Click"/>
+
+                    <!-- 标题和计数 -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                        <TextBlock x:Name="TitleText"
+                                   Text="全部作品"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="#5C4E3D"/>
+                        <TextBlock x:Name="CountText"
+                                   Text="(0)"
+                                   FontSize="14"
+                                   Foreground="#A89F91"
+                                   VerticalAlignment="Bottom"
+                                   Margin="8,0,0,5"/>
+                    </StackPanel>
+
+                    <!-- 右侧按钮组 -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                        <Button Content="➕ 添加作品"
+                                Width="90" Height="30"
+                                Background="#5C4E3D"
+                                Foreground="White"
+                                BorderThickness="0"
+                                Cursor="Hand"
+                                Click="AddWork_Click"
+                                Margin="0,0,5,0"/>
+                        <Button x:Name="GridButton"
+                                Content="▦"
+                                Style="{StaticResource ViewToggleButton}"
+                                Click="SetGridView_Click"
+                                Background="#E0D5C0"/>
+                        <Button x:Name="ListButton"
+                                Content="☰"
+                                Style="{StaticResource ViewToggleButton}"
+                                Click="SetListView_Click"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
         </Border>
 
         <!-- 作品列表区域 -->
@@ -104,7 +239,7 @@
                           ItemsPanel="{StaticResource GridPanel}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <controls:WorkCard 
+                        <controls:WorkCard
                             WorkId="{Binding Id}"
                             Title="{Binding Title}"
                             Info="{Binding Info}"
@@ -127,7 +262,7 @@
                    Foreground="#A89F91"
                    FontSize="14"
                    Visibility="Collapsed"/>
-        
+
         <!-- 空状态提示 -->
         <TextBlock x:Name="EmptyText"
                    Grid.Row="1"

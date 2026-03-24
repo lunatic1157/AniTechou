@@ -6,18 +6,34 @@
 
     <UserControl.Resources>
         <local:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
+
+        <!-- 筛选按钮样式 -->
+        <Style x:Key="FilterButton" TargetType="Button">
+            <Setter Property="Background" Value="#F0E9DD"/>
+            <Setter Property="Foreground" Value="#5C4E3D"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="0,0,5,5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E0D5C0"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        
+
         <!-- 顶部工具栏 -->
-        <Border Grid.Row="0" 
-                Background="White" 
-                BorderBrush="#E0D5C0" 
+        <Border Grid.Row="0"
+                Background="White"
+                BorderBrush="#E0D5C0"
                 BorderThickness="0,0,0,1"
                 Padding="15,10">
             <Grid>
@@ -25,25 +41,63 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                
-                <TextBlock Text="📝 全部笔记" 
-                           FontSize="18" 
-                           FontWeight="Bold" 
-                           Foreground="#5C4E3D"/>
-                
-                <Button Grid.Column="1" 
+
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="📝 全部笔记"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#5C4E3D"/>
+                    <TextBlock x:Name="CountText"
+                               Text="(0)"
+                               FontSize="14"
+                               Foreground="#A89F91"
+                               VerticalAlignment="Bottom"
+                               Margin="8,0,0,5"/>
+                </StackPanel>
+
+                <Button Grid.Column="1"
                         Content="➕ 写笔记"
                         Width="90" Height="30"
-                        Background="#5C4E3D" 
+                        Background="#5C4E3D"
                         Foreground="White"
                         BorderThickness="0"
                         Cursor="Hand"
                         Click="NewNote_Click"/>
             </Grid>
         </Border>
-        
+
+        <!-- 筛选栏 -->
+        <Border Grid.Row="1"
+                Background="White"
+                BorderBrush="#E0D5C0"
+                BorderThickness="0,0,0,1"
+                Padding="15,10">
+            <StackPanel>
+                <!-- 标签筛选 -->
+                <WrapPanel x:Name="TagFilterPanel" Margin="0,0,0,10">
+                    <Button Content="全部" Tag="" Style="{StaticResource FilterButton}" Click="TagFilter_Click"/>
+                    <!-- 标签按钮动态添加 -->
+                </WrapPanel>
+
+                <!-- 搜索框 -->
+                <StackPanel Orientation="Horizontal">
+                    <TextBox x:Name="SearchBox"
+                             Width="250"
+                             Height="30"
+                             Padding="8,5"
+                             ToolTip="搜索笔记标题"/>
+                    <Button Content="搜索"
+                            Width="60" Height="30"
+                            Background="#5C4E3D"
+                            Foreground="White"
+                            Margin="5,0,0,0"
+                            Click="Search_Click"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
         <!-- 笔记列表 -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <ItemsControl x:Name="NotesItemsControl" Margin="15">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
@@ -75,7 +129,6 @@
                                                Foreground="#5C4E3D"
                                                TextWrapping="Wrap"/>
 
-                                    <!-- 作品数量徽章 -->
                                     <Border Grid.Column="1"
                                             Background="#E0D5C0"
                                             CornerRadius="10"
@@ -105,7 +158,7 @@
                                            Foreground="#7F6E5A"
                                            Margin="0,0,0,5"/>
 
-                                <!-- 标签、日期和删除按钮 -->
+                                <!-- 标签和日期 -->
                                 <Grid Grid.Row="3">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -142,20 +195,20 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </ScrollViewer>
-        
+
         <!-- 空状态 -->
         <TextBlock x:Name="EmptyText"
-                   Grid.Row="1"
+                   Grid.Row="2"
                    Text="暂无笔记，点击「写笔记」开始记录～"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
                    Foreground="#A89F91"
                    FontSize="14"
                    Visibility="Collapsed"/>
-        
+
         <!-- 加载中 -->
         <TextBlock x:Name="LoadingText"
-                   Grid.Row="1"
+                   Grid.Row="2"
                    Text="加载中..."
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"

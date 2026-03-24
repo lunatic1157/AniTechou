@@ -66,6 +66,9 @@ namespace AniTechou.Views
                 string year = YearBox.Text.Trim();
                 string season = ((ComboBoxItem)SeasonBox.SelectedItem).Content.ToString();
 
+                // 原作类型
+                string sourceType = ((ComboBoxItem)SourceTypeBox.SelectedItem)?.Content.ToString() ?? "原创";
+
                 var workService = new WorkService(_accountName);
 
                 int workId = workService.AddWork(
@@ -75,6 +78,7 @@ namespace AniTechou.Views
                     CompanyBox.Text.Trim(),
                     year,
                     season,
+                    sourceType,                // 原作类型
                     EpisodesBox.Text.Trim(),
                     ProgressBox.Text.Trim(),
                     statusEn,                  // 英文状态

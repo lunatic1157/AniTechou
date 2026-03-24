@@ -66,13 +66,29 @@
                 </StackPanel>
             </Grid>
             
-            <!-- 制作公司 -->
+            <!-- 原作类型 -->
             <Grid Margin="0,10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="80"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="制作/出版" Foreground="#5C4E3D" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="0" Text="原作类型" Foreground="#5C4E3D" VerticalAlignment="Center"/>
+                <ComboBox x:Name="SourceTypeBox" Grid.Column="1" Height="30" SelectedIndex="0">
+                    <ComboBoxItem Content="原创"/>
+                    <ComboBoxItem Content="漫改"/>
+                    <ComboBoxItem Content="小说改"/>
+                    <ComboBoxItem Content="游戏改"/>
+                    <ComboBoxItem Content="其他"/>
+                </ComboBox>
+            </Grid>
+
+            <!-- 制作 -->
+            <Grid Margin="0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="制作" Foreground="#5C4E3D" VerticalAlignment="Center"/>
                 <TextBox x:Name="CompanyBox" Grid.Column="1" Height="30"/>
             </Grid>
             

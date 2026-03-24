@@ -196,16 +196,6 @@
                     <!-- 笔记中心 -->
                     <TextBlock Text="📝 笔记中心" Style="{StaticResource GroupHeaderStyle}"/>
                     <Button Content="📌 全部笔记" Style="{StaticResource SidebarButtonStyle}" Tag="notes" Click="SidebarMenu_Click"/>
-                    <Button Content="🏷️ 按标签" Style="{StaticResource SidebarButtonStyle}" Tag="tags" Click="SidebarMenu_Click"/>
-
-                    <!-- 最近浏览 -->
-                    <TextBlock Text="🕒 最近浏览" Style="{StaticResource GroupHeaderStyle}"/>
-                    <ListBox x:Name="RecentList" 
-                             Background="Transparent"
-                             BorderThickness="0"
-                             MaxHeight="150"
-                             DisplayMemberPath="Title"
-                             SelectionChanged="RecentList_SelectionChanged"/>
                 </StackPanel>
             </ScrollViewer>
 

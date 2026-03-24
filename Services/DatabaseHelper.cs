@@ -67,8 +67,9 @@ namespace AniTechou.Services
                             OriginalTitle TEXT,
                             Type TEXT CHECK(Type IN ('Anime','Manga','LightNovel','Game')),
                             Company TEXT,
-                            Year INTEGER,
+                            Year TEXT,
                             Season TEXT,
+                            SourceType TEXT,
                             EpisodesVolumes TEXT,
                             Synopsis TEXT,
                             CoverPath TEXT,
@@ -191,42 +192,96 @@ namespace AniTechou.Services
                 {
                     conn.Open();
 
-                    // 检查 Notes 表是否有 Title 列
-                    string checkSql = "PRAGMA table_info(Notes)";
-                    using (var cmd = new SQLiteCommand(checkSql, conn))
+                    // 迁移 Notes 表的 Title 列
+                    MigrateNotesTable(conn);
+
+                    // 迁移 Works 表的 SourceType 列
+                    MigrateWorksTable(conn);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Migration error: {ex.Message}");
+            }
+        }
+
+        private static void MigrateNotesTable(SQLiteConnection conn)
+        {
+            try
+            {
+                string checkSql = "PRAGMA table_info(Notes)";
+                using (var cmd = new SQLiteCommand(checkSql, conn))
+                {
+                    using (var reader = cmd.ExecuteReader())
                     {
-                        using (var reader = cmd.ExecuteReader())
+                        bool hasTitleColumn = false;
+                        while (reader.Read())
                         {
-                            bool hasTitleColumn = false;
-                            while (reader.Read())
+                            string columnName = reader.GetString(1);
+                            if (columnName == "Title")
                             {
-                                string columnName = reader.GetString(1);
-                                if (columnName == "Title")
-                                {
-                                    hasTitleColumn = true;
-                                    break;
-                                }
+                                hasTitleColumn = true;
+                                break;
                             }
+                        }
 
-                            System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Notes table has Title column: {hasTitleColumn}");
+                        System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Notes table has Title column: {hasTitleColumn}");
 
-                            if (!hasTitleColumn)
+                        if (!hasTitleColumn)
+                        {
+                            System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding Title column to Notes table...");
+                            using (var cmdAdd = new SQLiteCommand("ALTER TABLE Notes ADD COLUMN Title TEXT", conn))
                             {
-                                // 添加 Title 列
-                                System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding Title column to Notes table...");
-                                using (var cmdAdd = new SQLiteCommand("ALTER TABLE Notes ADD COLUMN Title TEXT", conn))
-                                {
-                                    cmdAdd.ExecuteNonQuery();
-                                }
-                                System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Title column added successfully!");
+                                cmdAdd.ExecuteNonQuery();
                             }
+                            System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Title column added successfully!");
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Migration error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] MigrateNotesTable error: {ex.Message}");
+            }
+        }
+
+        private static void MigrateWorksTable(SQLiteConnection conn)
+        {
+            try
+            {
+                string checkSql = "PRAGMA table_info(Works)";
+                using (var cmd = new SQLiteCommand(checkSql, conn))
+                {
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        bool hasSourceTypeColumn = false;
+                        while (reader.Read())
+                        {
+                            string columnName = reader.GetString(1);
+                            if (columnName == "SourceType")
+                            {
+                                hasSourceTypeColumn = true;
+                                break;
+                            }
+                        }
+
+                        System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Works table has SourceType column: {hasSourceTypeColumn}");
+
+                        if (!hasSourceTypeColumn)
+                        {
+                            System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding SourceType column to Works table...");
+                            using (var cmdAdd = new SQLiteCommand("ALTER TABLE Works ADD COLUMN SourceType TEXT", conn))
+                            {
+                                cmdAdd.ExecuteNonQuery();
+                            }
+                            System.Diagnostics.Debug.WriteLine("[DatabaseHelper] SourceType column added successfully!");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] MigrateWorksTable error: {ex.Message}");
             }
         }
     }

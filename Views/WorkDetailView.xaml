@@ -45,6 +45,7 @@
                 <StackPanel Grid.Row="0" Grid.Column="1" Margin="15,0,0,0">
                     <TextBlock x:Name="OriginalTitleText" FontSize="14" Foreground="#A89F91"/>
                     <TextBlock x:Name="TypeText" Margin="0,5,0,0"/>
+                    <TextBlock x:Name="SourceTypeText"/>
                     <TextBlock x:Name="CompanyText"/>
                     <TextBlock x:Name="YearText"/>
                     <TextBlock x:Name="EpisodesText"/>
@@ -64,7 +65,17 @@
             <!-- 简介 -->
             <TextBlock Text="简介" FontSize="16" FontWeight="Bold" Foreground="#5C4E3D" Margin="0,20,0,10"/>
             <TextBlock x:Name="SynopsisTextBlock" TextWrapping="Wrap" Foreground="#7F6E5A"/>
-            
+
+            <!-- 标签区域 -->
+            <TextBlock Text="标签" FontSize="16" FontWeight="Bold" Foreground="#5C4E3D" Margin="0,20,0,10"/>
+            <WrapPanel x:Name="TagsPanel" Margin="0,5">
+                <!-- 标签将动态添加 -->
+            </WrapPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,5">
+                <TextBox x:Name="NewTagBox" Width="100" Height="25" Margin="0,0,5,0" ToolTip="输入新标签"/>
+                <Button Content="添加标签" Width="70" Height="25" Click="AddTag_Click"/>
+            </StackPanel>
+
             <!-- 个人状态区域 -->
             <Border Background="#F0E9DD" CornerRadius="8" Padding="15" Margin="0,15">
                 <StackPanel>
@@ -129,7 +140,36 @@
                         Cursor="Hand"
                         Click="WriteNote_Click"/>
             </Grid>
-            <TextBlock Text="暂无笔记" Foreground="#A89F91" Margin="0,5"/>
+            <ItemsControl x:Name="NotesList" Margin="0,5">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="#F8F4E9" CornerRadius="6" Padding="10" Margin="0,0,0,8" Cursor="Hand" MouseLeftButtonUp="NoteItem_Click">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding DisplayTitle}"
+                                               FontWeight="Bold"
+                                               Foreground="#5C4E3D"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding CreatedTimeDisplay}"
+                                               FontSize="10"
+                                               Foreground="#A89F91"/>
+                                </Grid>
+                                <TextBlock Text="{Binding Preview}"
+                                           FontSize="11"
+                                           Foreground="#7F6E5A"
+                                           Margin="0,5,0,0"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock x:Name="NoNotesText" Text="暂无笔记" Foreground="#A89F91" Margin="0,5"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

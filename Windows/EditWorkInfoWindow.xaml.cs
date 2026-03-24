@@ -48,15 +48,24 @@ namespace AniTechou.Windows
                 string season = work.Season ?? "";
                 int seasonIndex = season switch
                 {
-                    "春" => 0,
-                    "夏" => 1,
-                    "秋" => 2,
-                    "冬" => 3,
-                    _ => -1
+                    "春" => 1,
+                    "夏" => 2,
+                    "秋" => 3,
+                    "冬" => 4,
+                    _ => 0
                 };
-                if (seasonIndex >= 0)
+                SeasonBox.SelectedIndex = seasonIndex;
+
+                // 设置原作类型
+                string sourceType = work.SourceType ?? "原创";
+                for (int i = 0; i < SourceTypeBox.Items.Count; i++)
                 {
-                    SeasonBox.SelectedIndex = seasonIndex;
+                    var item = SourceTypeBox.Items[i] as ComboBoxItem;
+                    if (item != null && item.Content.ToString() == sourceType)
+                    {
+                        SourceTypeBox.SelectedIndex = i;
+                        break;
+                    }
                 }
 
                 EpisodesBox.Text = work.EpisodesVolumes ?? "";
@@ -74,6 +83,7 @@ namespace AniTechou.Windows
                 // 分别获取年份和季度
                 string year = YearBox.Text.Trim();
                 string season = (SeasonBox.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "";
+                string sourceType = (SourceTypeBox.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "原创";
 
                 bool success = _workService.UpdateWorkInfo(
                     _workId,
@@ -83,6 +93,7 @@ namespace AniTechou.Windows
                     CompanyBox.Text.Trim(),
                     year,
                     season,
+                    sourceType,
                     EpisodesBox.Text.Trim(),
                     SynopsisBox.Text.Trim()
                 );

@@ -18,6 +18,7 @@ namespace AniTechou.Services
         public DateTime CreatedTime { get; set; }
         public DateTime LastLoginTime { get; set; }
         public string AvatarPath { get; set; }
+        public string Nickname { get; set; }
     }
 
     /// <summary>

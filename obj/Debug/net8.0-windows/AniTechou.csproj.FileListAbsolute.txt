@@ -51,3 +51,5 @@ F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\NoteEditor.g.cs
 F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Windows\WorkSelectionDialog.g.cs
 F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\NotesView.baml
 F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\NotesView.g.cs
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\ProfileView.baml
+F:\AniTechou\AniTechou\obj\Debug\net8.0-windows\Views\ProfileView.g.cs

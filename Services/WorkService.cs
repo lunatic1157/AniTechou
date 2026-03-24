@@ -22,28 +22,111 @@ namespace AniTechou.Services
         /// </summary>
         public async Task<List<WorkCardData>> GetWorksAsync(string type, string status)
         {
+            return await GetWorksAsync(type, status, "全部年份", "全部季节", "全部原作", "全部制作", "全部评分", new List<string>());
+        }
+
+        /// <summary>
+        /// 获取作品列表（支持所有筛选条件）
+        /// </summary>
+        public async Task<List<WorkCardData>> GetWorksAsync(string type, string status, string year, string season,
+                                                     string sourceType, string studio, string rating, List<string> tags)
+        {
             return await Task.Run(() =>
             {
                 var works = new List<WorkCardData>();
-                
+
                 using (var conn = DatabaseHelper.GetConnection(_currentAccount))
                 {
                     conn.Open();
 
                     string sql = @"
                         SELECT w.Id, w.Title, w.Year, w.Company, w.CoverPath,
-                            ul.Progress, ul.Rating
+                               ul.Progress, ul.Rating
                         FROM Works w
                         INNER JOIN UserList ul ON w.Id = ul.WorkId
-                        WHERE (@Type = 'all' OR w.Type = @Type)
-                        AND (@Status = 'all' OR ul.Status = @Status)
-                        ORDER BY ul.LastUpdated DESC";
+                        WHERE 1=1";
+
+                    var parameters = new List<SQLiteParameter>();
+
+                    // 类型筛选
+                    if (type != "all")
+                    {
+                        sql += " AND w.Type = @Type";
+                        parameters.Add(new SQLiteParameter("@Type", type));
+                    }
+
+                    // 状态筛选
+                    if (status != "all")
+                    {
+                        sql += " AND ul.Status = @Status";
+                        parameters.Add(new SQLiteParameter("@Status", status));
+                    }
+
+                    // 年份筛选
+                    if (year != "全部年份" && !string.IsNullOrEmpty(year))
+                    {
+                        sql += " AND w.Year LIKE @Year";
+                        parameters.Add(new SQLiteParameter("@Year", $"{year}%"));
+                    }
+
+                    // 季节筛选
+                    if (season != "全部季节" && !string.IsNullOrEmpty(season))
+                    {
+                        sql += " AND w.Season = @Season";
+                        parameters.Add(new SQLiteParameter("@Season", season));
+                    }
+
+                    // 原作类型筛选
+                    if (sourceType != "全部原作" && !string.IsNullOrEmpty(sourceType))
+                    {
+                        sql += " AND w.SourceType = @SourceType";
+                        parameters.Add(new SQLiteParameter("@SourceType", sourceType));
+                    }
+
+                    // 制作公司筛选
+                    if (studio != "全部制作" && !string.IsNullOrEmpty(studio))
+                    {
+                        sql += " AND w.Company = @Studio";
+                        parameters.Add(new SQLiteParameter("@Studio", studio));
+                    }
+
+                    // 评分筛选
+                    if (rating != "全部评分" && !string.IsNullOrEmpty(rating))
+                    {
+                        int minRating = rating switch
+                        {
+                            "★ 1-2分" => 1,
+                            "★★ 3-4分" => 3,
+                            "★★★ 5-6分" => 5,
+                            "★★★★ 7-8分" => 7,
+                            "★★★★★ 9-10分" => 9,
+                            _ => 0
+                        };
+                        int maxRating = minRating + 1;
+                        sql += " AND ul.Rating >= @MinRating AND ul.Rating <= @MaxRating";
+                        parameters.Add(new SQLiteParameter("@MinRating", minRating));
+                        parameters.Add(new SQLiteParameter("@MaxRating", maxRating));
+                    }
+
+                    // 标签筛选
+                    if (tags != null && tags.Count > 0)
+                    {
+                        sql += " AND EXISTS (SELECT 1 FROM WorkTags wt WHERE wt.WorkId = w.Id AND wt.TagName IN (";
+                        for (int i = 0; i < tags.Count; i++)
+                        {
+                            sql += $"@Tag{i}";
+                            if (i < tags.Count - 1) sql += ",";
+                            parameters.Add(new SQLiteParameter($"@Tag{i}", tags[i]));
+                        }
+                        sql += "))";
+                    }
+
+                    sql += " ORDER BY ul.LastUpdated DESC";
 
                     using (var cmd = new SQLiteCommand(sql, conn))
                     {
-                        cmd.Parameters.AddWithValue("@Type", type);
-                        cmd.Parameters.AddWithValue("@Status", status);
-                        
+                        cmd.Parameters.AddRange(parameters.ToArray());
+
                         using (var reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
@@ -62,9 +145,163 @@ namespace AniTechou.Services
                         }
                     }
                 }
-                
+
                 return works;
             });
+        }
+
+        /// <summary>
+        /// 获取所有年份
+        /// </summary>
+        public List<string> GetAllYears()
+        {
+            var years = new List<string>();
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "SELECT DISTINCT Year FROM Works WHERE Year IS NOT NULL AND Year != '' ORDER BY Year DESC";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        years.Add(SafeGetString(reader, 0));
+                    }
+                }
+            }
+            return years;
+        }
+
+        /// <summary>
+        /// 获取所有制作公司
+        /// </summary>
+        public List<string> GetAllStudios()
+        {
+            var studios = new List<string>();
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "SELECT DISTINCT Company FROM Works WHERE Company IS NOT NULL AND Company != '' ORDER BY Company";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        studios.Add(SafeGetString(reader, 0));
+                    }
+                }
+            }
+            return studios;
+        }
+
+        /// <summary>
+        /// 获取所有标签
+        /// </summary>
+        public List<string> GetAllTags()
+        {
+            var tags = new List<string>();
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "SELECT DISTINCT TagName FROM WorkTags ORDER BY TagName";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        tags.Add(SafeGetString(reader, 0));
+                    }
+                }
+            }
+            return tags;
+        }
+
+        /// <summary>
+        /// 获取所有笔记标签
+        /// </summary>
+        public List<string> GetAllNoteTags()
+        {
+            var tags = new List<string>();
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "SELECT DISTINCT TagName FROM NoteTags ORDER BY TagName";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        tags.Add(SafeGetString(reader, 0));
+                    }
+                }
+            }
+            return tags;
+        }
+
+        /// <summary>
+        /// 获取作品的所有标签
+        /// </summary>
+        public List<string> GetWorkTags(int workId)
+        {
+            var tags = new List<string>();
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "SELECT TagName FROM WorkTags WHERE WorkId = @WorkId ORDER BY TagName";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            tags.Add(SafeGetString(reader, 0));
+                        }
+                    }
+                }
+            }
+            return tags;
+        }
+
+        /// <summary>
+        /// 添加作品标签
+        /// </summary>
+        public bool AddWorkTag(int workId, string tagName, string category = "个人", string source = "Manual")
+        {
+            if (string.IsNullOrWhiteSpace(tagName)) return false;
+
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = @"INSERT OR IGNORE INTO WorkTags (WorkId, TagName, Category, Source)
+                        VALUES (@WorkId, @TagName, @Category, @Source)";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    cmd.Parameters.AddWithValue("@TagName", tagName.Trim());
+                    cmd.Parameters.AddWithValue("@Category", category);
+                    cmd.Parameters.AddWithValue("@Source", source);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 删除作品标签
+        /// </summary>
+        public bool RemoveWorkTag(int workId, string tagName)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "DELETE FROM WorkTags WHERE WorkId = @WorkId AND TagName = @TagName";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    cmd.Parameters.AddWithValue("@TagName", tagName);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
         }
 
         /// <summary>
@@ -139,7 +376,7 @@ namespace AniTechou.Services
         /// 添加新作品
         /// </summary>
         public int AddWork(string title, string originalTitle, string type, string company,
-                   string year, string season, string episodesVolumes, string progress,
+                   string year, string season, string sourceType, string episodesVolumes, string progress,
                    string status, int rating, string synopsis, string coverPath)
         {
             try
@@ -163,8 +400,8 @@ namespace AniTechou.Services
 
                             // 插入作品
                             string insertWork = @"
-                        INSERT INTO Works (Title, OriginalTitle, Type, Company, Year, Season, EpisodesVolumes, Synopsis, CoverPath, AddedTime, LastModified)
-                        VALUES (@Title, @OriginalTitle, @Type, @Company, @Year, @Season, @EpisodesVolumes, @Synopsis, @CoverPath, @AddedTime, @LastModified);
+                        INSERT INTO Works (Title, OriginalTitle, Type, Company, Year, Season, SourceType, EpisodesVolumes, Synopsis, CoverPath, AddedTime, LastModified)
+                        VALUES (@Title, @OriginalTitle, @Type, @Company, @Year, @Season, @SourceType, @EpisodesVolumes, @Synopsis, @CoverPath, @AddedTime, @LastModified);
                         SELECT last_insert_rowid();";
 
                             int workId;
@@ -176,6 +413,7 @@ namespace AniTechou.Services
                                 cmd.Parameters.AddWithValue("@Company", company ?? "");
                                 cmd.Parameters.AddWithValue("@Year", yearValue);
                                 cmd.Parameters.AddWithValue("@Season", season ?? "");
+                                cmd.Parameters.AddWithValue("@SourceType", sourceType ?? "");
                                 cmd.Parameters.AddWithValue("@EpisodesVolumes", episodesVolumes ?? "");
                                 cmd.Parameters.AddWithValue("@Synopsis", synopsis ?? "");
                                 cmd.Parameters.AddWithValue("@CoverPath", coverPath ?? "");
@@ -221,7 +459,7 @@ namespace AniTechou.Services
             using (var conn = DatabaseHelper.GetConnection(_currentAccount))
             {
                 conn.Open();
-                string sql = @"SELECT Id, Title, OriginalTitle, Type, Company, Year, Season, EpisodesVolumes, Synopsis, CoverPath
+                string sql = @"SELECT Id, Title, OriginalTitle, Type, Company, Year, Season, SourceType, EpisodesVolumes, Synopsis, CoverPath
                                FROM Works WHERE Id = @Id";
                 using (var cmd = new SQLiteCommand(sql, conn))
                 {
@@ -239,9 +477,10 @@ namespace AniTechou.Services
                                 Company = SafeGetString(reader, 4),
                                 Year = SafeGetString(reader, 5),
                                 Season = SafeGetString(reader, 6),
-                                EpisodesVolumes = SafeGetString(reader, 7),
-                                Synopsis = SafeGetString(reader, 8),
-                                CoverPath = SafeGetString(reader, 9)
+                                SourceType = SafeGetString(reader, 7),
+                                EpisodesVolumes = SafeGetString(reader, 8),
+                                Synopsis = SafeGetString(reader, 9),
+                                CoverPath = SafeGetString(reader, 10)
                             };
                         }
                     }
@@ -324,6 +563,7 @@ namespace AniTechou.Services
             public string Company { get; set; } = "";
             public string Year { get; set; } = "";
             public string Season { get; set; } = "";
+            public string SourceType { get; set; } = "";
             public string EpisodesVolumes { get; set; } = "";
             public string Synopsis { get; set; } = "";
             public string CoverPath { get; set; } = "";
@@ -345,7 +585,7 @@ namespace AniTechou.Services
 
         public bool UpdateWorkInfo(int workId, string title, string originalTitle,
                            string type, string company, string year, string season,
-                           string episodesVolumes, string synopsis)
+                           string sourceType, string episodesVolumes, string synopsis)
         {
             try
             {
@@ -360,6 +600,7 @@ namespace AniTechou.Services
                     Company = @Company,
                     Year = @Year,
                     Season = @Season,
+                    SourceType = @SourceType,
                     EpisodesVolumes = @EpisodesVolumes,
                     Synopsis = @Synopsis,
                     LastModified = @LastModified
@@ -373,6 +614,7 @@ namespace AniTechou.Services
                         cmd.Parameters.AddWithValue("@Company", company ?? "");
                         cmd.Parameters.AddWithValue("@Year", year ?? "");
                         cmd.Parameters.AddWithValue("@Season", season ?? "");
+                        cmd.Parameters.AddWithValue("@SourceType", sourceType ?? "");
                         cmd.Parameters.AddWithValue("@EpisodesVolumes", episodesVolumes ?? "");
                         cmd.Parameters.AddWithValue("@Synopsis", synopsis ?? "");
                         cmd.Parameters.AddWithValue("@LastModified", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -418,11 +660,11 @@ namespace AniTechou.Services
             public string Tags { get; set; } = "";
             public int WorkCount { get; set; }
             public List<string> WorkTitles { get; set; } = new List<string>();
+            public List<int> WorkIds { get; set; } = new List<int>();
 
             // 显示属性
-            public string DisplayTitle => string.IsNullOrEmpty(Title) ? "无标题" : Title;
-            public string DisplayContent => string.IsNullOrEmpty(Content) ? "" :
-                (Content.Length > 80 ? Content.Substring(0, 80) + "..." : Content);
+            public string DisplayTitle { get; set; } = "";
+            public string DisplayContent { get; set; } = "";
             public string CreatedTimeDisplay { get; set; } = "";
             public string TagsDisplay { get; set; } = "";
             public bool HasTags { get; set; }
@@ -459,18 +701,20 @@ namespace AniTechou.Services
                         int noteId = SafeGetInt(reader, 0);
                         int workCount = SafeGetInt(reader, 5);
 
-                        // 获取关联作品标题
+                        // 获取关联作品标题和ID
                         var workTitles = new List<string>();
+                        var workIds = new List<int>();
                         if (workCount > 0)
                         {
-                            using (var cmdWorks = new SQLiteCommand("SELECT w.Title FROM Works w INNER JOIN NoteWorks nw ON w.Id = nw.WorkId WHERE nw.NoteId = @NoteId", conn))
+                            using (var cmdWorks = new SQLiteCommand("SELECT w.Id, w.Title FROM Works w INNER JOIN NoteWorks nw ON w.Id = nw.WorkId WHERE nw.NoteId = @NoteId", conn))
                             {
                                 cmdWorks.Parameters.AddWithValue("@NoteId", noteId);
                                 using (var readerWorks = cmdWorks.ExecuteReader())
                                 {
                                     while (readerWorks.Read())
                                     {
-                                        workTitles.Add(SafeGetString(readerWorks, 0));
+                                        workIds.Add(SafeGetInt(readerWorks, 0));
+                                        workTitles.Add(SafeGetString(readerWorks, 1));
                                     }
                                 }
                             }
@@ -485,7 +729,9 @@ namespace AniTechou.Services
                             CreatedTime = DateTime.Parse(SafeGetString(reader, 3)),
                             Tags = SafeGetString(reader, 4) ?? "",
                             WorkCount = workCount,
-                            WorkTitles = workTitles
+                            WorkTitles = workTitles,
+                            WorkIds = workIds,
+                            DisplayTitle = string.IsNullOrEmpty(title) ? "无标题" : title
                         });
                     }
                 }
@@ -703,6 +949,220 @@ namespace AniTechou.Services
         {
             public int Id { get; set; }
             public string Title { get; set; } = "";
+        }
+
+        /// <summary>
+        /// 个人资料统计
+        /// </summary>
+        public class ProfileStats
+        {
+            public int AnimeCount { get; set; }
+            public int MangaCount { get; set; }
+            public int GameCount { get; set; }
+            public int TotalWorks { get; set; }
+            public int TotalNotes { get; set; }
+            public Dictionary<int, int> YearStats { get; set; } = new Dictionary<int, int>();
+            public Dictionary<string, int> TagStats { get; set; } = new Dictionary<string, int>();
+        }
+
+        /// <summary>
+        /// 获取个人统计数据
+        /// </summary>
+        public ProfileStats GetStats()
+        {
+            var stats = new ProfileStats();
+
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+
+                // 统计各类型作品数量
+                string typeSql = @"
+                    SELECT w.Type, COUNT(*) as Count
+                    FROM Works w
+                    INNER JOIN UserList ul ON w.Id = ul.WorkId
+                    GROUP BY w.Type";
+                using (var cmd = new SQLiteCommand(typeSql, conn))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        string type = SafeGetString(reader, 0);
+                        int count = SafeGetInt(reader, 1);
+                        switch (type)
+                        {
+                            case "Anime":
+                                stats.AnimeCount = count;
+                                break;
+                            case "Manga":
+                                stats.MangaCount = count;
+                                break;
+                            case "LightNovel":
+                                // 可以添加轻小说统计
+                                break;
+                            case "Game":
+                                stats.GameCount = count;
+                                break;
+                        }
+                    }
+                }
+
+                stats.TotalWorks = stats.AnimeCount + stats.MangaCount + stats.GameCount;
+
+                // 统计笔记数量
+                string noteCountSql = "SELECT COUNT(*) FROM Notes";
+                using (var cmd = new SQLiteCommand(noteCountSql, conn))
+                {
+                    stats.TotalNotes = Convert.ToInt32(cmd.ExecuteScalar());
+                }
+
+                // 年度统计
+                string yearSql = @"
+                    SELECT w.Year, COUNT(*) as Count
+                    FROM Works w
+                    INNER JOIN UserList ul ON w.Id = ul.WorkId
+                    WHERE w.Year IS NOT NULL AND w.Year != ''
+                    GROUP BY w.Year
+                    ORDER BY w.Year DESC";
+                using (var cmd = new SQLiteCommand(yearSql, conn))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        string yearStr = SafeGetString(reader, 0);
+                        int count = SafeGetInt(reader, 1);
+                        if (int.TryParse(yearStr, out int year) && year > 0)
+                        {
+                            stats.YearStats[year] = count;
+                        }
+                    }
+                }
+
+                // 标签统计
+                string tagSql = @"
+                    SELECT TagName, COUNT(*) as Count
+                    FROM WorkTags
+                    GROUP BY TagName
+                    ORDER BY Count DESC
+                    LIMIT 50";
+                using (var cmd = new SQLiteCommand(tagSql, conn))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        string tag = SafeGetString(reader, 0);
+                        int count = SafeGetInt(reader, 1);
+                        stats.TagStats[tag] = count;
+                    }
+                }
+            }
+
+            return stats;
+        }
+
+        /// <summary>
+        /// 获取账户信息
+        /// </summary>
+        public AccountInfo GetAccountInfo()
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "SELECT Username, Nickname, CreatedTime FROM Accounts WHERE Username = @Username";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Username", _currentAccount);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return new AccountInfo
+                            {
+                                Username = SafeGetString(reader, 0),
+                                Nickname = SafeGetString(reader, 1),
+                                CreatedTime = DateTime.Parse(SafeGetString(reader, 2))
+                            };
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 更新昵称
+        /// </summary>
+        public bool UpdateNickname(string nickname)
+        {
+            try
+            {
+                using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+                {
+                    conn.Open();
+
+                    // 创建 AccountInfo 表（如果不存在）
+                    string createTable = @"
+                        CREATE TABLE IF NOT EXISTS AccountInfo (
+                            Id INTEGER PRIMARY KEY,
+                            Nickname TEXT,
+                            AvatarPath TEXT
+                        )";
+                    using (var cmd = new SQLiteCommand(createTable, conn))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    // 插入或更新昵称
+                    string sql = @"
+                        INSERT OR REPLACE INTO AccountInfo (Id, Nickname)
+                        VALUES (1, @Nickname)";
+                    using (var cmd = new SQLiteCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@Nickname", nickname);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"UpdateNickname error: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 获取昵称
+        /// </summary>
+        public string GetNickname()
+        {
+            try
+            {
+                using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+                {
+                    conn.Open();
+                    string sql = "SELECT Nickname FROM AccountInfo WHERE Id = 1";
+                    using (var cmd = new SQLiteCommand(sql, conn))
+                    {
+                        var result = cmd.ExecuteScalar();
+                        return result?.ToString() ?? "";
+                    }
+                }
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        /// <summary>
+        /// 账户信息
+        /// </summary>
+        public class AccountInfo
+        {
+            public string Username { get; set; } = "";
+            public string Nickname { get; set; } = "";
+            public DateTime CreatedTime { get; set; }
         }
     }
 }

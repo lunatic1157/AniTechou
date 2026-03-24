@@ -40,8 +40,6 @@ namespace AniTechou
                 };
             }
 
-            LoadRecentItems();
-            
             // 确保AI面板默认展开
             _isAIPanelVisible = true;
             AIPanelColumn.Width = new GridLength(320);
@@ -91,17 +89,6 @@ namespace AniTechou
             // 可选：更新窗口标题或用户信息
         }
 
-        private void LoadRecentItems()
-        {
-            var recent = new List<dynamic>
-            {
-                new { Title = "葬送的芙莉莲" },
-                new { Title = "孤独摇滚" },
-                new { Title = "我独自升级" }
-            };
-            RecentList.ItemsSource = recent;
-        }
-        
         private void ShowLoginWindow()
         {
             var loginWindow = new LoginWindow(_accountManager);
@@ -172,20 +159,29 @@ namespace AniTechou
             }
         }
 
-        private void RecentList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            var selected = RecentList.SelectedItem;
-            if (selected != null)
-            {
-                MessageBox.Show($"打开：{selected.GetType().GetProperty("Title")?.GetValue(selected)}");
-                RecentList.SelectedItem = null;
-            }
-        }
-
         // ========== 顶部栏功能 ==========
         private void Profile_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("打开个人主页");
+            ShowProfile();
+        }
+
+        public void ShowProfile()
+        {
+            if (string.IsNullOrEmpty(_currentAccountName)) return;
+            var profileView = new Views.ProfileView(_currentAccountName);
+            MainContentArea.Content = profileView;
+            ContentPlaceholder.Visibility = Visibility.Collapsed;
+            MainContentArea.Visibility = Visibility.Visible;
+        }
+
+        public void ShowWorksWithTag(string tag)
+        {
+            if (string.IsNullOrEmpty(_currentAccountName)) return;
+            var worksView = new Views.WorksView(_currentAccountName, "all", "all");
+            worksView.SetTagFilter(tag);
+            MainContentArea.Content = worksView;
+            ContentPlaceholder.Visibility = Visibility.Collapsed;
+            MainContentArea.Visibility = Visibility.Visible;
         }
 
         private void Settings_Click(object sender, RoutedEventArgs e)

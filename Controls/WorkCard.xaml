@@ -66,7 +66,7 @@
                         TextWrapping="Wrap"
                         MaxHeight="40"/>
 
-                <!-- 年份和制作公司 -->
+                <!-- 年份和制作 -->
                 <TextBlock x:Name="InfoTextBlock" 
                         Text="{Binding Info}"
                         FontSize="11" 
