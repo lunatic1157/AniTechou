@@ -5,6 +5,18 @@
              Background="White">
 
     <UserControl.Resources>
+        <!-- 搜索框样式 -->
+        <Style x:Key="SearchTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Padding" Value="5,0"/>
+            <Setter Property="BorderBrush" Value="#E0D5C0"/>
+            <Setter Property="Background" Value="#F8F4ED"/>
+            <Style.Triggers>
+                <Trigger Property="IsFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="#8B7E66"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        
         <!-- 视图切换按钮样式 -->
         <Style x:Key="ViewToggleButton" TargetType="Button">
             <Setter Property="Width" Value="30"/>
@@ -169,12 +181,40 @@
                         <ComboBoxItem Content="★★★★ 7-8分"/>
                         <ComboBoxItem Content="★★★★★ 9-10分"/>
                     </ComboBox>
+
+                    <!-- 标签搜索框 -->
+                    <TextBox x:Name="TagSearchBox"
+                             Width="150"
+                             Height="28"
+                             Margin="0,0,10,5"
+                             VerticalContentAlignment="Center"
+                             Tag="搜索标签..."
+                             TextChanged="TagSearch_TextChanged"
+                             Style="{StaticResource SearchTextBoxStyle}"/>
                 </WrapPanel>
 
                 <!-- 第四行：标签筛选 -->
-                <WrapPanel x:Name="TagsFilterPanel" Margin="0,0,0,10">
-                    <!-- 标签按钮动态添加 -->
-                </WrapPanel>
+                <StackPanel Margin="0,0,0,10">
+                    <ItemsControl x:Name="TagsFilterItemsControl"
+                                  MaxHeight="100">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                    
+                    <Button x:Name="ExpandTagsButton"
+                            Content="展开更多 ▼"
+                            HorizontalAlignment="Left"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="#8B7E66"
+                            Cursor="Hand"
+                            Margin="0,5,0,0"
+                            Click="ExpandTags_Click"
+                            Visibility="Collapsed"/>
+                </StackPanel>
 
                 <!-- 第五行：视图切换和添加按钮 -->
                 <Grid>

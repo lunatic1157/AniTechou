@@ -39,8 +39,24 @@ namespace AniTechou.Services
         /// <returns>SQLite数据库连接对象</returns>
         public static SQLiteConnection GetConnection(string accountName)
         {
-            string dbPath = GetDatabasePath(accountName);
-            return new SQLiteConnection($"Data Source={dbPath};Version=3;");
+            try
+            {
+                string dbPath = GetDatabasePath(accountName);
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] GetConnection - Account: {accountName}, Path: {dbPath}, Exists: {File.Exists(dbPath)}");
+
+                if (!File.Exists(dbPath))
+                {
+                    System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Database file does not exist, creating new one: {dbPath}");
+                    CreateNewDatabase(dbPath);
+                }
+
+                return new SQLiteConnection($"Data Source={dbPath};Version=3;Foreign Keys=On;");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] GetConnection error: {ex.Message}");
+                throw;
+            }
         }
 
         /// <summary>
@@ -83,7 +99,7 @@ namespace AniTechou.Services
                             WorkId INTEGER NOT NULL,
                             Status TEXT CHECK(Status IN ('wish','doing','done')) DEFAULT 'wish',
                             Progress TEXT,
-                            Rating INTEGER CHECK(Rating BETWEEN 1 AND 10),
+                            Rating INTEGER CHECK(Rating BETWEEN 0 AND 10),
                             StartedDate DATETIME,
                             FinishedDate DATETIME,
                             LastUpdated DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -163,19 +179,26 @@ namespace AniTechou.Services
         /// <param name="accountName">账号名</param>
         public static void InitializeForAccount(string accountName)
         {
-            System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] InitializeForAccount called for: {accountName}");
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] InitializeForAccount called for: {accountName}");
 
-            string dbPath = GetDatabasePath(accountName);
-            if (!File.Exists(dbPath))
-            {
-                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Creating new database for: {accountName}");
-                CreateNewDatabase(dbPath);
+                string dbPath = GetDatabasePath(accountName);
+                if (!File.Exists(dbPath))
+                {
+                    System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Creating new database for: {accountName}");
+                    CreateNewDatabase(dbPath);
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Database exists, running migration for: {accountName}");
+                    // 迁移：为已有数据库添加缺失的列
+                    MigrateDatabase(accountName);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Database exists, running migration for: {accountName}");
-                // 迁移：为已有数据库添加缺失的列
-                MigrateDatabase(accountName);
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] InitializeForAccount error: {ex.Message}");
             }
         }
 

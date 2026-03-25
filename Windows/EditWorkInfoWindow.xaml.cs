@@ -70,6 +70,21 @@ namespace AniTechou.Windows
 
                 EpisodesBox.Text = work.EpisodesVolumes ?? "";
                 SynopsisBox.Text = work.Synopsis ?? "";
+                CoverPathBox.Text = work.CoverPath ?? "";
+            }
+        }
+
+        private void BrowseCover_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "选择封面图片",
+                Filter = "图片文件|*.jpg;*.jpeg;*.png;*.webp;*.bmp|所有文件|*.*"
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                CoverPathBox.Text = dialog.FileName;
             }
         }
 
@@ -95,7 +110,8 @@ namespace AniTechou.Windows
                     season,
                     sourceType,
                     EpisodesBox.Text.Trim(),
-                    SynopsisBox.Text.Trim()
+                    SynopsisBox.Text.Trim(),
+                    CoverPathBox.Text.Trim()
                 );
 
                 if (success)

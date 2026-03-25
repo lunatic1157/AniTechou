@@ -135,9 +135,9 @@ namespace AniTechou.Services
         /// </summary>
         private void SaveLastAccount(string userName)
         {
-            var config = new { LastAccount = userName };
-            var json = JsonSerializer.Serialize(config);
-            File.WriteAllText(_configFile, json);
+            var config = ConfigManager.Load();
+            config.LastAccount = userName;
+            ConfigManager.Save(config);
         }
 
         /// <summary>
@@ -145,20 +145,8 @@ namespace AniTechou.Services
         /// </summary>
         private string LoadLastAccount()
         {
-            if (!File.Exists(_configFile)) return null;
-
-            try
-            {
-                var json = File.ReadAllText(_configFile);
-                using var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("LastAccount", out var element))
-                {
-                    return element.GetString();
-                }
-            }
-            catch { }
-
-            return null;
+            var config = ConfigManager.Load();
+            return config.LastAccount;
         }
 
         /// <summary>
@@ -298,7 +286,10 @@ namespace AniTechou.Services
         public void Logout()
         {
             _currentAccount = null;
-            // 不清除最后登录记录，下次启动还是这个账号
+            // 清除自动登录配置
+            var config = ConfigManager.Load();
+            config.AutoLogin = false;
+            ConfigManager.Save(config);
         }
 
         /// <summary>

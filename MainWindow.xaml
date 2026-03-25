@@ -11,6 +11,13 @@
         ResizeMode="CanResizeWithGrip">
     
     <Window.Resources>
+        <!-- 颜色资源 -->
+        <SolidColorBrush x:Key="5C4E3D" Color="#5C4E3D"/>
+        <SolidColorBrush x:Key="7F6E5A" Color="#7F6E5A"/>
+        <SolidColorBrush x:Key="A89F91" Color="#A89F91"/>
+        <SolidColorBrush x:Key="E0D5C0" Color="#E0D5C0"/>
+        <SolidColorBrush x:Key="F8F4E9" Color="#F8F4E9"/>
+
         <!-- 分割条样式 -->
         <Style TargetType="GridSplitter">
             <Setter Property="Background" Value="#E0D5C0"/>
@@ -132,6 +139,10 @@
 
                 <!-- 右侧按钮区 -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Content="📊 核查"
+                            Style="{StaticResource TopBarButton}"
+                            Click="RunAudit_Click"
+                            ToolTip="运行数据库封面数据核查"/>
                     <Button x:Name="AIAssistantButton"
                             Content="🤖 AI助手"
                             Style="{StaticResource TopBarButton}"
@@ -249,39 +260,41 @@
                 </ScrollViewer>
 
                 <!-- 输入区域（底部） -->
-                <Border Grid.Row="2" 
-                        Background="#F0E9DD" 
-                        BorderBrush="#E0D5C0" 
+                <Border Grid.Row="2"
+                        Background="#F0E9DD"
+                        BorderBrush="#E0D5C0"
                         BorderThickness="0,1,0,0"
                         Padding="10">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <TextBox x:Name="AIChatInputBox"
-                                 Grid.Column="0"
-                                 Height="35"
-                                 Padding="8,5"
-                                 TextWrapping="Wrap"
-                                 FontSize="13"
-                                 Background="White"
-                                 ToolTip="输入你想问的问题..."
-                                 VerticalAlignment="Center"
-                                 KeyDown="AIChatInputBox_KeyDown"/>
-                        
-                        <Button Grid.Column="1"
-                                Content="发送"
-                                Width="60"
-                                Height="32"
-                                Margin="8,0,0,0"
-                                Background="#5C4E3D"
-                                Foreground="White"
-                                BorderThickness="0"
-                                Cursor="Hand"
-                                Click="SendAIChat_Click"/>
-                    </Grid>
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox x:Name="AIChatInputBox"
+                                     Grid.Column="0"
+                                     Height="35"
+                                     Padding="8,5"
+                                     TextWrapping="Wrap"
+                                     FontSize="13"
+                                     Background="White"
+                                     ToolTip="输入你想问的问题..."
+                                     VerticalAlignment="Center"
+                                     KeyDown="AIChatInputBox_KeyDown"/>
+
+                            <Button Grid.Column="1"
+                                    Content="发送"
+                                    Width="60"
+                                    Height="32"
+                                    Margin="8,0,0,0"
+                                    Background="#5C4E3D"
+                                    Foreground="White"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    Click="SendAIChat_Click"/>
+                        </Grid>
+                    </StackPanel>
                 </Border>
             </Grid>
         </Grid>

@@ -7,6 +7,8 @@ using System.Windows.Media;
 using AniTechou.Controls;
 using AniTechou.Services;
 
+using System.Windows.Threading;
+
 namespace AniTechou.Views
 {
     public partial class WorksView : UserControl
@@ -22,6 +24,9 @@ namespace AniTechou.Views
         private List<string> _selectedTags = new List<string>();
         private bool _isGridView = true;
         private bool _isInitializing = true;
+        private bool _isTagsExpanded = false;
+        private DispatcherTimer _tagSearchTimer;
+        private List<string> _allTags = new List<string>();
 
         private SolidColorBrush _selectedBrush = new SolidColorBrush(Color.FromRgb(224, 213, 192));
         private SolidColorBrush _normalBrush = new SolidColorBrush(Color.FromRgb(240, 233, 221));
@@ -32,27 +37,14 @@ namespace AniTechou.Views
         public void SetTagFilter(string tag)
         {
             // 先重新加载标签（确保包含目标标签）
-            LoadTagFilters();
+            _allTags = _workService.GetAllTags();
 
             // 选中目标标签
             _selectedTags.Clear();
             _selectedTags.Add(tag);
 
-            // 更新按钮样式
-            foreach (var child in TagsFilterPanel.Children)
-            {
-                if (child is Button btn)
-                {
-                    if (btn.Tag?.ToString() == tag)
-                    {
-                        btn.Background = _selectedBrush;
-                    }
-                    else
-                    {
-                        btn.Background = _normalBrush;
-                    }
-                }
-            }
+            // 重新显示
+            FilterAndDisplayTags();
 
             // 加载数据
             LoadWorks();
@@ -64,6 +56,11 @@ namespace AniTechou.Views
             _workService = new WorkService(accountName);
             _currentType = type;
             _currentStatus = status;
+
+            // 初始化搜索定时器
+            _tagSearchTimer = new DispatcherTimer();
+            _tagSearchTimer.Interval = TimeSpan.FromMilliseconds(300);
+            _tagSearchTimer.Tick += TagSearchTimer_Tick;
 
             // 加载年份选项
             LoadYearOptions();
@@ -114,21 +111,57 @@ namespace AniTechou.Views
 
         private void LoadTagFilters()
         {
-            var tags = _workService.GetAllTags();
-            TagsFilterPanel.Children.Clear();
+            _allTags = _workService.GetAllTags();
+            FilterAndDisplayTags();
+        }
 
-            foreach (var tag in tags)
+        private void FilterAndDisplayTags(string filterText = "")
+        {
+            var filteredTags = string.IsNullOrEmpty(filterText)
+                ? _allTags
+                : _allTags.Where(t => t.Contains(filterText, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            // 如果没有展开，只显示前3行（假设每行约8个标签）
+            bool showExpandButton = false;
+            if (!_isTagsExpanded && filteredTags.Count > 24)
+            {
+                filteredTags = filteredTags.Take(24).ToList();
+                showExpandButton = true;
+            }
+
+            TagsFilterItemsControl.ItemsSource = filteredTags.Select(tag =>
             {
                 var btn = new Button
                 {
                     Content = tag,
                     Tag = tag,
                     Style = (Style)FindResource("FilterButton"),
-                    Background = new SolidColorBrush(Color.FromRgb(240, 233, 221))
+                    Background = _selectedTags.Contains(tag) ? _selectedBrush : _normalBrush
                 };
                 btn.Click += TagFilter_Click;
-                TagsFilterPanel.Children.Add(btn);
-            }
+                return btn;
+            });
+
+            ExpandTagsButton.Visibility = showExpandButton || _isTagsExpanded ? Visibility.Visible : Visibility.Collapsed;
+            ExpandTagsButton.Content = _isTagsExpanded ? "收起 ▲" : "展开更多 ▼";
+        }
+
+        private void TagSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _tagSearchTimer.Stop();
+            _tagSearchTimer.Start();
+        }
+
+        private void TagSearchTimer_Tick(object sender, EventArgs e)
+        {
+            _tagSearchTimer.Stop();
+            FilterAndDisplayTags(TagSearchBox.Text.Trim());
+        }
+
+        private void ExpandTags_Click(object sender, RoutedEventArgs e)
+        {
+            _isTagsExpanded = !_isTagsExpanded;
+            FilterAndDisplayTags(TagSearchBox.Text.Trim());
         }
 
         private void TagFilter_Click(object sender, RoutedEventArgs e)
@@ -140,7 +173,7 @@ namespace AniTechou.Views
             if (_selectedTags.Contains(tag))
             {
                 _selectedTags.Remove(tag);
-                btn.Background = new SolidColorBrush(Color.FromRgb(240, 233, 221));
+                btn.Background = _normalBrush;
             }
             else
             {
@@ -263,13 +296,7 @@ namespace AniTechou.Views
             RatingFilter.SelectedIndex = 0;
 
             // 重置标签按钮样式
-            foreach (var child in TagsFilterPanel.Children)
-            {
-                if (child is Button btn)
-                {
-                    btn.Background = new SolidColorBrush(Color.FromRgb(240, 233, 221));
-                }
-            }
+            FilterAndDisplayTags();
 
             LoadWorks();
         }
@@ -282,25 +309,28 @@ namespace AniTechou.Views
                 if (WorksItemsControl != null) WorksItemsControl.Visibility = Visibility.Collapsed;
                 if (EmptyText != null) EmptyText.Visibility = Visibility.Collapsed;
 
-                var works = await _workService.GetWorksAsync(
+                // 异步获取数据，不在 UI 线程等待
+                var works = await Task.Run(() => _workService.GetWorksAsync(
                     _currentType, _currentStatus, _currentYear, _currentSeason,
-                    _currentSourceType, _currentStudio, _currentRating, _selectedTags);
+                    _currentSourceType, _currentStudio, _currentRating, _selectedTags));
 
-                if (CountText != null) CountText.Text = $"({works.Count})";
+                Dispatcher.Invoke(() => {
+                    if (CountText != null) CountText.Text = $"({works.Count})";
 
-                if (works.Count == 0)
-                {
-                    if (WorksItemsControl != null) WorksItemsControl.Visibility = Visibility.Collapsed;
-                    if (EmptyText != null) EmptyText.Visibility = Visibility.Visible;
-                }
-                else
-                {
-                    if (WorksItemsControl != null)
+                    if (works.Count == 0)
                     {
-                        WorksItemsControl.Visibility = Visibility.Visible;
-                        WorksItemsControl.ItemsSource = works;
+                        if (WorksItemsControl != null) WorksItemsControl.Visibility = Visibility.Collapsed;
+                        if (EmptyText != null) EmptyText.Visibility = Visibility.Visible;
                     }
-                }
+                    else
+                    {
+                        if (WorksItemsControl != null)
+                        {
+                            WorksItemsControl.Visibility = Visibility.Visible;
+                            WorksItemsControl.ItemsSource = works;
+                        }
+                    }
+                });
             }
             catch (Exception ex)
             {

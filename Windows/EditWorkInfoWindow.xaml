@@ -31,6 +31,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- 标题 -->
@@ -85,6 +86,17 @@
                 <!-- 简介 -->
                 <TextBlock Grid.Row="8" Grid.Column="0" Text="简介" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Top"/>
                 <TextBox x:Name="SynopsisBox" Grid.Row="8" Grid.Column="1" Height="100" TextWrapping="Wrap" AcceptsReturn="True" Margin="5"/>
+
+                <!-- 封面路径 -->
+                <TextBlock Grid.Row="9" Grid.Column="0" Text="封面" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
+                <Grid Grid.Row="9" Grid.Column="1" Margin="5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="CoverPathBox" Grid.Column="0" Height="30" VerticalAlignment="Center"/>
+                    <Button Content="浏览" Grid.Column="1" Width="60" Height="30" Margin="5,0,0,0" Click="BrowseCover_Click"/>
+                </Grid>
             </Grid>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20">

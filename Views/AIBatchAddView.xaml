@@ -1,0 +1,134 @@
+<UserControl x:Class="AniTechou.Views.AIBatchAddView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="White">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 标题 -->
+        <Border Grid.Row="0" Background="White" BorderBrush="#E0D5C0" BorderThickness="0,0,0,1" Padding="15">
+            <TextBlock Text="🤖 AI批量添加作品"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Foreground="#5C4E3D"/>
+        </Border>
+
+        <!-- 输入区域 -->
+        <Border Grid.Row="1" Background="#F8F4E9" Padding="15" Margin="15">
+            <StackPanel>
+                <TextBlock Text="输入你想要添加的作品"
+                           FontSize="14"
+                           Foreground="#5C4E3D"
+                           Margin="0,0,0,8"/>
+                <TextBox x:Name="QueryBox"
+                         Height="60"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         Padding="8"
+                         FontSize="13"
+                         ToolTip="例如：给我京阿尼近三年的动画作品"/>
+                <Button Content="🔍 搜索"
+                        Width="100" Height="32"
+                        Background="#5C4E3D"
+                        Foreground="White"
+                        Click="Search_Click"
+                        Margin="0,10,0,0"/>
+                <TextBlock x:Name="StatusText"
+                           FontSize="11"
+                           Foreground="#7F6E5A"
+                           Margin="0,5,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- 搜索结果列表 -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="15,0,15,15">
+            <ItemsControl x:Name="ResultsList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="#F8F4E9"
+                                CornerRadius="8"
+                                Margin="0,0,0,8"
+                                Padding="12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <CheckBox Grid.Column="0"
+                                          IsChecked="{Binding IsSelected}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,10,0"/>
+
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{Binding Title}"
+                                               FontSize="14"
+                                               FontWeight="Bold"
+                                               Foreground="#5C4E3D"/>
+                                    <TextBlock Text="{Binding Info}"
+                                               FontSize="11"
+                                               Foreground="#7F6E5A"/>
+                                </StackPanel>
+
+                                <Button Grid.Column="2"
+                                        Content="查看详情"
+                                        Width="70" Height="25"
+                                        Background="Transparent"
+                                        Foreground="#5C4E3D"
+                                        Click="ViewDetail_Click"
+                                        Tag="{Binding}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- 底部按钮 -->
+        <Border Grid.Row="3" Background="White" BorderBrush="#E0D5C0" BorderThickness="0,1,0,0" Padding="15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0"
+                        Content="全选"
+                        Width="60" Height="30"
+                        Background="#E0D5C0"
+                        Foreground="#5C4E3D"
+                        Click="SelectAll_Click"/>
+                <TextBlock Grid.Column="1"
+                           x:Name="SelectedCountText"
+                           Text="已选择 0 项"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="#7F6E5A"/>
+                <Button Grid.Column="2"
+                        Content="添加到列表"
+                        Width="100" Height="35"
+                        Background="#5C4E3D"
+                        Foreground="White"
+                        Click="AddSelected_Click"/>
+            </Grid>
+        </Border>
+
+        <!-- 加载中提示 -->
+        <TextBlock x:Name="LoadingText"
+                   Grid.Row="2"
+                   Text="正在搜索..."
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Foreground="#A89F91"
+                   FontSize="14"
+                   Visibility="Collapsed"/>
+    </Grid>
+</UserControl>

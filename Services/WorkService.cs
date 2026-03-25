@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
+using System.IO;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace AniTechou.Services
@@ -289,6 +291,155 @@ namespace AniTechou.Services
         /// <summary>
         /// 删除作品标签
         /// </summary>
+        public async Task<List<WorkCardData>> SearchWorksByNameAsync(string title)
+        {
+            return await Task.Run(() =>
+            {
+                var works = new List<WorkCardData>();
+                using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+                {
+                    conn.Open();
+                    string sql = @"SELECT w.Id, w.Title, w.Year, w.Company, w.CoverPath, ul.Progress, ul.Rating 
+                                   FROM Works w 
+                                   INNER JOIN UserList ul ON w.Id = ul.WorkId 
+                                   WHERE w.Title LIKE @Title OR w.OriginalTitle LIKE @Title";
+                    using (var cmd = new SQLiteCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@Title", $"%{title}%");
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                works.Add(new WorkCardData
+                                {
+                                    Id = SafeGetInt(reader, 0),
+                                    Title = SafeGetString(reader, 1),
+                                    Info = $"{SafeGetString(reader, 2)} · {SafeGetString(reader, 3)}",
+                                    CoverPath = SafeGetString(reader, 4),
+                                    ProgressValue = ParseProgressToValue(SafeGetString(reader, 5)),
+                                    ProgressText = SafeGetString(reader, 5) ?? "未开始",
+                                    RatingDisplay = GetRatingDisplay(SafeGetInt(reader, 6))
+                                });
+                            }
+                        }
+                    }
+                }
+                return works;
+            });
+        }
+
+        public bool UpdateWorkStatus(int workId, string status)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "UPDATE UserList SET Status = @Status, LastUpdated = @Now WHERE WorkId = @WorkId";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Status", status);
+                    cmd.Parameters.AddWithValue("@Now", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
+        public bool UpdateWorkProgress(int workId, string progress)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "UPDATE UserList SET Progress = @Progress, LastUpdated = @Now WHERE WorkId = @WorkId";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Progress", progress);
+                    cmd.Parameters.AddWithValue("@Now", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
+        public bool UpdateWorkRating(int workId, int rating)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "UPDATE UserList SET Rating = @Rating, LastUpdated = @Now WHERE WorkId = @WorkId";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Rating", rating > 0 ? rating : DBNull.Value);
+                    cmd.Parameters.AddWithValue("@Now", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
+        public bool UpdateWorkEpisodes(int workId, string episodes)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "UPDATE Works SET EpisodesVolumes = @Episodes, LastModified = @Now WHERE Id = @WorkId";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Episodes", episodes);
+                    cmd.Parameters.AddWithValue("@Now", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
+        public bool UpdateWorkSeason(int workId, string season)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "UPDATE Works SET Season = @Season, LastModified = @Now WHERE Id = @WorkId";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Season", season);
+                    cmd.Parameters.AddWithValue("@Now", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
+        public bool UpdateWorkSourceType(int workId, string sourceType)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "UPDATE Works SET SourceType = @SourceType, LastModified = @Now WHERE Id = @WorkId";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@SourceType", sourceType);
+                    cmd.Parameters.AddWithValue("@Now", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
+        public bool UpdateWorkSynopsis(int workId, string synopsis)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "UPDATE Works SET Synopsis = @Synopsis, LastModified = @Now WHERE Id = @WorkId";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Synopsis", synopsis);
+                    cmd.Parameters.AddWithValue("@Now", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
         public bool RemoveWorkTag(int workId, string tagName)
         {
             using (var conn = DatabaseHelper.GetConnection(_currentAccount))
@@ -359,6 +510,83 @@ namespace AniTechou.Services
         }
 
         /// <summary>
+        /// 下载并保存封面图片
+        /// </summary>
+        /// <param name="url">图片URL</param>
+        /// <param name="workId">作品ID</param>
+        /// <returns>本地路径</returns>
+        public async Task<string> DownloadAndSaveCoverAsync(string url, int workId)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return "";
+
+            try
+            {
+                string appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "AniTechou",
+                    "covers"
+                );
+
+                if (!Directory.Exists(appDataDir))
+                {
+                    Directory.CreateDirectory(appDataDir);
+                }
+
+                // 获取扩展名，默认为 jpg
+                string extension = ".jpg";
+                try
+                {
+                    Uri uri = new Uri(url);
+                    string path = uri.AbsolutePath;
+                    if (path.Contains("."))
+                    {
+                        extension = Path.GetExtension(path);
+                    }
+                }
+                catch { }
+
+                string fileName = $"{workId}_{DateTime.Now.Ticks}{extension}";
+                string localPath = Path.Combine(appDataDir, fileName);
+
+                using (var client = new HttpClient())
+                {
+                    // 设置超时
+                    client.Timeout = TimeSpan.FromSeconds(30);
+                    // 添加 User-Agent 模拟浏览器
+                    client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+
+                    var bytes = await client.GetByteArrayAsync(url);
+                    await File.WriteAllBytesAsync(localPath, bytes);
+                }
+
+                // 更新数据库中的 CoverPath
+                UpdateCoverPath(workId, localPath);
+
+                return localPath;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WorkService] DownloadAndSaveCoverAsync error: {ex.Message}");
+                return "";
+            }
+        }
+
+        private void UpdateCoverPath(int workId, string localPath)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "UPDATE Works SET CoverPath = @CoverPath WHERE Id = @Id";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@CoverPath", localPath);
+                    cmd.Parameters.AddWithValue("@Id", workId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        /// <summary>
         /// 作品卡片数据模型
         /// </summary>
         public class WorkCardData
@@ -413,7 +641,7 @@ namespace AniTechou.Services
                                 cmd.Parameters.AddWithValue("@Company", company ?? "");
                                 cmd.Parameters.AddWithValue("@Year", yearValue);
                                 cmd.Parameters.AddWithValue("@Season", season ?? "");
-                                cmd.Parameters.AddWithValue("@SourceType", sourceType ?? "");
+                                cmd.Parameters.AddWithValue("@SourceType", sourceType ?? "原创");
                                 cmd.Parameters.AddWithValue("@EpisodesVolumes", episodesVolumes ?? "");
                                 cmd.Parameters.AddWithValue("@Synopsis", synopsis ?? "");
                                 cmd.Parameters.AddWithValue("@CoverPath", coverPath ?? "");
@@ -432,7 +660,8 @@ namespace AniTechou.Services
                                 cmd.Parameters.AddWithValue("@WorkId", workId);
                                 cmd.Parameters.AddWithValue("@Status", status);
                                 cmd.Parameters.AddWithValue("@Progress", progress ?? "");
-                                cmd.Parameters.AddWithValue("@Rating", rating);
+                                // Rating 为 0 时存入 NULL（现有数据库约束是 1-10）
+                                cmd.Parameters.AddWithValue("@Rating", rating > 0 ? rating : DBNull.Value);
                                 cmd.Parameters.AddWithValue("@LastUpdated", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                                 cmd.ExecuteNonQuery();
                             }
@@ -585,7 +814,7 @@ namespace AniTechou.Services
 
         public bool UpdateWorkInfo(int workId, string title, string originalTitle,
                            string type, string company, string year, string season,
-                           string sourceType, string episodesVolumes, string synopsis)
+                           string sourceType, string episodesVolumes, string synopsis, string coverPath)
         {
             try
             {
@@ -603,6 +832,7 @@ namespace AniTechou.Services
                     SourceType = @SourceType,
                     EpisodesVolumes = @EpisodesVolumes,
                     Synopsis = @Synopsis,
+                    CoverPath = @CoverPath,
                     LastModified = @LastModified
                 WHERE Id = @Id";
 
@@ -617,6 +847,7 @@ namespace AniTechou.Services
                         cmd.Parameters.AddWithValue("@SourceType", sourceType ?? "");
                         cmd.Parameters.AddWithValue("@EpisodesVolumes", episodesVolumes ?? "");
                         cmd.Parameters.AddWithValue("@Synopsis", synopsis ?? "");
+                        cmd.Parameters.AddWithValue("@CoverPath", coverPath ?? "");
                         cmd.Parameters.AddWithValue("@LastModified", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                         cmd.Parameters.AddWithValue("@Id", workId);
 
@@ -1163,6 +1394,77 @@ namespace AniTechou.Services
             public string Username { get; set; } = "";
             public string Nickname { get; set; } = "";
             public DateTime CreatedTime { get; set; }
+        }
+
+        /// <summary>
+        /// 导出所有数据
+        /// </summary>
+        public string ExportAllData()
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+
+                var data = new
+                {
+                    Works = GetWorksForExport(conn),
+                    Notes = GetNotesForExport(conn),
+                    ExportTime = DateTime.Now
+                };
+
+                return System.Text.Json.JsonSerializer.Serialize(data, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            }
+        }
+
+        private List<object> GetWorksForExport(SQLiteConnection conn)
+        {
+            var works = new List<object>();
+            string sql = "SELECT Id, Title, OriginalTitle, Type, Company, Year, Season, SourceType, EpisodesVolumes, Synopsis, CoverPath, AddedTime FROM Works";
+            using (var cmd = new SQLiteCommand(sql, conn))
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    works.Add(new
+                    {
+                        Id = SafeGetInt(reader, 0),
+                        Title = SafeGetString(reader, 1),
+                        OriginalTitle = SafeGetString(reader, 2),
+                        Type = SafeGetString(reader, 3),
+                        Company = SafeGetString(reader, 4),
+                        Year = SafeGetString(reader, 5),
+                        Season = SafeGetString(reader, 6),
+                        SourceType = SafeGetString(reader, 7),
+                        EpisodesVolumes = SafeGetString(reader, 8),
+                        Synopsis = SafeGetString(reader, 9),
+                        CoverPath = SafeGetString(reader, 10),
+                        AddedTime = SafeGetString(reader, 11)
+                    });
+                }
+            }
+            return works;
+        }
+
+        private List<object> GetNotesForExport(SQLiteConnection conn)
+        {
+            var notes = new List<object>();
+            string sql = "SELECT Id, Title, Content, CreatedTime, ModifiedTime FROM Notes";
+            using (var cmd = new SQLiteCommand(sql, conn))
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    notes.Add(new
+                    {
+                        Id = SafeGetInt(reader, 0),
+                        Title = SafeGetString(reader, 1),
+                        Content = SafeGetString(reader, 2),
+                        CreatedTime = SafeGetString(reader, 3),
+                        ModifiedTime = SafeGetString(reader, 4)
+                    });
+                }
+            }
+            return notes;
         }
     }
 }
