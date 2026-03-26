@@ -127,6 +127,81 @@ namespace AniTechou.Views
             }
         }
 
+        private void EditPrompt_Click(object sender, RoutedEventArgs e)
+        {
+            var config = ConfigManager.Load();
+            
+            var promptDialog = new Window
+            {
+                Title = "自定义 AI 系统提示词",
+                Width = 800,
+                Height = 600,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = Application.Current.MainWindow,
+                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(248, 244, 233))
+            };
+
+            var grid = new Grid { Margin = new Thickness(20) };
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Auto) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Auto) });
+
+            var helpText = new TextBlock
+            {
+                Text = "在这里您可以修改 AI 的核心指令。请谨慎修改 JSON 格式要求，否则可能导致软件解析失败。\n如果您改乱了，清空文本框并保存即可恢复默认提示词。",
+                Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(127, 110, 90)),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+            Grid.SetRow(helpText, 0);
+            grid.Children.Add(helpText);
+
+            var textBox = new TextBox
+            {
+                Text = string.IsNullOrEmpty(config.CustomSystemPrompt) ? AIService.GetDefaultSystemPrompt() : config.CustomSystemPrompt,
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                FontSize = 13,
+                Padding = new Thickness(10)
+            };
+            Grid.SetRow(textBox, 1);
+            grid.Children.Add(textBox);
+
+            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 20, 0, 0) };
+            var okBtn = new Button { Content = "保存", Width = 100, Height = 35, Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(92, 78, 61)), Foreground = System.Windows.Media.Brushes.White, Margin = new Thickness(0, 0, 10, 0) };
+            var resetBtn = new Button { Content = "恢复默认", Width = 100, Height = 35, Margin = new Thickness(0, 0, 10, 0) };
+            var cancelBtn = new Button { Content = "取消", Width = 100, Height = 35 };
+
+            okBtn.Click += (s, args) =>
+            {
+                config.CustomSystemPrompt = textBox.Text.Trim();
+                ConfigManager.Save(config);
+                MessageBox.Show("AI 提示词已保存，将在下一次对话时生效。", "保存成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                promptDialog.Close();
+            };
+
+            resetBtn.Click += (s, args) =>
+            {
+                if (MessageBox.Show("确定要恢复默认提示词吗？您的自定义修改将丢失。", "确认恢复", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                {
+                    textBox.Text = AIService.GetDefaultSystemPrompt();
+                }
+            };
+
+            cancelBtn.Click += (s, args) => promptDialog.Close();
+
+            btnPanel.Children.Add(okBtn);
+            btnPanel.Children.Add(resetBtn);
+            btnPanel.Children.Add(cancelBtn);
+            Grid.SetRow(btnPanel, 2);
+            grid.Children.Add(btnPanel);
+
+            promptDialog.Content = grid;
+            promptDialog.ShowDialog();
+        }
+
         private void ExportData_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new Microsoft.Win32.SaveFileDialog

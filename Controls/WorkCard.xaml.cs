@@ -84,7 +84,12 @@ namespace AniTechou.Controls
             {
                 try
                 {
-                    var bitmap = new BitmapImage(new Uri(path));
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad; // 关键：加载到内存后立即释放文件锁定
+                    bitmap.UriSource = new Uri(path);
+                    bitmap.EndInit();
+                    
                     CoverImage.Source = bitmap;
                     CoverImage.Visibility = Visibility.Visible;
                     CoverPlaceholder.Visibility = Visibility.Collapsed;

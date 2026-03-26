@@ -39,11 +39,47 @@ namespace AniTechou.Views
                 OriginalTitleText.Text = work.OriginalTitle ?? "";
                 TypeText.Text = $"类型：{GetTypeDisplayName(work.Type)}";
 
-                // 显示原作类型
-                string sourceType = work.SourceType ?? "";
-                SourceTypeText.Text = string.IsNullOrEmpty(sourceType) ? "" : $"原作类型：{sourceType}";
+                // 根据作品类型动态显示制作公司或作者
+                if (work.Type == "Manga" || work.Type == "LightNovel")
+                {
+                    CompanyText.Text = string.IsNullOrEmpty(work.Author) ? "" : $"作者：{work.Author}";
+                    CompanyText.Visibility = string.IsNullOrEmpty(work.Author) ? Visibility.Collapsed : Visibility.Visible;
+                }
+                else
+                {
+                    CompanyText.Text = string.IsNullOrEmpty(work.Company) ? "" : $"制作：{work.Company}";
+                    CompanyText.Visibility = string.IsNullOrEmpty(work.Company) ? Visibility.Collapsed : Visibility.Visible;
+                }
 
-                CompanyText.Text = $"制作：{work.Company ?? "未知"}";
+                // 显示原作类型和原作名称
+                string sourceType = work.SourceType ?? "";
+                string originalWork = work.OriginalWork ?? "";
+                
+                // 原作类型
+                if (string.IsNullOrEmpty(sourceType) || sourceType == "无")
+                {
+                    SourceTypeText.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    SourceTypeText.Text = $"原作类型：{sourceType}";
+                    SourceTypeText.Visibility = Visibility.Visible;
+                }
+
+                // 原作
+                var originalWorkText = FindName("OriginalWorkText") as TextBlock;
+                if (originalWorkText != null)
+                {
+                    if (string.IsNullOrEmpty(originalWork))
+                    {
+                        originalWorkText.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        originalWorkText.Text = $"原作：{originalWork}";
+                        originalWorkText.Visibility = Visibility.Visible;
+                    }
+                }
 
                 // 显示年份和季度
                 string year = work.Year ?? "";
@@ -116,8 +152,133 @@ namespace AniTechou.Views
             _currentTags = _workService.GetWorkTags(_workId);
             RefreshTagsPanel();
 
-            // 加载关联笔记
-            LoadRelatedNotes();
+            // 加载关联作品
+            LoadRelatedWorks();
+        }
+
+        private void LoadRelatedWorks()
+        {
+            var relatedWorks = _workService.GetRelatedWorks(_workId);
+            RelationsList.ItemsSource = relatedWorks;
+            NoRelationsText.Visibility = relatedWorks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            RelationsList.Visibility = relatedWorks.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void AddRelation_Click(object sender, RoutedEventArgs e)
+        {
+            // 获取所有作品供选择（排除自己和已关联的）
+            var allWorks = _workService.GetAllWorksForSearch();
+            var relatedWorks = _workService.GetRelatedWorks(_workId);
+            var relatedIds = relatedWorks.Select(w => w.Id).ToList();
+            relatedIds.Add(_workId);
+
+            var availableWorks = allWorks.Where(w => !relatedIds.Contains(w.Id)).ToList();
+
+            if (availableWorks.Count == 0)
+            {
+                MessageBox.Show("没有可关联的其他作品。");
+                return;
+            }
+
+            var dialog = new Window
+            {
+                Title = "添加关联作品",
+                Width = 400,
+                Height = 500,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = Application.Current.MainWindow
+            };
+
+            var panel = new StackPanel { Margin = new Thickness(10) };
+            
+            // 搜索框
+            var searchBox = new TextBox 
+            { 
+                Margin = new Thickness(0, 0, 0, 10),
+                Padding = new Thickness(5),
+                Height = 30
+            };
+            
+            var listBox = new ListBox
+            {
+                ItemsSource = availableWorks,
+                DisplayMemberPath = "Title",
+                Height = 350,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+
+            searchBox.TextChanged += (s, args) =>
+            {
+                string text = searchBox.Text.ToLower();
+                listBox.ItemsSource = string.IsNullOrEmpty(text) 
+                    ? availableWorks 
+                    : availableWorks.Where(w => (w.Title != null && w.Title.ToLower().Contains(text)) || (w.OriginalTitle != null && w.OriginalTitle.ToLower().Contains(text))).ToList();
+            };
+
+            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            var okBtn = new Button { Content = "确定", Width = 80, Margin = new Thickness(0, 0, 10, 0) };
+            var cancelBtn = new Button { Content = "取消", Width = 80 };
+
+            okBtn.Click += (s, args) =>
+            {
+                if (listBox.SelectedItem is WorkService.WorkCardData selectedWork)
+                {
+                    if (_workService.AddWorkRelation(_workId, selectedWork.Id))
+                    {
+                        LoadRelatedWorks();
+                    }
+                }
+                dialog.Close();
+            };
+
+            cancelBtn.Click += (s, args) => dialog.Close();
+
+            listBox.MouseDoubleClick += (s, args) =>
+            {
+                if (listBox.SelectedItem is WorkService.WorkCardData selectedWork)
+                {
+                    if (_workService.AddWorkRelation(_workId, selectedWork.Id))
+                    {
+                        LoadRelatedWorks();
+                    }
+                    dialog.Close();
+                }
+            };
+
+            btnPanel.Children.Add(okBtn);
+            btnPanel.Children.Add(cancelBtn);
+            panel.Children.Add(new TextBlock { Text = "搜索并选择要关联的作品：", Margin = new Thickness(0, 0, 0, 5) });
+            panel.Children.Add(searchBox);
+            panel.Children.Add(listBox);
+            panel.Children.Add(btnPanel);
+            dialog.Content = panel;
+
+            dialog.Loaded += (s, args) => searchBox.Focus();
+
+            dialog.ShowDialog();
+        }
+
+        private void RemoveRelation_Click(object sender, RoutedEventArgs e)
+        {
+            var btn = sender as Button;
+            if (btn?.Tag is int targetId)
+            {
+                if (_workService.RemoveWorkRelation(_workId, targetId))
+                {
+                    LoadRelatedWorks();
+                }
+            }
+            e.Handled = true; // 阻止事件冒泡到卡片点击
+        }
+
+        private void RelatedWork_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            var border = sender as Border;
+            if (border?.DataContext is WorkService.WorkCardData work)
+            {
+                var mainWindow = Application.Current.MainWindow as MainWindow;
+                mainWindow?.ShowDetailView(new WorkDetailView(work.Id, _userListId, _accountName));
+            }
         }
 
         private void LoadRelatedNotes()
@@ -334,6 +495,25 @@ namespace AniTechou.Views
             if (editDialog.ShowDialog() == true)
             {
                 LoadData();
+            }
+        }
+
+        private void DeleteWork_Click(object sender, RoutedEventArgs e)
+        {
+            var result = MessageBox.Show($"确定要删除《{TitleText.Text}》吗？相关的所有笔记关联也将被移除。", 
+                                       "确认删除", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            
+            if (result == MessageBoxResult.Yes)
+            {
+                if (_workService.DeleteWork(_workId))
+                {
+                    MessageBox.Show("删除成功！");
+                    Back_Click(null, null);
+                }
+                else
+                {
+                    MessageBox.Show("删除失败，请稍后再试。");
+                }
             }
         }
 

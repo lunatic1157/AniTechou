@@ -43,23 +43,40 @@
                 
                 <!-- 基本信息 -->
                 <StackPanel Grid.Row="0" Grid.Column="1" Margin="15,0,0,0">
-                    <TextBlock x:Name="OriginalTitleText" FontSize="14" Foreground="#A89F91"/>
-                    <TextBlock x:Name="TypeText" Margin="0,5,0,0"/>
-                    <TextBlock x:Name="SourceTypeText"/>
-                    <TextBlock x:Name="CompanyText"/>
-                    <TextBlock x:Name="YearText"/>
-                    <TextBlock x:Name="EpisodesText"/>
+                    <TextBlock x:Name="OriginalTitleText" FontSize="14" Foreground="#7F6E5A" Margin="0,0,0,15"/>
+                    
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                        <TextBlock x:Name="TypeText" FontSize="14" Foreground="#5C4E3D" Width="150"/>
+                        <TextBlock x:Name="SourceTypeText" FontSize="14" Foreground="#5C4E3D"/>
+                    </StackPanel>
+                    
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                        <TextBlock x:Name="CompanyText" FontSize="14" Foreground="#5C4E3D" Width="150"/>
+                        <TextBlock x:Name="OriginalWorkText" FontSize="14" Foreground="#5C4E3D"/>
+                    </StackPanel>
+                    
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                        <TextBlock x:Name="YearText" FontSize="14" Foreground="#5C4E3D" Width="150"/>
+                        <TextBlock x:Name="EpisodesText" FontSize="14" Foreground="#5C4E3D"/>
+                    </StackPanel>
                 </StackPanel>
                 
-                <!-- 编辑按钮 -->
-                <Button Grid.Row="0" Grid.Column="2" 
-                        Content="编辑" 
-                        Width="60" Height="30"
-                        Background="#5C4E3D" 
-                        Foreground="White"
-                        VerticalAlignment="Top"
-                        HorizontalAlignment="Right"
-                        Click="EditInfo_Click"/>
+                <!-- 编辑/删除 按钮组 -->
+                <StackPanel Grid.Row="0" Grid.Column="2" VerticalAlignment="Top">
+                    <Button Content="编辑" 
+                            Width="60" Height="30"
+                            Background="#5C4E3D" 
+                            Foreground="White"
+                            Margin="0,0,0,5"
+                            Click="EditInfo_Click"/>
+                    <Button Content="删除" 
+                            Width="60" Height="30"
+                            Background="Transparent" 
+                            Foreground="#D32F2F"
+                            BorderBrush="#D32F2F"
+                            BorderThickness="1"
+                            Click="DeleteWork_Click"/>
+                </StackPanel>
             </Grid>
             
             <!-- 简介 -->
@@ -124,52 +141,145 @@
                 </StackPanel>
             </Border>
 
-            <!-- 关联笔记 -->
-            <Grid Margin="0,20,0,10">
+            <!-- 关联笔记和关联作品区域 -->
+            <Grid Margin="0,30,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="关联笔记" FontSize="16" FontWeight="Bold" Foreground="#5C4E3D"/>
-                <Button Grid.Column="1"
-                        Content="写笔记"
-                        Width="70" Height="28"
-                        Background="#5C4E3D"
-                        Foreground="White"
-                        BorderThickness="0"
-                        Cursor="Hand"
-                        Click="WriteNote_Click"/>
+
+                <!-- 左侧：关联笔记 -->
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="📝 关联笔记"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#5C4E3D"
+                               Margin="0,0,0,15"/>
+                    
+                    <ItemsControl x:Name="NotesList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#F8F4E9" 
+                                        CornerRadius="8" 
+                                        Padding="15" 
+                                        Margin="0,0,0,10"
+                                        Cursor="Hand"
+                                        MouseLeftButtonUp="NoteItem_Click">
+                                    <StackPanel>
+                                        <Grid>
+                                            <TextBlock Text="{Binding DisplayTitle}" 
+                                                       FontWeight="Bold" 
+                                                       Foreground="#5C4E3D"/>
+                                            <TextBlock Text="{Binding CreatedTimeDisplay}" 
+                                                       Foreground="#A89F91" 
+                                                       FontSize="11" 
+                                                       HorizontalAlignment="Right"/>
+                                        </Grid>
+                                        <TextBlock Text="{Binding Preview}" 
+                                                   Foreground="#7F6E5A" 
+                                                   Margin="0,5,0,0" 
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock x:Name="NoNotesText"
+                               Text="暂无关联笔记"
+                               Foreground="#A89F91"
+                               FontStyle="Italic"
+                               Margin="0,10,0,0"
+                               Visibility="Collapsed"/>
+                </StackPanel>
+
+                <!-- 右侧：关联作品 -->
+                <StackPanel Grid.Column="2">
+                    <Grid Margin="0,0,0,15">
+                        <TextBlock Text="🔗 关联作品"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="#5C4E3D"
+                                   VerticalAlignment="Center"/>
+                        <Button Content="+ 添加关联"
+                                Width="80" Height="25"
+                                Background="Transparent"
+                                Foreground="#7F6E5A"
+                                BorderBrush="#E0D5C0"
+                                FontSize="12"
+                                HorizontalAlignment="Right"
+                                Cursor="Hand"
+                                Click="AddRelation_Click"/>
+                    </Grid>
+
+                    <ItemsControl x:Name="RelationsList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#F8F4E9" 
+                                        CornerRadius="8" 
+                                        Padding="10" 
+                                        Margin="0,0,0,10"
+                                        Cursor="Hand"
+                                        MouseLeftButtonUp="RelatedWork_Click">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <!-- 封面缩略图 -->
+                                        <Border CornerRadius="4" ClipToBounds="True" Width="30" Height="40" HorizontalAlignment="Left">
+                                            <Image Source="{Binding CoverPath}" Stretch="UniformToFill">
+                                                <Image.Style>
+                                                    <Style TargetType="Image">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding CoverPath}" Value="">
+                                                                <Setter Property="Source" Value="{x:Null}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Image.Style>
+                                            </Image>
+                                        </Border>
+
+                                        <!-- 信息 -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Title}" 
+                                                       FontWeight="Bold" 
+                                                       Foreground="#5C4E3D"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Info}" 
+                                                       Foreground="#A89F91" 
+                                                       FontSize="11" 
+                                                       Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                        
+                                        <!-- 取消关联按钮 -->
+                                        <Button Grid.Column="2"
+                                                Content="✕"
+                                                Width="20" Height="20"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Foreground="#A89F91"
+                                                ToolTip="取消关联"
+                                                Click="RemoveRelation_Click"
+                                                Tag="{Binding Id}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock x:Name="NoRelationsText"
+                               Text="暂无关联作品 (同系列/原作)"
+                               Foreground="#A89F91"
+                               FontStyle="Italic"
+                               Margin="0,10,0,0"
+                               Visibility="Collapsed"/>
+                </StackPanel>
             </Grid>
-            <ItemsControl x:Name="NotesList" Margin="0,5">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Background="#F8F4E9" CornerRadius="6" Padding="10" Margin="0,0,0,8" Cursor="Hand" MouseLeftButtonUp="NoteItem_Click">
-                            <StackPanel>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
-                                               Text="{Binding DisplayTitle}"
-                                               FontWeight="Bold"
-                                               Foreground="#5C4E3D"/>
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding CreatedTimeDisplay}"
-                                               FontSize="10"
-                                               Foreground="#A89F91"/>
-                                </Grid>
-                                <TextBlock Text="{Binding Preview}"
-                                           FontSize="11"
-                                           Foreground="#7F6E5A"
-                                           Margin="0,5,0,0"
-                                           TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            <TextBlock x:Name="NoNotesText" Text="暂无笔记" Foreground="#A89F91" Margin="0,5"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

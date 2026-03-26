@@ -4,10 +4,12 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using AniTechou.Controls;
 using AniTechou.Services;
 
 using System.Windows.Threading;
+using ToolGood.Words;
 
 namespace AniTechou.Views
 {
@@ -119,7 +121,11 @@ namespace AniTechou.Views
         {
             var filteredTags = string.IsNullOrEmpty(filterText)
                 ? _allTags
-                : _allTags.Where(t => t.Contains(filterText, StringComparison.OrdinalIgnoreCase)).ToList();
+                : _allTags.Where(t => 
+                    t.Contains(filterText, StringComparison.OrdinalIgnoreCase) || 
+                    WordsHelper.GetPinyin(t).Replace(" ", "").Contains(filterText, StringComparison.OrdinalIgnoreCase) ||
+                    WordsHelper.GetFirstPinyin(t).Replace(" ", "").Contains(filterText, StringComparison.OrdinalIgnoreCase)
+                ).ToList();
 
             // 如果没有展开，只显示前3行（假设每行约8个标签）
             bool showExpandButton = false;
@@ -161,6 +167,22 @@ namespace AniTechou.Views
         private void ExpandTags_Click(object sender, RoutedEventArgs e)
         {
             _isTagsExpanded = !_isTagsExpanded;
+
+            // 停止任何正在进行的动画
+            TagsFilterItemsControl.BeginAnimation(ItemsControl.MaxHeightProperty, null);
+
+            if (_isTagsExpanded)
+            {
+                // 展开时，直接设置最大高度为无穷大，不使用动画，避免冲突
+                TagsFilterItemsControl.MaxHeight = double.PositiveInfinity;
+            }
+            else
+            {
+                // 收起时，直接设置回固定的高度
+                TagsFilterItemsControl.MaxHeight = 100;
+            }
+
+            // 更新按钮文本和重新筛选显示
             FilterAndDisplayTags(TagSearchBox.Text.Trim());
         }
 

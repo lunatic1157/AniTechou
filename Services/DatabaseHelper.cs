@@ -89,6 +89,8 @@ namespace AniTechou.Services
                             EpisodesVolumes TEXT,
                             Synopsis TEXT,
                             CoverPath TEXT,
+                            Author TEXT,
+                            OriginalWork TEXT,
                             AddedTime DATETIME DEFAULT CURRENT_TIMESTAMP,
                             LastModified DATETIME DEFAULT CURRENT_TIMESTAMP
                         );
@@ -142,12 +144,24 @@ namespace AniTechou.Services
                             FOREIGN KEY(NoteId) REFERENCES Notes(Id) ON DELETE CASCADE
                         );
 
+                        -- 作品关联表（同系列/衍生）
+                        CREATE TABLE WorkRelations (
+                            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            SourceWorkId INTEGER NOT NULL,
+                            TargetWorkId INTEGER NOT NULL,
+                            RelationType TEXT DEFAULT 'Related',
+                            FOREIGN KEY(SourceWorkId) REFERENCES Works(Id) ON DELETE CASCADE,
+                            FOREIGN KEY(TargetWorkId) REFERENCES Works(Id) ON DELETE CASCADE,
+                            UNIQUE(SourceWorkId, TargetWorkId)
+                        );
+
                         -- 创建索引提高查询性能
                         CREATE INDEX idx_works_type ON Works(Type);
                         CREATE INDEX idx_userlist_status ON UserList(Status);
                         CREATE INDEX idx_noteworks_note ON NoteWorks(NoteId);
                         CREATE INDEX idx_noteworks_work ON NoteWorks(WorkId);
                         CREATE INDEX idx_worktags_work ON WorkTags(WorkId);
+                        CREATE INDEX idx_workrelations_source ON WorkRelations(SourceWorkId);
                     ";
 
                     using (var cmd = new SQLiteCommand(createTablesSql, conn))
@@ -220,11 +234,58 @@ namespace AniTechou.Services
 
                     // 迁移 Works 表的 SourceType 列
                     MigrateWorksTable(conn);
+
+                    // 检查并创建 WorkRelations 表 (如果不存在)
+                    MigrateWorkRelationsTable(conn);
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Migration error: {ex.Message}");
+            }
+        }
+
+        private static void MigrateWorkRelationsTable(SQLiteConnection conn)
+        {
+            try
+            {
+                string checkSql = "SELECT name FROM sqlite_master WHERE type='table' AND name='WorkRelations'";
+                bool tableExists = false;
+                using (var cmd = new SQLiteCommand(checkSql, conn))
+                {
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            tableExists = true;
+                        }
+                    }
+                }
+
+                if (!tableExists)
+                {
+                    System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Creating WorkRelations table during migration...");
+                    string createSql = @"
+                        CREATE TABLE WorkRelations (
+                            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            SourceWorkId INTEGER NOT NULL,
+                            TargetWorkId INTEGER NOT NULL,
+                            RelationType TEXT DEFAULT 'Related',
+                            FOREIGN KEY(SourceWorkId) REFERENCES Works(Id) ON DELETE CASCADE,
+                            FOREIGN KEY(TargetWorkId) REFERENCES Works(Id) ON DELETE CASCADE,
+                            UNIQUE(SourceWorkId, TargetWorkId)
+                        );
+                        CREATE INDEX idx_workrelations_source ON WorkRelations(SourceWorkId);
+                    ";
+                    using (var cmd = new SQLiteCommand(createSql, conn))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] MigrateWorkRelationsTable error: {ex.Message}");
             }
         }
 
@@ -275,29 +336,48 @@ namespace AniTechou.Services
                 string checkSql = "PRAGMA table_info(Works)";
                 using (var cmd = new SQLiteCommand(checkSql, conn))
                 {
+                    bool hasSourceTypeColumn = false;
+                    bool hasAuthorColumn = false;
+                    bool hasOriginalWorkColumn = false;
+
                     using (var reader = cmd.ExecuteReader())
                     {
-                        bool hasSourceTypeColumn = false;
                         while (reader.Read())
                         {
                             string columnName = reader.GetString(1);
-                            if (columnName == "SourceType")
-                            {
-                                hasSourceTypeColumn = true;
-                                break;
-                            }
+                            if (columnName == "SourceType") hasSourceTypeColumn = true;
+                            if (columnName == "Author") hasAuthorColumn = true;
+                            if (columnName == "OriginalWork") hasOriginalWorkColumn = true;
                         }
+                    }
 
-                        System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Works table has SourceType column: {hasSourceTypeColumn}");
+                    System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Works table has SourceType column: {hasSourceTypeColumn}");
 
-                        if (!hasSourceTypeColumn)
+                    if (!hasSourceTypeColumn)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding SourceType column to Works table...");
+                        using (var cmdAdd = new SQLiteCommand("ALTER TABLE Works ADD COLUMN SourceType TEXT", conn))
                         {
-                            System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding SourceType column to Works table...");
-                            using (var cmdAdd = new SQLiteCommand("ALTER TABLE Works ADD COLUMN SourceType TEXT", conn))
-                            {
-                                cmdAdd.ExecuteNonQuery();
-                            }
-                            System.Diagnostics.Debug.WriteLine("[DatabaseHelper] SourceType column added successfully!");
+                            cmdAdd.ExecuteNonQuery();
+                        }
+                        System.Diagnostics.Debug.WriteLine("[DatabaseHelper] SourceType column added successfully!");
+                    }
+
+                    if (!hasAuthorColumn)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding Author column to Works table...");
+                        using (var cmdAdd = new SQLiteCommand("ALTER TABLE Works ADD COLUMN Author TEXT", conn))
+                        {
+                            cmdAdd.ExecuteNonQuery();
+                        }
+                    }
+
+                    if (!hasOriginalWorkColumn)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding OriginalWork column to Works table...");
+                        using (var cmdAdd = new SQLiteCommand("ALTER TABLE Works ADD COLUMN OriginalWork TEXT", conn))
+                        {
+                            cmdAdd.ExecuteNonQuery();
                         }
                     }
                 }

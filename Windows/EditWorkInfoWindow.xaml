@@ -44,16 +44,25 @@
 
                 <!-- 类型 -->
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="类型" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
-                <ComboBox x:Name="TypeBox" Grid.Row="2" Grid.Column="1" Margin="5" Height="30">
-                    <ComboBoxItem Content="Anime"/>
-                    <ComboBoxItem Content="Manga"/>
-                    <ComboBoxItem Content="LightNovel"/>
-                    <ComboBoxItem Content="Game"/>
+                <ComboBox x:Name="TypeBox" Grid.Row="2" Grid.Column="1" Margin="5" Height="30" SelectionChanged="TypeBox_SelectionChanged">
+                    <ComboBoxItem Content="动画"/>
+                    <ComboBoxItem Content="漫画"/>
+                    <ComboBoxItem Content="轻小说"/>
+                    <ComboBoxItem Content="游戏"/>
                 </ComboBox>
 
                 <!-- 制作 -->
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="制作" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
-                <TextBox x:Name="CompanyBox" Grid.Row="3" Grid.Column="1" Margin="5" Height="30" ToolTip="制作公司/出版社/作者"/>
+                <TextBlock x:Name="CompanyLabel" Grid.Row="3" Grid.Column="0" Text="制作" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
+                <Grid Grid.Row="3" Grid.Column="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="CompanyBox" Grid.Column="0" Margin="5" Height="30" ToolTip="制作公司/出版社/作者"/>
+                    <TextBlock Grid.Column="1" Text="原作" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
+                    <TextBox x:Name="OriginalWorkBox" Grid.Column="2" Margin="5" Height="30" ToolTip="原作作者（如小说作者）"/>
+                </Grid>
 
                 <!-- 年份 -->
                 <TextBlock Grid.Row="4" Grid.Column="0" Text="年份" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
@@ -72,6 +81,7 @@
                 <!-- 原作类型（新增） -->
                 <TextBlock Grid.Row="6" Grid.Column="0" Text="原作类型" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
                 <ComboBox x:Name="SourceTypeBox" Grid.Row="6" Grid.Column="1" Margin="5" Height="30" SelectedIndex="0">
+                    <ComboBoxItem Content="无"/>
                     <ComboBoxItem Content="原创"/>
                     <ComboBoxItem Content="漫改"/>
                     <ComboBoxItem Content="小说改"/>

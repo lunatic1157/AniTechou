@@ -170,7 +170,7 @@
                     </ComboBox>
 
                     <ComboBox x:Name="RatingFilter"
-                              Width="100"
+                              Width="120"
                               Height="28"
                               Margin="0,0,10,5"
                               SelectionChanged="RatingFilter_Changed">
@@ -187,7 +187,6 @@
                              Width="150"
                              Height="28"
                              Margin="0,0,10,5"
-                             VerticalContentAlignment="Center"
                              Tag="搜索标签..."
                              TextChanged="TagSearch_TextChanged"
                              Style="{StaticResource SearchTextBoxStyle}"/>

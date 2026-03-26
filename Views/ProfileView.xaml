@@ -27,11 +27,24 @@
                             Width="80" Height="80"
                             Background="#E0D5C0"
                             CornerRadius="40"
-                            HorizontalAlignment="Left">
-                        <TextBlock Text="👤"
-                                   FontSize="40"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"/>
+                            HorizontalAlignment="Left"
+                            Cursor="Hand"
+                            MouseLeftButtonUp="Avatar_Click">
+                        <Border.ToolTip>点击上传/修改头像</Border.ToolTip>
+                        <Grid>
+                            <TextBlock x:Name="DefaultAvatarText"
+                                       Text="👤"
+                                       FontSize="40"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                            <Image x:Name="AvatarImage"
+                                   Stretch="UniformToFill"
+                                   RenderOptions.BitmapScalingMode="HighQuality">
+                                <Image.Clip>
+                                    <EllipseGeometry RadiusX="40" RadiusY="40" Center="40,40"/>
+                                </Image.Clip>
+                            </Image>
+                        </Grid>
                     </Border>
 
                     <!-- 昵称和加入时间 -->

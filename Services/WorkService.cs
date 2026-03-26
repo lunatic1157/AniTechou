@@ -7,6 +7,32 @@ using System.Threading.Tasks;
 
 namespace AniTechou.Services
 {
+    public class WorkInfo
+    {
+        public int Id { get; set; }
+        public string Title { get; set; }
+        public string OriginalTitle { get; set; }
+        public string Type { get; set; }
+        public string Company { get; set; }
+        public string Author { get; set; }
+        public string OriginalWork { get; set; }
+        public string Year { get; set; }
+        public string Season { get; set; }
+        public string SourceType { get; set; }
+        public string EpisodesVolumes { get; set; }
+        public string Synopsis { get; set; }
+        public string CoverPath { get; set; }
+    }
+
+    public class UserWorkInfo
+    {
+        public int Id { get; set; }
+        public int WorkId { get; set; }
+        public string Status { get; set; }
+        public string Progress { get; set; }
+        public int Rating { get; set; }
+    }
+
     /// <summary>
     /// 作品数据服务
     /// </summary>
@@ -42,8 +68,8 @@ namespace AniTechou.Services
                     conn.Open();
 
                     string sql = @"
-                        SELECT w.Id, w.Title, w.Year, w.Company, w.CoverPath,
-                               ul.Progress, ul.Rating
+                        SELECT w.Id, w.Title, w.OriginalTitle, w.Year, w.Company, w.CoverPath,
+                               ul.Progress, ul.Rating, w.Author, w.Type
                         FROM Works w
                         INNER JOIN UserList ul ON w.Id = ul.WorkId
                         WHERE 1=1";
@@ -133,15 +159,21 @@ namespace AniTechou.Services
                         {
                             while (reader.Read())
                             {
+                                string company = SafeGetString(reader, 4);
+                                string author = SafeGetString(reader, 8);
+                                string displayMaker = !string.IsNullOrEmpty(company) ? company : author;
+
                                 works.Add(new WorkCardData
                                 {
                                     Id = SafeGetInt(reader, 0),
                                     Title = SafeGetString(reader, 1),
-                                    Info = $"{SafeGetString(reader, 2)} · {SafeGetString(reader, 3)}",
-                                    CoverPath = SafeGetString(reader, 4),
-                                    ProgressValue = ParseProgressToValue(SafeGetString(reader, 5)),
-                                    ProgressText = SafeGetString(reader, 5) ?? "未开始",
-                                    RatingDisplay = GetRatingDisplay(SafeGetInt(reader, 6))
+                                    OriginalTitle = SafeGetString(reader, 2),
+                                    Type = SafeGetString(reader, 9), // 新增
+                                    Info = $"{SafeGetString(reader, 3)} · {displayMaker}",
+                                    CoverPath = SafeGetString(reader, 5),
+                                    ProgressValue = ParseProgressToValue(SafeGetString(reader, 6)),
+                                    ProgressText = SafeGetString(reader, 6) ?? "未开始",
+                                    RatingDisplay = GetRatingDisplay(SafeGetInt(reader, 7))
                                 });
                             }
                         }
@@ -291,6 +323,44 @@ namespace AniTechou.Services
         /// <summary>
         /// 删除作品标签
         /// </summary>
+        public List<WorkCardData> GetAllWorksForSearch()
+        {
+            var works = new List<WorkCardData>();
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = @"SELECT w.Id, w.Title, w.OriginalTitle, w.Year, w.Company, w.CoverPath, ul.Progress, ul.Rating, w.Author, w.Type 
+                               FROM Works w 
+                               INNER JOIN UserList ul ON w.Id = ul.WorkId 
+                               ORDER BY w.Title";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string company = SafeGetString(reader, 4);
+                            string author = SafeGetString(reader, 8);
+                            string displayMaker = !string.IsNullOrEmpty(company) ? company : author;
+
+                            works.Add(new WorkCardData
+                            {
+                                Id = SafeGetInt(reader, 0),
+                                Title = SafeGetString(reader, 1),
+                                OriginalTitle = SafeGetString(reader, 2),
+                                Type = SafeGetString(reader, 9),
+                                Info = $"{SafeGetString(reader, 3)} · {displayMaker}",
+                                CoverPath = SafeGetString(reader, 5),
+                                ProgressValue = ParseProgressToValue(SafeGetString(reader, 6)),
+                                ProgressText = SafeGetString(reader, 6) ?? "未开始",
+                                RatingDisplay = GetRatingDisplay(SafeGetInt(reader, 7))
+                            });
+                        }
+                    }
+                }
+            }
+            return works;
+        }
         public async Task<List<WorkCardData>> SearchWorksByNameAsync(string title)
         {
             return await Task.Run(() =>
@@ -299,7 +369,7 @@ namespace AniTechou.Services
                 using (var conn = DatabaseHelper.GetConnection(_currentAccount))
                 {
                     conn.Open();
-                    string sql = @"SELECT w.Id, w.Title, w.Year, w.Company, w.CoverPath, ul.Progress, ul.Rating 
+                    string sql = @"SELECT w.Id, w.Title, w.OriginalTitle, w.Year, w.Company, w.CoverPath, ul.Progress, ul.Rating, w.Author, w.Type 
                                    FROM Works w 
                                    INNER JOIN UserList ul ON w.Id = ul.WorkId 
                                    WHERE w.Title LIKE @Title OR w.OriginalTitle LIKE @Title";
@@ -310,15 +380,21 @@ namespace AniTechou.Services
                         {
                             while (reader.Read())
                             {
+                                string company = SafeGetString(reader, 4);
+                                string author = SafeGetString(reader, 8);
+                                string displayMaker = !string.IsNullOrEmpty(company) ? company : author;
+
                                 works.Add(new WorkCardData
                                 {
                                     Id = SafeGetInt(reader, 0),
                                     Title = SafeGetString(reader, 1),
-                                    Info = $"{SafeGetString(reader, 2)} · {SafeGetString(reader, 3)}",
-                                    CoverPath = SafeGetString(reader, 4),
-                                    ProgressValue = ParseProgressToValue(SafeGetString(reader, 5)),
-                                    ProgressText = SafeGetString(reader, 5) ?? "未开始",
-                                    RatingDisplay = GetRatingDisplay(SafeGetInt(reader, 6))
+                                    OriginalTitle = SafeGetString(reader, 2),
+                                    Type = SafeGetString(reader, 9),
+                                    Info = $"{SafeGetString(reader, 3)} · {displayMaker}",
+                                    CoverPath = SafeGetString(reader, 5),
+                                    ProgressValue = ParseProgressToValue(SafeGetString(reader, 6)),
+                                    ProgressText = SafeGetString(reader, 6) ?? "未开始",
+                                    RatingDisplay = GetRatingDisplay(SafeGetInt(reader, 7))
                                 });
                             }
                         }
@@ -326,6 +402,111 @@ namespace AniTechou.Services
                 }
                 return works;
             });
+        }
+
+        // ==========================================
+        // 关联作品 (Work Relations)
+        // ==========================================
+
+        /// <summary>
+        /// 添加关联作品（双向绑定）
+        /// </summary>
+        public bool AddWorkRelation(int sourceWorkId, int targetWorkId)
+        {
+            if (sourceWorkId == targetWorkId) return false;
+
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                using (var transaction = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        string sql = @"INSERT OR IGNORE INTO WorkRelations (SourceWorkId, TargetWorkId) VALUES (@S1, @T1), (@T2, @S2)";
+                        using (var cmd = new SQLiteCommand(sql, conn))
+                        {
+                            cmd.Parameters.AddWithValue("@S1", sourceWorkId);
+                            cmd.Parameters.AddWithValue("@T1", targetWorkId);
+                            cmd.Parameters.AddWithValue("@T2", targetWorkId);
+                            cmd.Parameters.AddWithValue("@S2", sourceWorkId);
+                            cmd.ExecuteNonQuery();
+                        }
+                        transaction.Commit();
+                        return true;
+                    }
+                    catch
+                    {
+                        transaction.Rollback();
+                        return false;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 删除关联作品（双向解除）
+        /// </summary>
+        public bool RemoveWorkRelation(int sourceWorkId, int targetWorkId)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = @"DELETE FROM WorkRelations 
+                               WHERE (SourceWorkId = @S1 AND TargetWorkId = @T1) 
+                                  OR (SourceWorkId = @T2 AND TargetWorkId = @S2)";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@S1", sourceWorkId);
+                    cmd.Parameters.AddWithValue("@T1", targetWorkId);
+                    cmd.Parameters.AddWithValue("@T2", targetWorkId);
+                    cmd.Parameters.AddWithValue("@S2", sourceWorkId);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 获取某部作品的所有关联作品卡片数据
+        /// </summary>
+        public List<WorkCardData> GetRelatedWorks(int workId)
+        {
+            var works = new List<WorkCardData>();
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = @"SELECT w.Id, w.Title, w.OriginalTitle, w.Year, w.Company, w.CoverPath, ul.Progress, ul.Rating, w.Author, w.Type 
+                               FROM Works w 
+                               INNER JOIN UserList ul ON w.Id = ul.WorkId 
+                               INNER JOIN WorkRelations wr ON w.Id = wr.TargetWorkId
+                               WHERE wr.SourceWorkId = @WorkId";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string company = SafeGetString(reader, 4);
+                            string author = SafeGetString(reader, 8);
+                            string displayMaker = !string.IsNullOrEmpty(company) ? company : author;
+
+                            works.Add(new WorkCardData
+                            {
+                                Id = SafeGetInt(reader, 0),
+                                Title = SafeGetString(reader, 1),
+                                OriginalTitle = SafeGetString(reader, 2),
+                                Type = SafeGetString(reader, 9),
+                                Info = $"{SafeGetString(reader, 3)} · {displayMaker}",
+                                CoverPath = SafeGetString(reader, 5),
+                                ProgressValue = ParseProgressToValue(SafeGetString(reader, 6)),
+                                ProgressText = SafeGetString(reader, 6) ?? "未开始",
+                                RatingDisplay = GetRatingDisplay(SafeGetInt(reader, 7))
+                            });
+                        }
+                    }
+                }
+            }
+            return works;
         }
 
         public bool UpdateWorkStatus(int workId, string status)
@@ -440,6 +621,117 @@ namespace AniTechou.Services
             }
         }
 
+        public bool UpdateWorkCompany(int workId, string company)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "UPDATE Works SET Company = @Company, LastModified = @Now WHERE Id = @WorkId";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Company", company);
+                    cmd.Parameters.AddWithValue("@Now", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
+        public bool UpdateWorkAuthor(int workId, string author)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "UPDATE Works SET Author = @Author, LastModified = @Now WHERE Id = @WorkId";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Author", author);
+                    cmd.Parameters.AddWithValue("@Now", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
+        public bool UpdateWorkOriginalWork(int workId, string originalWork)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "UPDATE Works SET OriginalWork = @OriginalWork, LastModified = @Now WHERE Id = @WorkId";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@OriginalWork", originalWork);
+                    cmd.Parameters.AddWithValue("@Now", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 批量统一标签
+        /// </summary>
+        public int UnifyTags(string targetTag, string newTag)
+        {
+            if (string.IsNullOrWhiteSpace(targetTag) || string.IsNullOrWhiteSpace(newTag)) return 0;
+
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                using (var transaction = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        // 1. 找出所有包含 targetTag 的作品ID
+                        var workIds = new List<int>();
+                        string findSql = "SELECT DISTINCT WorkId FROM WorkTags WHERE TagName = @TargetTag";
+                        using (var findCmd = new SQLiteCommand(findSql, conn))
+                        {
+                            findCmd.Parameters.AddWithValue("@TargetTag", targetTag);
+                            using (var reader = findCmd.ExecuteReader())
+                            {
+                                while (reader.Read())
+                                {
+                                    workIds.Add(reader.GetInt32(0));
+                                }
+                            }
+                        }
+
+                        if (workIds.Count == 0) return 0;
+
+                        // 2. 为这些作品添加 newTag (如果不存在)
+                        string insertSql = "INSERT OR IGNORE INTO WorkTags (WorkId, TagName) VALUES (@WorkId, @NewTag)";
+                        foreach (var workId in workIds)
+                        {
+                            using (var insertCmd = new SQLiteCommand(insertSql, conn))
+                            {
+                                insertCmd.Parameters.AddWithValue("@WorkId", workId);
+                                insertCmd.Parameters.AddWithValue("@NewTag", newTag);
+                                insertCmd.ExecuteNonQuery();
+                            }
+                        }
+
+                        // 3. 从这些作品中删除 targetTag
+                        string deleteSql = "DELETE FROM WorkTags WHERE TagName = @TargetTag AND WorkId IN (" + string.Join(",", workIds) + ")";
+                        using (var deleteCmd = new SQLiteCommand(deleteSql, conn))
+                        {
+                            deleteCmd.Parameters.AddWithValue("@TargetTag", targetTag);
+                            deleteCmd.ExecuteNonQuery();
+                        }
+
+                        transaction.Commit();
+                        return workIds.Count;
+                    }
+                    catch
+                    {
+                        transaction.Rollback();
+                        return 0;
+                    }
+                }
+            }
+        }
+
         public bool RemoveWorkTag(int workId, string tagName)
         {
             using (var conn = DatabaseHelper.GetConnection(_currentAccount))
@@ -515,60 +807,275 @@ namespace AniTechou.Services
         /// <param name="url">图片URL</param>
         /// <param name="workId">作品ID</param>
         /// <returns>本地路径</returns>
-        public async Task<string> DownloadAndSaveCoverAsync(string url, int workId)
+        public async Task<string> DownloadAndSaveCoverAsync(string urlOrBangumiInfo, int workId)
         {
-            if (string.IsNullOrWhiteSpace(url)) return "";
+            if (string.IsNullOrWhiteSpace(urlOrBangumiInfo)) return "";
 
-            try
+            var targetUrls = new List<string>();
+            string originalUrl = urlOrBangumiInfo;
+            string bangumiId = "";
+            string searchTitle = "";
+
+            // 解析我们自定义的格式 "bgm_id:{id}|{url}"
+            if (urlOrBangumiInfo.StartsWith("bgm_id:"))
             {
-                string appDataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "AniTechou",
-                    "covers"
-                );
-
-                if (!Directory.Exists(appDataDir))
+                var parts = urlOrBangumiInfo.Split('|', 2);
+                if (parts.Length == 2)
                 {
-                    Directory.CreateDirectory(appDataDir);
+                    bangumiId = parts[0].Replace("bgm_id:", "").Trim();
+                    originalUrl = parts[1];
                 }
+            }
+            else if (urlOrBangumiInfo.StartsWith("search_title:"))
+            {
+                searchTitle = urlOrBangumiInfo.Replace("search_title:", "").Trim();
+                originalUrl = ""; // 放弃原始链接，完全依赖搜索
+            }
 
-                // 获取扩展名，默认为 jpg
-                string extension = ".jpg";
-                try
+            // 清洗 URL
+            if (!string.IsNullOrEmpty(originalUrl))
+            {
+                originalUrl = originalUrl.Trim().TrimEnd(')', ':', ']', '}', '。', '，', ',', '.');
+                if (originalUrl.Contains("?"))
                 {
-                    Uri uri = new Uri(url);
-                    string path = uri.AbsolutePath;
-                    if (path.Contains("."))
+                    originalUrl = originalUrl.Split('?')[0];
+                }
+            }
+
+            using (var client = new HttpClient())
+            {
+                client.Timeout = TimeSpan.FromSeconds(30); 
+                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                client.DefaultRequestHeaders.Add("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
+                client.DefaultRequestHeaders.Add("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8");
+                
+                string jikanSearchQuery = searchTitle;
+                
+                // 如果没有传入 searchTitle，从数据库中获取标题用于搜索
+                if (string.IsNullOrEmpty(jikanSearchQuery))
+                {
+                    using (var conn = DatabaseHelper.GetConnection(_currentAccount))
                     {
-                        extension = Path.GetExtension(path);
+                        conn.Open();
+                        using (var cmd = new SQLiteCommand("SELECT Title, OriginalTitle, Year FROM Works WHERE Id = @Id", conn))
+                        {
+                            cmd.Parameters.AddWithValue("@Id", workId);
+                            using (var reader = cmd.ExecuteReader())
+                            {
+                                if (reader.Read())
+                                {
+                                    string title = SafeGetString(reader, 0);
+                                    string originalTitle = SafeGetString(reader, 1);
+                                    string year = SafeGetString(reader, 2);
+                                    
+                                    // 基础关键词
+                                    jikanSearchQuery = string.IsNullOrEmpty(originalTitle) ? title : originalTitle;
+                                    
+                                    // 【优化】多季度作品防误伤：把年份加进搜索词，防止“咒术回战 第2季”搜出第一季的图
+                                    if (!string.IsNullOrEmpty(year))
+                                    {
+                                        // 提取年份数字
+                                        var match = System.Text.RegularExpressions.Regex.Match(year, @"\d{4}");
+                                        if (match.Success)
+                                        {
+                                            jikanSearchQuery += $" {match.Value}";
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-                catch { }
 
-                string fileName = $"{workId}_{DateTime.Now.Ticks}{extension}";
-                string localPath = Path.Combine(appDataDir, fileName);
-
-                using (var client = new HttpClient())
+                // 如果有 Bangumi ID，优先通过官方 API 获取最准确的图片 URL
+                if (!string.IsNullOrEmpty(bangumiId))
                 {
-                    // 设置超时
-                    client.Timeout = TimeSpan.FromSeconds(30);
-                    // 添加 User-Agent 模拟浏览器
-                    client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
-
-                    var bytes = await client.GetByteArrayAsync(url);
-                    await File.WriteAllBytesAsync(localPath, bytes);
+                    try
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[WorkService] 尝试通过 Bangumi API 获取真实封面，ID: {bangumiId}");
+                        client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "AniTechou/1.0 (https://github.com/your-repo/AniTechou)");
+                        
+                        var apiResponse = await client.GetAsync($"https://api.bgm.tv/v0/subjects/{bangumiId}");
+                        if (apiResponse.IsSuccessStatusCode)
+                        {
+                            var jsonString = await apiResponse.Content.ReadAsStringAsync();
+                            using (var doc = System.Text.Json.JsonDocument.Parse(jsonString))
+                            {
+                                var root = doc.RootElement;
+                                if (root.TryGetProperty("images", out var images))
+                                {
+                                    if (images.TryGetProperty("large", out var largeUrl)) targetUrls.Add(largeUrl.GetString());
+                                    if (images.TryGetProperty("common", out var commonUrl)) targetUrls.Add(commonUrl.GetString());
+                                    if (images.TryGetProperty("medium", out var mediumUrl)) targetUrls.Add(mediumUrl.GetString());
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[WorkService] Bangumi API 异常: {ex.Message}");
+                    }
                 }
 
-                // 更新数据库中的 CoverPath
-                UpdateCoverPath(workId, localPath);
+                // 【新增策略】如果 AI 没有给 ID，或者 API 请求失败，我们用标题去搜 Bangumi
+                if (targetUrls.Count == 0 && !string.IsNullOrEmpty(jikanSearchQuery))
+                {
+                    try
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[WorkService] 启动 Bangumi 关键词搜索，关键词: {jikanSearchQuery}");
+                        client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "AniTechou/1.0 (https://github.com/your-repo/AniTechou)");
+                        
+                        // 调用 Bangumi 的搜索 API
+                        var searchResponse = await client.GetAsync($"https://api.bgm.tv/search/subject/{Uri.EscapeDataString(jikanSearchQuery)}?type=2&responseGroup=small");
+                        if (searchResponse.IsSuccessStatusCode)
+                        {
+                            var jsonString = await searchResponse.Content.ReadAsStringAsync();
+                            using (var doc = System.Text.Json.JsonDocument.Parse(jsonString))
+                            {
+                                var root = doc.RootElement;
+                                if (root.TryGetProperty("list", out var listArray) && listArray.GetArrayLength() > 0)
+                                {
+                                    var firstResult = listArray[0];
+                                    if (firstResult.TryGetProperty("images", out var images))
+                                    {
+                                        if (images.TryGetProperty("large", out var largeUrl)) targetUrls.Add(largeUrl.GetString());
+                                        if (images.TryGetProperty("common", out var commonUrl)) targetUrls.Add(commonUrl.GetString());
+                                    }
+                                    System.Diagnostics.Debug.WriteLine($"[WorkService] Bangumi 关键词搜索成功，匹配到 ID: {firstResult.GetProperty("id")}");
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[WorkService] Bangumi 搜索异常: {ex.Message}");
+                    }
+                }
 
-                return localPath;
+                // 【核心策略2】如果 Bgm 彻底失败，启动 Jikan API (MyAnimeList) 搜索兜底
+                if (targetUrls.Count == 0 && !string.IsNullOrEmpty(jikanSearchQuery))
+                {
+                    try
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[WorkService] 启动 Jikan API (MAL) 备用搜索，关键词: {jikanSearchQuery}");
+                        // Jikan 搜索动画
+                        var jikanResponse = await client.GetAsync($"https://api.jikan.moe/v4/anime?q={Uri.EscapeDataString(jikanSearchQuery)}&limit=1");
+                        if (jikanResponse.IsSuccessStatusCode)
+                        {
+                            var jsonString = await jikanResponse.Content.ReadAsStringAsync();
+                            using (var doc = System.Text.Json.JsonDocument.Parse(jsonString))
+                            {
+                                var root = doc.RootElement;
+                                if (root.TryGetProperty("data", out var dataArray) && dataArray.GetArrayLength() > 0)
+                                {
+                                    var firstResult = dataArray[0];
+                                    if (firstResult.TryGetProperty("images", out var images) && 
+                                        images.TryGetProperty("jpg", out var jpgImages) && 
+                                        jpgImages.TryGetProperty("large_image_url", out var imgUrl))
+                                    {
+                                        string malUrl = imgUrl.GetString();
+                                        if (!string.IsNullOrEmpty(malUrl))
+                                        {
+                                            System.Diagnostics.Debug.WriteLine($"[WorkService] 从 MAL 获取到封面: {malUrl}");
+                                            targetUrls.Add(malUrl);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[WorkService] Jikan API 搜索异常: {ex.Message}");
+                    }
+                }
+
+                // 如果上述都失败，退回到对原始 URL 的猜测策略
+                if (targetUrls.Count == 0 && !string.IsNullOrEmpty(originalUrl) && originalUrl.Contains("lain.bgm.tv"))
+                {
+                    string rawUrl = originalUrl;
+                    if (rawUrl.Contains("/s/")) { targetUrls.Add(rawUrl.Replace("/s/", "/l/")); targetUrls.Add(rawUrl.Replace("/s/", "/c/")); targetUrls.Add(rawUrl); }
+                    else if (rawUrl.Contains("/l/")) { targetUrls.Add(rawUrl); targetUrls.Add(rawUrl.Replace("/l/", "/c/")); targetUrls.Add(rawUrl.Replace("/l/", "/m/")); }
+                    else if (rawUrl.Contains("/c/")) { targetUrls.Add(rawUrl.Replace("/c/", "/l/")); targetUrls.Add(rawUrl); }
+                    else if (rawUrl.Contains("/m/")) { targetUrls.Add(rawUrl.Replace("/m/", "/l/")); targetUrls.Add(rawUrl.Replace("/m/", "/c/")); targetUrls.Add(rawUrl); }
+                    else { targetUrls.Add(rawUrl); }
+                }
+
+                targetUrls = targetUrls.Where(u => !string.IsNullOrEmpty(u)).Distinct().ToList();
+
+                foreach (var targetUrl in targetUrls)
+                {
+                    try
+                    {
+                        // 发送图片下载请求时，动态调整 Referer
+                        if (targetUrl.Contains("bgm.tv"))
+                        {
+                            client.DefaultRequestHeaders.Remove("Referer");
+                            client.DefaultRequestHeaders.Add("Referer", "https://bgm.tv/");
+                        }
+                        else if (targetUrl.Contains("myanimelist.net"))
+                        {
+                            client.DefaultRequestHeaders.Remove("Referer");
+                            client.DefaultRequestHeaders.Add("Referer", "https://myanimelist.net/");
+                        }
+
+                        string appDataDir = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                            "AniTechou",
+                            "covers"
+                        );
+
+                        if (!Directory.Exists(appDataDir)) Directory.CreateDirectory(appDataDir);
+
+                        string extension = ".jpg";
+                        try
+                        {
+                            Uri uri = new Uri(targetUrl);
+                            string path = uri.AbsolutePath;
+                            if (path.Contains(".")) extension = Path.GetExtension(path);
+                        }
+                        catch { }
+
+                        string fileName = $"{workId}_{DateTime.Now.Ticks}{extension}";
+                        string localPath = Path.Combine(appDataDir, fileName);
+
+                        System.Diagnostics.Debug.WriteLine($"[WorkService] 真正开始下载图片: {targetUrl}");
+                        var response = await client.GetAsync(targetUrl);
+                        
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[WorkService] 下载失败，状态码: {response.StatusCode}");
+                            continue; 
+                        }
+
+                        // 检查 Content-Type，确保下载的确实是图片而不是防盗链的 HTML 页面
+                        if (response.Content.Headers.ContentType != null && !response.Content.Headers.ContentType.MediaType.StartsWith("image/"))
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[WorkService] 下载的不是图片格式 ({response.Content.Headers.ContentType.MediaType})，可能是防盗链拦截");
+                            continue;
+                        }
+
+                        var bytes = await response.Content.ReadAsByteArrayAsync();
+                        if (bytes.Length < 1024) 
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[WorkService] 图片文件过小 (<1KB)，可能是占位图或防盗链错误");
+                            continue;
+                        }
+
+                        await File.WriteAllBytesAsync(localPath, bytes);
+                        UpdateCoverPath(workId, localPath);
+                        System.Diagnostics.Debug.WriteLine($"[WorkService] 封面保存成功: {localPath}");
+                        return localPath;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[WorkService] 下载异常 ({targetUrl}): {ex.Message}");
+                        continue; 
+                    }
+                }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[WorkService] DownloadAndSaveCoverAsync error: {ex.Message}");
-                return "";
-            }
+
+            return "";
         }
 
         private void UpdateCoverPath(int workId, string localPath)
@@ -593,6 +1100,8 @@ namespace AniTechou.Services
         {
             public int Id { get; set; }
             public string Title { get; set; } = "";
+            public string OriginalTitle { get; set; } = "";
+            public string Type { get; set; } = "";
             public string Info { get; set; } = "";
             public string CoverPath { get; set; } = "";
             public double ProgressValue { get; set; }
@@ -605,7 +1114,7 @@ namespace AniTechou.Services
         /// </summary>
         public int AddWork(string title, string originalTitle, string type, string company,
                    string year, string season, string sourceType, string episodesVolumes, string progress,
-                   string status, int rating, string synopsis, string coverPath)
+                   string status, int rating, string synopsis, string coverPath, string author = "", string originalWork = "")
         {
             try
             {
@@ -628,8 +1137,8 @@ namespace AniTechou.Services
 
                             // 插入作品
                             string insertWork = @"
-                        INSERT INTO Works (Title, OriginalTitle, Type, Company, Year, Season, SourceType, EpisodesVolumes, Synopsis, CoverPath, AddedTime, LastModified)
-                        VALUES (@Title, @OriginalTitle, @Type, @Company, @Year, @Season, @SourceType, @EpisodesVolumes, @Synopsis, @CoverPath, @AddedTime, @LastModified);
+                        INSERT INTO Works (Title, OriginalTitle, Type, Company, Year, Season, SourceType, EpisodesVolumes, Synopsis, CoverPath, Author, OriginalWork, AddedTime, LastModified)
+                        VALUES (@Title, @OriginalTitle, @Type, @Company, @Year, @Season, @SourceType, @EpisodesVolumes, @Synopsis, @CoverPath, @Author, @OriginalWork, @AddedTime, @LastModified);
                         SELECT last_insert_rowid();";
 
                             int workId;
@@ -639,6 +1148,8 @@ namespace AniTechou.Services
                                 cmd.Parameters.AddWithValue("@OriginalTitle", originalTitle ?? "");
                                 cmd.Parameters.AddWithValue("@Type", type);
                                 cmd.Parameters.AddWithValue("@Company", company ?? "");
+                                cmd.Parameters.AddWithValue("@Author", author ?? "");
+                                cmd.Parameters.AddWithValue("@OriginalWork", originalWork ?? "");
                                 cmd.Parameters.AddWithValue("@Year", yearValue);
                                 cmd.Parameters.AddWithValue("@Season", season ?? "");
                                 cmd.Parameters.AddWithValue("@SourceType", sourceType ?? "原创");
@@ -688,7 +1199,7 @@ namespace AniTechou.Services
             using (var conn = DatabaseHelper.GetConnection(_currentAccount))
             {
                 conn.Open();
-                string sql = @"SELECT Id, Title, OriginalTitle, Type, Company, Year, Season, SourceType, EpisodesVolumes, Synopsis, CoverPath
+                string sql = @"SELECT Id, Title, OriginalTitle, Type, Company, Year, Season, SourceType, EpisodesVolumes, Synopsis, CoverPath, Author, OriginalWork
                                FROM Works WHERE Id = @Id";
                 using (var cmd = new SQLiteCommand(sql, conn))
                 {
@@ -709,7 +1220,9 @@ namespace AniTechou.Services
                                 SourceType = SafeGetString(reader, 7),
                                 EpisodesVolumes = SafeGetString(reader, 8),
                                 Synopsis = SafeGetString(reader, 9),
-                                CoverPath = SafeGetString(reader, 10)
+                                CoverPath = SafeGetString(reader, 10),
+                                Author = SafeGetString(reader, 11),
+                                OriginalWork = SafeGetString(reader, 12)
                             };
                         }
                     }
@@ -783,20 +1296,7 @@ namespace AniTechou.Services
             }
         }
 
-        public class WorkInfo
-        {
-            public int Id { get; set; }
-            public string Title { get; set; } = "";
-            public string OriginalTitle { get; set; } = "";
-            public string Type { get; set; } = "";
-            public string Company { get; set; } = "";
-            public string Year { get; set; } = "";
-            public string Season { get; set; } = "";
-            public string SourceType { get; set; } = "";
-            public string EpisodesVolumes { get; set; } = "";
-            public string Synopsis { get; set; } = "";
-            public string CoverPath { get; set; } = "";
-        }
+
 
         public class UserWorkInfo
         {
@@ -814,7 +1314,7 @@ namespace AniTechou.Services
 
         public bool UpdateWorkInfo(int workId, string title, string originalTitle,
                            string type, string company, string year, string season,
-                           string sourceType, string episodesVolumes, string synopsis, string coverPath)
+                           string sourceType, string episodesVolumes, string synopsis, string coverPath, string author = "", string originalWork = "")
         {
             try
             {
@@ -827,6 +1327,8 @@ namespace AniTechou.Services
                     OriginalTitle = @OriginalTitle,
                     Type = @Type,
                     Company = @Company,
+                    Author = @Author,
+                    OriginalWork = @OriginalWork,
                     Year = @Year,
                     Season = @Season,
                     SourceType = @SourceType,
@@ -842,6 +1344,8 @@ namespace AniTechou.Services
                         cmd.Parameters.AddWithValue("@OriginalTitle", originalTitle ?? "");
                         cmd.Parameters.AddWithValue("@Type", type);
                         cmd.Parameters.AddWithValue("@Company", company ?? "");
+                        cmd.Parameters.AddWithValue("@Author", author ?? "");
+                        cmd.Parameters.AddWithValue("@OriginalWork", originalWork ?? "");
                         cmd.Parameters.AddWithValue("@Year", year ?? "");
                         cmd.Parameters.AddWithValue("@Season", season ?? "");
                         cmd.Parameters.AddWithValue("@SourceType", sourceType ?? "");
@@ -1145,6 +1649,61 @@ namespace AniTechou.Services
                     return cmd.ExecuteNonQuery() > 0;
                 }
             }
+        }
+
+        /// <summary>
+        /// 删除作品
+        /// </summary>
+        public bool DeleteWork(int workId)
+        {
+            try
+            {
+                using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+                {
+                    conn.Open();
+                    using (var transaction = conn.BeginTransaction())
+                    {
+                        try
+                        {
+                            // 1. 获取封面路径（用于后续删除文件）
+                            string coverPath = "";
+                            using (var cmd = new SQLiteCommand("SELECT CoverPath FROM Works WHERE Id = @Id", conn))
+                            {
+                                cmd.Parameters.AddWithValue("@Id", workId);
+                                coverPath = cmd.ExecuteScalar()?.ToString();
+                            }
+
+                            // 2. 删除关联数据（外键级联删除应该已经处理了部分，但这里手动处理更稳妥）
+                            new SQLiteCommand("DELETE FROM UserList WHERE WorkId = " + workId, conn).ExecuteNonQuery();
+                            new SQLiteCommand("DELETE FROM WorkTags WHERE WorkId = " + workId, conn).ExecuteNonQuery();
+                            new SQLiteCommand("DELETE FROM NoteWorks WHERE WorkId = " + workId, conn).ExecuteNonQuery();
+                            
+                            // 3. 删除作品主表
+                            using (var cmd = new SQLiteCommand("DELETE FROM Works WHERE Id = @Id", conn))
+                            {
+                                cmd.Parameters.AddWithValue("@Id", workId);
+                                cmd.ExecuteNonQuery();
+                            }
+
+                            transaction.Commit();
+
+                            // 4. 尝试删除本地封面文件
+                            if (!string.IsNullOrEmpty(coverPath) && File.Exists(coverPath))
+                            {
+                                try { File.Delete(coverPath); } catch { }
+                            }
+
+                            return true;
+                        }
+                        catch
+                        {
+                            transaction.Rollback();
+                            return false;
+                        }
+                    }
+                }
+            }
+            catch { return false; }
         }
 
         /// <summary>

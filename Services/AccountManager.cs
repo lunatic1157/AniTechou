@@ -126,8 +126,27 @@ namespace AniTechou.Services
             var infoPath = Path.Combine(_accountsDir, $"{userName}.info");
             if (!File.Exists(infoPath)) return null;
 
-            var json = File.ReadAllText(infoPath);
-            return JsonSerializer.Deserialize<Account>(json);
+            try
+            {
+                var json = File.ReadAllText(infoPath);
+                var account = JsonSerializer.Deserialize<Account>(json);
+                
+                // 如果头像文件不存在，则清除头像路径
+                if (account != null && !string.IsNullOrEmpty(account.AvatarPath))
+                {
+                    if (!File.Exists(account.AvatarPath))
+                    {
+                        account.AvatarPath = "";
+                        SaveAccountInfo(account); // 顺便修复文件
+                    }
+                }
+                
+                return account;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>
@@ -278,6 +297,25 @@ namespace AniTechou.Services
             SaveLastAccount(userName);
             AccountSwitched?.Invoke(this, account);
             return true;
+        }
+
+        public bool UpdateAvatar(string userName, string avatarPath)
+        {
+            var account = LoadAccountInfo(userName);
+            if (account != null)
+            {
+                account.AvatarPath = avatarPath;
+                SaveAccountInfo(account); // 确保写入磁盘
+
+                // 更新内存中的当前账号
+                if (_currentAccount != null && _currentAccount.UserName == userName)
+                {
+                    _currentAccount.AvatarPath = avatarPath;
+                }
+
+                return true;
+            }
+            return false;
         }
 
         /// <summary>
