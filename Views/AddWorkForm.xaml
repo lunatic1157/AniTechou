@@ -39,7 +39,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="类型 *" Foreground="#5C4E3D" VerticalAlignment="Center"/>
-                <ComboBox x:Name="TypeBox" Grid.Column="1" Height="30" SelectedIndex="0">
+                <ComboBox x:Name="TypeBox" Grid.Column="1" Height="30" SelectedIndex="0" SelectionChanged="TypeBox_SelectionChanged">
                     <ComboBoxItem Content="动画"/>
                     <ComboBoxItem Content="漫画"/>
                     <ComboBoxItem Content="轻小说"/>
@@ -55,7 +55,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="年份/季度" Foreground="#5C4E3D" VerticalAlignment="Center"/>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <TextBox x:Name="YearBox" Width="60" Height="30"/>
+                    <TextBox x:Name="YearBox" Width="60" Height="30" ToolTip="例如: 2024"/>
                     <ComboBox x:Name="SeasonBox" Width="50" Height="30" Margin="5,0,0,0" SelectedIndex="0">
                         <ComboBoxItem Content="春"/>
                         <ComboBoxItem Content="夏"/>
@@ -74,6 +74,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="原作类型" Foreground="#5C4E3D" VerticalAlignment="Center"/>
                 <ComboBox x:Name="SourceTypeBox" Grid.Column="1" Height="30" SelectedIndex="0">
+                    <ComboBoxItem Content="无"/>
                     <ComboBoxItem Content="原创"/>
                     <ComboBoxItem Content="漫改"/>
                     <ComboBoxItem Content="小说改"/>
@@ -82,14 +83,23 @@
                 </ComboBox>
             </Grid>
 
-            <!-- 制作 -->
+            <!-- 制作/作者 与 原作 -->
             <Grid Margin="0,10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="80"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="制作" Foreground="#5C4E3D" VerticalAlignment="Center"/>
-                <TextBox x:Name="CompanyBox" Grid.Column="1" Height="30"/>
+                <TextBlock x:Name="CompanyLabel" Grid.Column="0" Text="制作公司" Foreground="#5C4E3D" VerticalAlignment="Center"/>
+                <Grid Grid.Column="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="CompanyBox" Grid.Column="0" Height="30" ToolTip="制作公司/出版社/作者"/>
+                    <TextBlock Grid.Column="1" Text="原作" Foreground="#5C4E3D" Margin="10,0,5,0" VerticalAlignment="Center"/>
+                    <TextBox x:Name="OriginalWorkBox" Grid.Column="2" Height="30" ToolTip="原作作者（如小说作者）"/>
+                </Grid>
             </Grid>
             
             <!-- 集数/卷数 -->
@@ -137,7 +147,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="评分" Foreground="#5C4E3D" VerticalAlignment="Center"/>
-                <ComboBox x:Name="RatingBox" Grid.Column="1" Height="30" Width="120" HorizontalAlignment="Left" SelectedIndex="0">
+                <ComboBox x:Name="RatingBox" Grid.Column="1" Height="30" Width="150" HorizontalAlignment="Left" SelectedIndex="0">
                     <ComboBoxItem Content="未评分"/>
                     <ComboBoxItem Content="★☆☆☆☆ (1-2分)"/>
                     <ComboBoxItem Content="★★☆☆☆ (3-4分)"/>

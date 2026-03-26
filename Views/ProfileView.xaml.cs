@@ -5,6 +5,10 @@ using System.Windows;
 using System.Windows.Controls;
 using AniTechou.Services;
 
+using System.IO;
+using Microsoft.Win32;
+using System.Windows.Media.Imaging;
+
 namespace AniTechou.Views
 {
     public partial class ProfileView : UserControl
@@ -41,6 +45,12 @@ namespace AniTechou.Views
                 if (account != null)
                 {
                     JoinDateText.Text = $"加入时间：{account.CreatedTime:yyyy年MM月dd日}";
+                    
+                    // 加载头像
+                    if (!string.IsNullOrEmpty(account.AvatarPath) && File.Exists(account.AvatarPath))
+                    {
+                        LoadAvatarImage(account.AvatarPath);
+                    }
                 }
 
                 // 昵称 - 从数据库获取
@@ -52,6 +62,17 @@ namespace AniTechou.Views
 
                 // 标签云
                 LoadTagCloud(stats.TagStats);
+                
+                // 再次尝试从 MainWindow 中获取最新状态的头像
+                var mainWindow = Application.Current.MainWindow as MainWindow;
+                if (mainWindow != null && mainWindow._accountManager.CurrentAccount != null)
+                {
+                    string currentAvatar = mainWindow._accountManager.CurrentAccount.AvatarPath;
+                    if (!string.IsNullOrEmpty(currentAvatar) && File.Exists(currentAvatar))
+                    {
+                        LoadAvatarImage(currentAvatar);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -182,6 +203,98 @@ namespace AniTechou.Views
             inputDialog.Content = panel;
 
             inputDialog.ShowDialog();
+        }
+
+        private void Avatar_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog
+            {
+                Title = "选择头像",
+                Filter = "图片文件 (*.jpg;*.jpeg;*.png;*.webp)|*.jpg;*.jpeg;*.png;*.webp|所有文件 (*.*)|*.*",
+                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures)
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    // 将图片复制到应用数据目录
+                    string appDataDir = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "AniTechou",
+                        "avatars"
+                    );
+
+                    if (!Directory.Exists(appDataDir))
+                    {
+                        Directory.CreateDirectory(appDataDir);
+                    }
+
+                    string extension = Path.GetExtension(openFileDialog.FileName);
+                    string fileName = $"{_accountName}_avatar_{DateTime.Now.Ticks}{extension}";
+                    string targetPath = Path.Combine(appDataDir, fileName);
+
+                    File.Copy(openFileDialog.FileName, targetPath, true);
+
+                    var mainWindow = Application.Current.MainWindow as MainWindow;
+                    if (mainWindow != null)
+                    {
+                        if (mainWindow._accountManager.UpdateAvatar(_accountName, targetPath))
+                        {
+                            LoadAvatarImage(targetPath);
+                            MessageBox.Show("头像更新成功！");
+                        }
+                        else
+                        {
+                            MessageBox.Show("保存头像路径失败。");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"设置头像失败: {ex.Message}");
+                }
+            }
+        }
+
+        private void LoadAvatarImage(string path)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                {
+                    ShowDefaultAvatar();
+                    return;
+                }
+
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                // 解决文件被锁定的问题，允许覆盖保存
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+                bitmap.UriSource = new Uri(path);
+                bitmap.EndInit();
+                
+                var avatarImage = FindName("AvatarImage") as Image;
+                var defaultAvatarText = FindName("DefaultAvatarText") as TextBlock;
+
+                if (avatarImage != null) avatarImage.Source = bitmap;
+                if (defaultAvatarText != null) defaultAvatarText.Visibility = Visibility.Collapsed;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ProfileView] LoadAvatarImage Error: {ex.Message}");
+                ShowDefaultAvatar();
+            }
+        }
+
+        private void ShowDefaultAvatar()
+        {
+            var avatarImage = FindName("AvatarImage") as Image;
+            var defaultAvatarText = FindName("DefaultAvatarText") as TextBlock;
+
+            if (avatarImage != null) avatarImage.Source = null;
+            if (defaultAvatarText != null) defaultAvatarText.Visibility = Visibility.Visible;
         }
     }
 }

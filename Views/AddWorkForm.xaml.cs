@@ -18,6 +18,30 @@ namespace AniTechou.Views
             _accountName = accountName;
         }
 
+        private void TypeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (TypeBox.SelectedItem is ComboBoxItem selectedItem)
+            {
+                UpdateDynamicLabels(selectedItem.Content.ToString());
+            }
+        }
+
+        private void UpdateDynamicLabels(string type)
+        {
+            var companyLabel = FindName("CompanyLabel") as TextBlock;
+            if (companyLabel != null)
+            {
+                if (type == "漫画" || type == "轻小说")
+                {
+                    companyLabel.Text = "作者";
+                }
+                else
+                {
+                    companyLabel.Text = "制作公司";
+                }
+            }
+        }
+
         private void Save_Click(object sender, RoutedEventArgs e)
         {
             string title = TitleBox.Text.Trim();
@@ -30,8 +54,8 @@ namespace AniTechou.Views
             try
             {
                 // 类型转换
-                string type = ((ComboBoxItem)TypeBox.SelectedItem).Content.ToString();
-                string typeEn = type switch
+                string typeText = ((ComboBoxItem)TypeBox.SelectedItem).Content.ToString();
+                string typeEn = typeText switch
                 {
                     "动画" => "Anime",
                     "漫画" => "Manga",
@@ -67,7 +91,17 @@ namespace AniTechou.Views
                 string season = ((ComboBoxItem)SeasonBox.SelectedItem).Content.ToString();
 
                 // 原作类型
-                string sourceType = ((ComboBoxItem)SourceTypeBox.SelectedItem)?.Content.ToString() ?? "原创";
+                string sourceType = ((ComboBoxItem)SourceTypeBox.SelectedItem)?.Content.ToString() ?? "";
+                if (sourceType == "无") sourceType = "";
+
+                string company = typeEn == "Anime" || typeEn == "Game" ? CompanyBox.Text.Trim() : "";
+                string author = typeEn == "Manga" || typeEn == "LightNovel" ? CompanyBox.Text.Trim() : "";
+                string originalWork = "";
+                var originalWorkBox = FindName("OriginalWorkBox") as TextBox;
+                if (originalWorkBox != null)
+                {
+                    originalWork = originalWorkBox.Text.Trim();
+                }
 
                 var workService = new WorkService(_accountName);
 
@@ -75,7 +109,7 @@ namespace AniTechou.Views
                     title,
                     OriginalTitleBox.Text.Trim(),
                     typeEn,                    // 英文类型
-                    CompanyBox.Text.Trim(),
+                    company,
                     year,
                     season,
                     sourceType,                // 原作类型
@@ -84,7 +118,9 @@ namespace AniTechou.Views
                     statusEn,                  // 英文状态
                     rating,
                     SynopsisBox.Text.Trim(),
-                    _selectedCoverPath
+                    _selectedCoverPath,
+                    author,
+                    originalWork
                 );
 
                 if (workId > 0)

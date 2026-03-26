@@ -58,6 +58,13 @@
                                 Foreground="White"
                                 Click="TestConnection_Click"
                                 Margin="0,0,10,0"/>
+                        <Button Content="编辑AI提示词"
+                                Width="110" Height="32"
+                                Background="#E0D5C0"
+                                Foreground="#5C4E3D"
+                                Click="EditPrompt_Click"
+                                Margin="0,0,10,0"
+                                ToolTip="自定义AI助手的系统提示词，调整其行为"/>
                         <TextBlock x:Name="TestStatusText"
                                    Text=""
                                    FontSize="12"
