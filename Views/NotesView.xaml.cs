@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
 using AniTechou.Services;
 
 namespace AniTechou.Views
@@ -21,7 +22,6 @@ namespace AniTechou.Views
             InitializeComponent();
             _accountName = accountName;
 
-            // 添加转换器
             if (!Resources.Contains("BoolToVisibility"))
             {
                 Resources.Add("BoolToVisibility", new BoolToVisibilityConverter());
@@ -38,17 +38,13 @@ namespace AniTechou.Views
 
             TagFilterPanel.Children.Clear();
 
-            // 添加"全部"按钮
             var allBtn = new Button
             {
                 Content = "全部",
                 Tag = "",
-                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(240, 233, 221)),
-                Padding = new Thickness(8, 4, 8, 4),
-                Margin = new Thickness(0, 0, 5, 5),
-                Cursor = System.Windows.Input.Cursors.Hand,
-                BorderThickness = new Thickness(0)
+                Style = (Style)FindResource("FilterButton")
             };
+            ApplyTagButtonState(allBtn, string.IsNullOrEmpty(_currentTagFilter));
             allBtn.Click += TagFilter_Click;
             TagFilterPanel.Children.Add(allBtn);
 
@@ -58,12 +54,9 @@ namespace AniTechou.Views
                 {
                     Content = tag,
                     Tag = tag,
-                    Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(240, 233, 221)),
-                    Padding = new Thickness(8, 4, 8, 4),
-                    Margin = new Thickness(0, 0, 5, 5),
-                    Cursor = System.Windows.Input.Cursors.Hand,
-                    BorderThickness = new Thickness(0)
+                    Style = (Style)FindResource("FilterButton")
                 };
+                ApplyTagButtonState(btn, string.Equals(_currentTagFilter, tag, StringComparison.Ordinal));
                 btn.Click += TagFilter_Click;
                 TagFilterPanel.Children.Add(btn);
             }
@@ -74,15 +67,14 @@ namespace AniTechou.Views
             var btn = sender as Button;
             _currentTagFilter = btn?.Tag?.ToString() ?? "";
 
-            // 更新按钮样式
             foreach (var child in TagFilterPanel.Children)
             {
                 if (child is Button b)
                 {
-                    b.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(240, 233, 221));
+                    ApplyTagButtonState(b, false);
                 }
             }
-            btn.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(224, 213, 192));
+            ApplyTagButtonState(btn, true);
 
             ApplyFilters();
         }
@@ -99,14 +91,12 @@ namespace AniTechou.Views
 
             _filteredNotes = _allNotes.Where(n =>
             {
-                // 标签筛选
                 if (!string.IsNullOrEmpty(_currentTagFilter))
                 {
                     var tags = n.Tags?.Split(',') ?? new string[0];
                     if (!tags.Contains(_currentTagFilter)) return false;
                 }
 
-                // 搜索筛选 - 只搜索标题
                 if (!string.IsNullOrEmpty(_currentSearchText))
                 {
                     bool titleMatch = n.Title?.Contains(_currentSearchText) ?? false;
@@ -124,9 +114,7 @@ namespace AniTechou.Views
             foreach (var note in _filteredNotes)
             {
                 note.DisplayTitle = string.IsNullOrEmpty(note.Title) ? "无标题" : note.Title;
-                note.Preview = string.IsNullOrEmpty(note.Content) ? "" :
-                    (note.Content.Length > 80 ? note.Content.Substring(0, 80) + "..." : note.Content);
-                note.DisplayContent = note.Preview;
+                note.DisplayContent = note.Preview ?? "";
                 note.CreatedTimeDisplay = note.CreatedTime.ToString("yyyy-MM-dd HH:mm");
                 note.TagsDisplay = string.IsNullOrEmpty(note.Tags) ? "" : $"#{note.Tags.Replace(",", " #")}";
                 note.HasTags = !string.IsNullOrEmpty(note.Tags);
@@ -207,20 +195,37 @@ namespace AniTechou.Views
             var button = sender as Button;
             if (button?.Tag is int noteId)
             {
-                var result = MessageBox.Show("确定删除这篇笔记吗？", "确认删除", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                if (result == MessageBoxResult.Yes)
+                if (Windows.AppMessageDialog.Show(Application.Current.MainWindow, "确认删除", "确定删除这篇笔记吗？", true))
                 {
                     var workService = new WorkService(_accountName);
                     if (workService.DeleteNote(noteId))
                     {
                         LoadNotes();
-                        MessageBox.Show("删除成功", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                        Windows.AppMessageDialog.Show(Application.Current.MainWindow, "提示", "删除成功");
                     }
                     else
                     {
-                        MessageBox.Show("删除失败", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                        Windows.AppMessageDialog.Show(Application.Current.MainWindow, "错误", "删除失败");
                     }
                 }
+            }
+        }
+
+        private static void ApplyTagButtonState(Button button, bool isSelected)
+        {
+            if (button == null) return;
+
+            button.ClearValue(Control.BackgroundProperty);
+            button.ClearValue(Control.BorderBrushProperty);
+            if (isSelected)
+            {
+                button.SetResourceReference(Control.BackgroundProperty, "AccentSoftBrush");
+                button.SetResourceReference(Control.BorderBrushProperty, "AccentSoftBrush");
+            }
+            else
+            {
+                button.SetResourceReference(Control.BackgroundProperty, "Surface3Brush");
+                button.BorderBrush = Brushes.Transparent;
             }
         }
     }

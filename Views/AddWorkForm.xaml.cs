@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
@@ -16,13 +17,40 @@ namespace AniTechou.Views
         {
             InitializeComponent();
             _accountName = accountName;
+            InitializeOptions();
+        }
+
+        private void InitializeOptions()
+        {
+            TypeBox.ItemsSource = new List<string> { "动画", "漫画", "轻小说", "游戏" };
+            TypeBox.SelectedIndex = 0;
+
+            SeasonBox.ItemsSource = new List<string> { "春", "夏", "秋", "冬", "" };
+            SeasonBox.SelectedIndex = 0;
+
+            SourceTypeBox.ItemsSource = new List<string> { "无", "原创", "漫改", "小说改", "游戏改", "其他" };
+            SourceTypeBox.SelectedIndex = 0;
+
+            StatusBox.ItemsSource = new List<string> { "想看", "在看", "看过" };
+            StatusBox.SelectedIndex = 0;
+
+            RatingBox.ItemsSource = new List<string>
+            {
+                "未评分",
+                "★☆☆☆☆ (1-2分)",
+                "★★☆☆☆ (3-4分)",
+                "★★★☆☆ (5-6分)",
+                "★★★★☆ (7-8分)",
+                "★★★★★ (9-10分)"
+            };
+            RatingBox.SelectedIndex = 0;
         }
 
         private void TypeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (TypeBox.SelectedItem is ComboBoxItem selectedItem)
+            if (TypeBox.SelectedItem is string selectedItem)
             {
-                UpdateDynamicLabels(selectedItem.Content.ToString());
+                UpdateDynamicLabels(selectedItem);
             }
         }
 
@@ -47,14 +75,14 @@ namespace AniTechou.Views
             string title = TitleBox.Text.Trim();
             if (string.IsNullOrEmpty(title))
             {
-                MessageBox.Show("请输入作品标题");
+                Windows.AppMessageDialog.Show(Application.Current.MainWindow, "提示", "请输入作品标题");
                 return;
             }
 
             try
             {
                 // 类型转换
-                string typeText = ((ComboBoxItem)TypeBox.SelectedItem).Content.ToString();
+                string typeText = TypeBox.SelectedItem as string ?? "动画";
                 string typeEn = typeText switch
                 {
                     "动画" => "Anime",
@@ -65,7 +93,7 @@ namespace AniTechou.Views
                 };
 
                 // 状态转换
-                string status = ((ComboBoxItem)StatusBox.SelectedItem).Content.ToString();
+                string status = StatusBox.SelectedItem as string ?? "想看";
                 string statusEn = status switch
                 {
                     "想看" => "wish",
@@ -75,7 +103,7 @@ namespace AniTechou.Views
                 };
 
                 // 评分转换
-                string ratingText = ((ComboBoxItem)RatingBox.SelectedItem).Content.ToString();
+                string ratingText = RatingBox.SelectedItem as string ?? "未评分";
                 int rating = ratingText switch
                 {
                     "★☆☆☆☆ (1-2分)" => 2,
@@ -88,10 +116,10 @@ namespace AniTechou.Views
 
                 // 年份季度
                 string year = YearBox.Text.Trim();
-                string season = ((ComboBoxItem)SeasonBox.SelectedItem).Content.ToString();
+                string season = SeasonBox.SelectedItem as string ?? "";
 
                 // 原作类型
-                string sourceType = ((ComboBoxItem)SourceTypeBox.SelectedItem)?.Content.ToString() ?? "";
+                string sourceType = SourceTypeBox.SelectedItem as string ?? "";
                 if (sourceType == "无") sourceType = "";
 
                 string company = typeEn == "Anime" || typeEn == "Game" ? CompanyBox.Text.Trim() : "";
@@ -125,17 +153,17 @@ namespace AniTechou.Views
 
                 if (workId > 0)
                 {
-                    MessageBox.Show("添加成功！");
+                    Windows.AppMessageDialog.Show(Application.Current.MainWindow, "成功", "添加成功！");
                     WorkAdded?.Invoke();
                 }
                 else
                 {
-                    MessageBox.Show("保存失败，请检查输入信息");
+                    Windows.AppMessageDialog.Show(Application.Current.MainWindow, "失败", "保存失败，请检查输入信息");
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"保存失败：{ex.Message}");
+                Windows.AppMessageDialog.Show(Application.Current.MainWindow, "错误", $"保存失败：{ex.Message}");
             }
         }
 

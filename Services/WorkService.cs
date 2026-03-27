@@ -4,35 +4,11 @@ using System.Data.SQLite;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
+using AniTechou.Models;
+using AniTechou.Utilities;
 
 namespace AniTechou.Services
 {
-    public class WorkInfo
-    {
-        public int Id { get; set; }
-        public string Title { get; set; }
-        public string OriginalTitle { get; set; }
-        public string Type { get; set; }
-        public string Company { get; set; }
-        public string Author { get; set; }
-        public string OriginalWork { get; set; }
-        public string Year { get; set; }
-        public string Season { get; set; }
-        public string SourceType { get; set; }
-        public string EpisodesVolumes { get; set; }
-        public string Synopsis { get; set; }
-        public string CoverPath { get; set; }
-    }
-
-    public class UserWorkInfo
-    {
-        public int Id { get; set; }
-        public int WorkId { get; set; }
-        public string Status { get; set; }
-        public string Progress { get; set; }
-        public int Rating { get; set; }
-    }
-
     /// <summary>
     /// 作品数据服务
     /// </summary>
@@ -1295,18 +1271,6 @@ namespace AniTechou.Services
                 System.Windows.MessageBox.Show($"更新失败：{ex.Message}");
             }
         }
-
-
-
-        public class UserWorkInfo
-        {
-            public int Id { get; set; }
-            public int WorkId { get; set; }
-            public string Status { get; set; } = "";
-            public string Progress { get; set; } = "";
-            public int Rating { get; set; }
-        }
-
         public string GetCurrentAccount()
         {
             return _currentAccount;
@@ -1407,6 +1371,40 @@ namespace AniTechou.Services
         }
 
         /// <summary>
+        /// 从 XAML 或纯文本中提取预览纯文本
+        /// </summary>
+        private string ExtractPreviewText(string content, int maxLength = 100)
+        {
+            if (string.IsNullOrWhiteSpace(content)) return "";
+            string text = content;
+            
+            if (content.TrimStart().StartsWith("<FlowDocument", StringComparison.OrdinalIgnoreCase) || 
+                content.TrimStart().StartsWith("<Section", StringComparison.OrdinalIgnoreCase) ||
+                content.TrimStart().StartsWith("<Span", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var document = new System.Windows.Documents.FlowDocument();
+                    var range = new System.Windows.Documents.TextRange(document.ContentStart, document.ContentEnd);
+                    using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+                    range.Load(stream, System.Windows.DataFormats.Xaml);
+                    text = range.Text;
+                }
+                catch
+                {
+                    text = System.Text.RegularExpressions.Regex.Replace(content, "<.*?>", string.Empty);
+                }
+            }
+
+            text = text.Trim();
+            if (text.Length > maxLength)
+            {
+                return text.Substring(0, maxLength) + "...";
+            }
+            return text;
+        }
+
+        /// <summary>
         /// 获取所有笔记
         /// </summary>
         public List<NoteListItem> GetAllNotes()
@@ -1432,7 +1430,7 @@ namespace AniTechou.Services
                     {
                         string title = SafeGetString(reader, 1);
                         string content = SafeGetString(reader, 2);
-                        string preview = content.Length > 100 ? content.Substring(0, 100) + "..." : content;
+                        string preview = ExtractPreviewText(content);
                         int noteId = SafeGetInt(reader, 0);
                         int workCount = SafeGetInt(reader, 5);
 
@@ -1953,6 +1951,430 @@ namespace AniTechou.Services
             public string Username { get; set; } = "";
             public string Nickname { get; set; } = "";
             public DateTime CreatedTime { get; set; }
+        }
+
+        public class ImportResult
+        {
+            public bool Success { get; set; }
+            public string ErrorMessage { get; set; } = "";
+            public int NewWorks { get; set; }
+            public int UpdatedWorks { get; set; }
+            public int SkippedWorks { get; set; }
+            public int InvalidWorks { get; set; }
+            public int NewNotes { get; set; }
+            public int UpdatedNotes { get; set; }
+            public int SkippedNotes { get; set; }
+            public int InvalidNotes { get; set; }
+        }
+
+        private sealed class ExportDataDto
+        {
+            public List<WorkExportDto> Works { get; set; }
+            public List<NoteExportDto> Notes { get; set; }
+            public DateTime ExportTime { get; set; }
+        }
+
+        private sealed class WorkExportDto
+        {
+            public int Id { get; set; }
+            public string Title { get; set; }
+            public string OriginalTitle { get; set; }
+            public string Type { get; set; }
+            public string Company { get; set; }
+            public string Year { get; set; }
+            public string Season { get; set; }
+            public string SourceType { get; set; }
+            public string EpisodesVolumes { get; set; }
+            public string Synopsis { get; set; }
+            public string CoverPath { get; set; }
+            public string AddedTime { get; set; }
+        }
+
+        private sealed class NoteExportDto
+        {
+            public int Id { get; set; }
+            public string Title { get; set; }
+            public string Content { get; set; }
+            public string CreatedTime { get; set; }
+            public string ModifiedTime { get; set; }
+        }
+
+        private sealed class ExistingWorkRecord
+        {
+            public int Id { get; set; }
+            public string Title { get; set; } = "";
+            public string OriginalTitle { get; set; } = "";
+            public string Type { get; set; } = "";
+            public string Company { get; set; } = "";
+            public string Year { get; set; } = "";
+            public string Season { get; set; } = "";
+            public string SourceType { get; set; } = "";
+            public string EpisodesVolumes { get; set; } = "";
+            public string Synopsis { get; set; } = "";
+            public string CoverPath { get; set; } = "";
+            public string AddedTime { get; set; } = "";
+        }
+
+        public ImportResult ImportAllData(string json)
+        {
+            var result = new ImportResult();
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                result.Success = false;
+                result.ErrorMessage = "导入内容为空";
+                return result;
+            }
+
+            ExportDataDto data;
+            try
+            {
+                data = System.Text.Json.JsonSerializer.Deserialize<ExportDataDto>(
+                    json,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.ErrorMessage = $"JSON 解析失败：{ex.Message}";
+                return result;
+            }
+
+            if (data == null)
+            {
+                result.Success = false;
+                result.ErrorMessage = "JSON 解析失败：数据为空";
+                return result;
+            }
+
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                using (var transaction = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        var existingWorks = LoadExistingWorks(conn);
+                        ImportWorks(conn, existingWorks, data.Works, result);
+                        ImportNotes(conn, data.Notes, result);
+
+                        transaction.Commit();
+                        result.Success = true;
+                        return result;
+                    }
+                    catch (Exception ex)
+                    {
+                        try { transaction.Rollback(); } catch { }
+                        result.Success = false;
+                        result.ErrorMessage = $"导入失败：{ex.Message}";
+                        return result;
+                    }
+                }
+            }
+        }
+
+        private List<ExistingWorkRecord> LoadExistingWorks(SQLiteConnection conn)
+        {
+            var works = new List<ExistingWorkRecord>();
+            string sql = "SELECT Id, Title, OriginalTitle, Type, Company, Year, Season, SourceType, EpisodesVolumes, Synopsis, CoverPath, AddedTime FROM Works";
+            using (var cmd = new SQLiteCommand(sql, conn))
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    works.Add(new ExistingWorkRecord
+                    {
+                        Id = SafeGetInt(reader, 0),
+                        Title = SafeGetString(reader, 1),
+                        OriginalTitle = SafeGetString(reader, 2),
+                        Type = SafeGetString(reader, 3),
+                        Company = SafeGetString(reader, 4),
+                        Year = SafeGetString(reader, 5),
+                        Season = SafeGetString(reader, 6),
+                        SourceType = SafeGetString(reader, 7),
+                        EpisodesVolumes = SafeGetString(reader, 8),
+                        Synopsis = SafeGetString(reader, 9),
+                        CoverPath = SafeGetString(reader, 10),
+                        AddedTime = SafeGetString(reader, 11)
+                    });
+                }
+            }
+            return works;
+        }
+
+        private static void ImportWorks(SQLiteConnection conn, List<ExistingWorkRecord> existingWorks, List<WorkExportDto> works, ImportResult result)
+        {
+            if (works == null || works.Count == 0) return;
+
+            foreach (var work in works)
+            {
+                if (work == null)
+                {
+                    result.InvalidWorks++;
+                    continue;
+                }
+
+                string title = (work.Title ?? "").Trim();
+                string originalTitle = (work.OriginalTitle ?? "").Trim();
+                string type = WorkDataRules.NormalizeTypeToEnglish(work.Type ?? "");
+                if (string.IsNullOrWhiteSpace(type) || !IsAllowedWorkType(type))
+                {
+                    result.InvalidWorks++;
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(originalTitle))
+                {
+                    result.InvalidWorks++;
+                    continue;
+                }
+
+                string company = (work.Company ?? "").Trim();
+                string year = NormalizeYear(work.Year);
+                string season = (work.Season ?? "").Trim();
+                string sourceType = WorkDataRules.NormalizeSourceType(work.SourceType);
+                string episodesVolumes = (work.EpisodesVolumes ?? "").Trim();
+                string synopsis = (work.Synopsis ?? "").Trim();
+                string coverPath = (work.CoverPath ?? "").Trim();
+
+                var match = FindWorkMatch(existingWorks, title, originalTitle, type);
+                if (match != null)
+                {
+                    EnsureUserListRow(conn, match.Id);
+
+                    bool changed =
+                        !StringEquals(match.Title, title)
+                        || !StringEquals(match.OriginalTitle, originalTitle)
+                        || !StringEquals(WorkDataRules.NormalizeTypeToEnglish(match.Type), type)
+                        || !StringEquals(match.Company, company)
+                        || !StringEquals(NormalizeYear(match.Year), year)
+                        || !StringEquals(WorkDataRules.NormalizeSourceType(match.SourceType), sourceType)
+                        || !StringEquals(match.Season, season)
+                        || !StringEquals(match.EpisodesVolumes, episodesVolumes)
+                        || !StringEquals(match.Synopsis, synopsis)
+                        || !StringEquals(match.CoverPath, coverPath);
+
+                    if (!changed)
+                    {
+                        result.SkippedWorks++;
+                        continue;
+                    }
+
+                    string updateSql = @"
+                        UPDATE Works
+                        SET Title = @Title,
+                            OriginalTitle = @OriginalTitle,
+                            Type = @Type,
+                            Company = @Company,
+                            Year = @Year,
+                            Season = @Season,
+                            SourceType = @SourceType,
+                            EpisodesVolumes = @EpisodesVolumes,
+                            Synopsis = @Synopsis,
+                            CoverPath = @CoverPath,
+                            LastModified = @LastModified
+                        WHERE Id = @Id";
+                    using (var cmd = new SQLiteCommand(updateSql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@Title", title);
+                        cmd.Parameters.AddWithValue("@OriginalTitle", originalTitle);
+                        cmd.Parameters.AddWithValue("@Type", type);
+                        cmd.Parameters.AddWithValue("@Company", company);
+                        cmd.Parameters.AddWithValue("@Year", year);
+                        cmd.Parameters.AddWithValue("@Season", season);
+                        cmd.Parameters.AddWithValue("@SourceType", sourceType);
+                        cmd.Parameters.AddWithValue("@EpisodesVolumes", episodesVolumes);
+                        cmd.Parameters.AddWithValue("@Synopsis", synopsis);
+                        cmd.Parameters.AddWithValue("@CoverPath", coverPath);
+                        cmd.Parameters.AddWithValue("@LastModified", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                        cmd.Parameters.AddWithValue("@Id", match.Id);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    match.Title = title;
+                    match.OriginalTitle = originalTitle;
+                    match.Type = type;
+                    match.Company = company;
+                    match.Year = year;
+                    match.Season = season;
+                    match.SourceType = sourceType;
+                    match.EpisodesVolumes = episodesVolumes;
+                    match.Synopsis = synopsis;
+                    match.CoverPath = coverPath;
+
+                    result.UpdatedWorks++;
+                    continue;
+                }
+
+                string addedTime = ParseDateTimeOrNow(work.AddedTime).ToString("yyyy-MM-dd HH:mm:ss");
+                string insertSql = @"
+                    INSERT INTO Works (Title, OriginalTitle, Type, Company, Year, Season, SourceType, EpisodesVolumes, Synopsis, CoverPath, Author, OriginalWork, AddedTime, LastModified)
+                    VALUES (@Title, @OriginalTitle, @Type, @Company, @Year, @Season, @SourceType, @EpisodesVolumes, @Synopsis, @CoverPath, @Author, @OriginalWork, @AddedTime, @LastModified);
+                    SELECT last_insert_rowid();";
+
+                int workId;
+                using (var cmd = new SQLiteCommand(insertSql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Title", title);
+                    cmd.Parameters.AddWithValue("@OriginalTitle", originalTitle);
+                    cmd.Parameters.AddWithValue("@Type", type);
+                    cmd.Parameters.AddWithValue("@Company", company);
+                    cmd.Parameters.AddWithValue("@Year", year);
+                    cmd.Parameters.AddWithValue("@Season", season);
+                    cmd.Parameters.AddWithValue("@SourceType", sourceType);
+                    cmd.Parameters.AddWithValue("@EpisodesVolumes", episodesVolumes);
+                    cmd.Parameters.AddWithValue("@Synopsis", synopsis);
+                    cmd.Parameters.AddWithValue("@CoverPath", coverPath);
+                    cmd.Parameters.AddWithValue("@Author", "");
+                    cmd.Parameters.AddWithValue("@OriginalWork", "");
+                    cmd.Parameters.AddWithValue("@AddedTime", addedTime);
+                    cmd.Parameters.AddWithValue("@LastModified", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    workId = Convert.ToInt32(cmd.ExecuteScalar());
+                }
+
+                string insertUserListSql = @"
+                    INSERT INTO UserList (WorkId, Status, Progress, Rating, LastUpdated)
+                    VALUES (@WorkId, @Status, @Progress, @Rating, @LastUpdated)";
+                using (var cmd = new SQLiteCommand(insertUserListSql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    cmd.Parameters.AddWithValue("@Status", "wish");
+                    cmd.Parameters.AddWithValue("@Progress", "");
+                    cmd.Parameters.AddWithValue("@Rating", DBNull.Value);
+                    cmd.Parameters.AddWithValue("@LastUpdated", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.ExecuteNonQuery();
+                }
+
+                existingWorks.Add(new ExistingWorkRecord
+                {
+                    Id = workId,
+                    Title = title,
+                    OriginalTitle = originalTitle,
+                    Type = type,
+                    Company = company,
+                    Year = year,
+                    Season = season,
+                    SourceType = sourceType,
+                    EpisodesVolumes = episodesVolumes,
+                    Synopsis = synopsis,
+                    CoverPath = coverPath,
+                    AddedTime = addedTime
+                });
+
+                result.NewWorks++;
+            }
+        }
+
+        private static ExistingWorkRecord FindWorkMatch(List<ExistingWorkRecord> existingWorks, string title, string originalTitle, string type)
+        {
+            foreach (var existing in existingWorks)
+            {
+                if (WorkDataRules.IsSameWork(existing.Title, existing.OriginalTitle, existing.Type, title, originalTitle, type))
+                {
+                    return existing;
+                }
+            }
+            return null;
+        }
+
+        private static void EnsureUserListRow(SQLiteConnection conn, int workId)
+        {
+            using (var cmd = new SQLiteCommand("SELECT COUNT(1) FROM UserList WHERE WorkId = @WorkId", conn))
+            {
+                cmd.Parameters.AddWithValue("@WorkId", workId);
+                var count = Convert.ToInt32(cmd.ExecuteScalar());
+                if (count > 0) return;
+            }
+
+            string insertUserListSql = @"
+                INSERT INTO UserList (WorkId, Status, Progress, Rating, LastUpdated)
+                VALUES (@WorkId, @Status, @Progress, @Rating, @LastUpdated)";
+            using (var cmd = new SQLiteCommand(insertUserListSql, conn))
+            {
+                cmd.Parameters.AddWithValue("@WorkId", workId);
+                cmd.Parameters.AddWithValue("@Status", "wish");
+                cmd.Parameters.AddWithValue("@Progress", "");
+                cmd.Parameters.AddWithValue("@Rating", DBNull.Value);
+                cmd.Parameters.AddWithValue("@LastUpdated", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        private static void ImportNotes(SQLiteConnection conn, List<NoteExportDto> notes, ImportResult result)
+        {
+            if (notes == null || notes.Count == 0) return;
+
+            foreach (var note in notes)
+            {
+                if (note == null)
+                {
+                    result.InvalidNotes++;
+                    continue;
+                }
+
+                string title = (note.Title ?? "").Trim();
+                string content = note.Content ?? "";
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    result.InvalidNotes++;
+                    continue;
+                }
+
+                if (NoteExistsByTitleAndContent(conn, title, content))
+                {
+                    result.SkippedNotes++;
+                    continue;
+                }
+
+                string insertSql = @"
+                    INSERT INTO Notes (Title, Content, CreatedTime, ModifiedTime)
+                    VALUES (@Title, @Content, @CreatedTime, @ModifiedTime)";
+                using (var cmd = new SQLiteCommand(insertSql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Title", title);
+                    cmd.Parameters.AddWithValue("@Content", content);
+                    cmd.Parameters.AddWithValue("@CreatedTime", ParseDateTimeOrNow(note.CreatedTime).ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.Parameters.AddWithValue("@ModifiedTime", ParseDateTimeOrNow(note.ModifiedTime).ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.ExecuteNonQuery();
+                }
+
+                result.NewNotes++;
+            }
+        }
+
+        private static bool NoteExistsByTitleAndContent(SQLiteConnection conn, string title, string content)
+        {
+            using (var cmd = new SQLiteCommand("SELECT 1 FROM Notes WHERE COALESCE(Title,'') = @Title AND Content = @Content LIMIT 1", conn))
+            {
+                cmd.Parameters.AddWithValue("@Title", title ?? "");
+                cmd.Parameters.AddWithValue("@Content", content ?? "");
+                var found = cmd.ExecuteScalar();
+                return found != null && found != DBNull.Value;
+            }
+        }
+
+        private static bool IsAllowedWorkType(string type)
+        {
+            return type == "Anime" || type == "Manga" || type == "LightNovel" || type == "Game";
+        }
+
+        private static string NormalizeYear(string year)
+        {
+            var value = (year ?? "").Trim();
+            if (string.IsNullOrEmpty(value)) return "";
+            var match = System.Text.RegularExpressions.Regex.Match(value, @"\d+");
+            return match.Success ? match.Value : value;
+        }
+
+        private static DateTime ParseDateTimeOrNow(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return DateTime.Now;
+            return DateTime.TryParse(value, out var dt) ? dt : DateTime.Now;
+        }
+
+        private static bool StringEquals(string left, string right)
+        {
+            return string.Equals((left ?? "").Trim(), (right ?? "").Trim(), StringComparison.Ordinal);
         }
 
         /// <summary>

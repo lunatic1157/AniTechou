@@ -25,6 +25,19 @@ namespace AniTechou.Views
             _accountName = accountName;
             _workService = new WorkService(accountName);
 
+            StatusBox.ItemsSource = new List<string> { "想看", "在看", "看过" };
+            StatusBox.SelectedIndex = 0;
+            RatingBox.ItemsSource = new List<string>
+            {
+                "未评分",
+                "★☆☆☆☆ (1-2分)",
+                "★★☆☆☆ (3-4分)",
+                "★★★☆☆ (5-6分)",
+                "★★★★☆ (7-8分)",
+                "★★★★★ (9-10分)"
+            };
+            RatingBox.SelectedIndex = 0;
+
             LoadData();
         }
 
@@ -121,16 +134,8 @@ namespace AniTechou.Views
                     "done" => "看过",
                     _ => "想看"
                 };
-                
-                for (int i = 0; i < StatusBox.Items.Count; i++)
-                {
-                    var item = StatusBox.Items[i] as ComboBoxItem;
-                    if (item != null && item.Content.ToString() == statusText)
-                    {
-                        StatusBox.SelectedIndex = i;
-                        break;
-                    }
-                }
+                StatusBox.SelectedItem = statusText;
+                if (StatusBox.SelectedItem == null) StatusBox.SelectedIndex = 0;
                 
                 // 设置进度
                 ProgressBox.Text = userWork.Progress ?? "";
@@ -176,36 +181,50 @@ namespace AniTechou.Views
 
             if (availableWorks.Count == 0)
             {
-                MessageBox.Show("没有可关联的其他作品。");
+                Windows.AppMessageDialog.Show(Application.Current.MainWindow, "提示", "没有可关联的其他作品。");
                 return;
             }
 
             var dialog = new Window
             {
                 Title = "添加关联作品",
-                Width = 400,
-                Height = 500,
+                Width = 460,
+                Height = 560,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Owner = Application.Current.MainWindow
+                Owner = Application.Current.MainWindow,
+                FontFamily = FontFamily
             };
+            dialog.SetResourceReference(Window.BackgroundProperty, "WindowBackgroundBrush");
 
-            var panel = new StackPanel { Margin = new Thickness(10) };
+            var panel = new StackPanel { Margin = new Thickness(18) };
             
-            // 搜索框
+            var header = new TextBlock
+            {
+                Text = "搜索并选择要关联的作品",
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+            header.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+
             var searchBox = new TextBox 
             { 
                 Margin = new Thickness(0, 0, 0, 10),
-                Padding = new Thickness(5),
-                Height = 30
+                Height = 38
             };
+            searchBox.Style = (Style)FindResource("AppTextBoxStyle");
             
             var listBox = new ListBox
             {
                 ItemsSource = availableWorks,
                 DisplayMemberPath = "Title",
                 Height = 350,
-                Margin = new Thickness(0, 0, 0, 10)
+                Margin = new Thickness(0, 0, 0, 12),
+                BorderThickness = new Thickness(1)
             };
+            listBox.SetResourceReference(Control.BackgroundProperty, "Surface1Brush");
+            listBox.SetResourceReference(Control.ForegroundProperty, "TextPrimaryBrush");
+            listBox.SetResourceReference(Control.BorderBrushProperty, "BorderBrush");
 
             searchBox.TextChanged += (s, args) =>
             {
@@ -216,8 +235,8 @@ namespace AniTechou.Views
             };
 
             var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-            var okBtn = new Button { Content = "确定", Width = 80, Margin = new Thickness(0, 0, 10, 0) };
-            var cancelBtn = new Button { Content = "取消", Width = 80 };
+            var okBtn = new Button { Content = "确定", Width = 88, Height = 36, Margin = new Thickness(0, 0, 10, 0), Style = (Style)FindResource("AppPrimaryButtonStyle") };
+            var cancelBtn = new Button { Content = "取消", Width = 88, Height = 36, Style = (Style)FindResource("AppSecondaryButtonStyle") };
 
             okBtn.Click += (s, args) =>
             {
@@ -247,7 +266,7 @@ namespace AniTechou.Views
 
             btnPanel.Children.Add(okBtn);
             btnPanel.Children.Add(cancelBtn);
-            panel.Children.Add(new TextBlock { Text = "搜索并选择要关联的作品：", Margin = new Thickness(0, 0, 0, 5) });
+            panel.Children.Add(header);
             panel.Children.Add(searchBox);
             panel.Children.Add(listBox);
             panel.Children.Add(btnPanel);
@@ -289,8 +308,6 @@ namespace AniTechou.Views
             foreach (var note in _relatedNotes)
             {
                 note.DisplayTitle = string.IsNullOrEmpty(note.Title) ? "无标题" : note.Title;
-                note.Preview = string.IsNullOrEmpty(note.Content) ? "" :
-                    (note.Content.Length > 80 ? note.Content.Substring(0, 80) + "..." : note.Content);
                 note.CreatedTimeDisplay = note.CreatedTime.ToString("yyyy-MM-dd");
             }
 
@@ -306,24 +323,29 @@ namespace AniTechou.Views
             {
                 var tagBorder = new Border
                 {
-                    Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(224, 213, 192)),
                     CornerRadius = new CornerRadius(12),
                     Padding = new Thickness(8, 4, 8, 4),
                     Margin = new Thickness(0, 0, 5, 5)
                 };
+                tagBorder.SetResourceReference(Border.BackgroundProperty, "AccentSoftBrush");
                 var stack = new StackPanel { Orientation = Orientation.Horizontal };
-                stack.Children.Add(new TextBlock { Text = tag, FontSize = 12, Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(92, 78, 61)) });
+                var text = new TextBlock { Text = tag, FontSize = 12 };
+                text.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+                stack.Children.Add(text);
                 var removeBtn = new Button
                 {
                     Content = "✕",
-                    Width = 18,
-                    Height = 18,
+                    Width = 16,
+                    Height = 16,
                     Margin = new Thickness(5, 0, 0, 0),
                     Background = System.Windows.Media.Brushes.Transparent,
+                    BorderBrush = System.Windows.Media.Brushes.Transparent,
                     BorderThickness = new Thickness(0),
                     Cursor = System.Windows.Input.Cursors.Hand,
+                    Padding = new Thickness(0),
                     Tag = tag
                 };
+                removeBtn.SetResourceReference(Button.ForegroundProperty, "TextSecondaryBrush");
                 removeBtn.Click += (s, e) => RemoveTag(tag);
                 stack.Children.Add(removeBtn);
                 tagBorder.Child = stack;
@@ -347,7 +369,7 @@ namespace AniTechou.Views
             }
             else
             {
-                MessageBox.Show("添加标签失败或标签已存在");
+                Windows.AppMessageDialog.Show(Application.Current.MainWindow, "提示", "添加标签失败或标签已存在");
             }
         }
 
@@ -448,8 +470,7 @@ namespace AniTechou.Views
             try
             {
                 // 获取状态
-                var statusItem = StatusBox.SelectedItem as ComboBoxItem;
-                string statusText = statusItem?.Content.ToString() ?? "在看";
+                string statusText = StatusBox.SelectedItem as string ?? "在看";
                 string statusEn = statusText switch
                 {
                     "想看" => "wish",
@@ -459,8 +480,7 @@ namespace AniTechou.Views
                 };
                 
                 // 获取评分
-                var ratingItem = RatingBox.SelectedItem as ComboBoxItem;
-                string ratingText = ratingItem?.Content.ToString() ?? "未评分";
+                string ratingText = RatingBox.SelectedItem as string ?? "未评分";
                 int rating = ratingText switch
                 {
                     "★☆☆☆☆ (1-2分)" => 2,
@@ -477,14 +497,14 @@ namespace AniTechou.Views
                 // 更新数据库
                 _workService.UpdateUserWork(_userListId, statusEn, progress, rating);
                 
-                MessageBox.Show("更新成功！");
+                Windows.AppMessageDialog.Show(Application.Current.MainWindow, "成功", "更新成功！");
                 
                 // 重新加载数据以确认更新
                 LoadData();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"更新失败：{ex.Message}");
+                Windows.AppMessageDialog.Show(Application.Current.MainWindow, "错误", $"更新失败：{ex.Message}");
             }
         }
 
@@ -500,19 +520,16 @@ namespace AniTechou.Views
 
         private void DeleteWork_Click(object sender, RoutedEventArgs e)
         {
-            var result = MessageBox.Show($"确定要删除《{TitleText.Text}》吗？相关的所有笔记关联也将被移除。", 
-                                       "确认删除", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            
-            if (result == MessageBoxResult.Yes)
+            if (Windows.AppMessageDialog.Show(Application.Current.MainWindow, "确认删除", $"确定要删除《{TitleText.Text}》吗？相关的所有笔记关联也将被移除。", true))
             {
                 if (_workService.DeleteWork(_workId))
                 {
-                    MessageBox.Show("删除成功！");
+                    Windows.AppMessageDialog.Show(Application.Current.MainWindow, "成功", "删除成功！");
                     Back_Click(null, null);
                 }
                 else
                 {
-                    MessageBox.Show("删除失败，请稍后再试。");
+                    Windows.AppMessageDialog.Show(Application.Current.MainWindow, "失败", "删除失败，请稍后再试。");
                 }
             }
         }

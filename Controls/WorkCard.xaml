@@ -5,25 +5,19 @@
              Cursor="Hand">
     
     <UserControl.Resources>
-        <!-- 卡片样式 -->
         <Style TargetType="Border" x:Key="CardBorder">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#E0D5C0"/>
+            <Setter Property="Background" Value="{DynamicResource Surface1Brush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Margin" Value="5"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource CardCornerRadius}"/>
+            <Setter Property="Margin" Value="8"/>
         </Style>
         
-        <!-- 悬停效果 -->
         <Style TargetType="Border" BasedOn="{StaticResource CardBorder}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=IsMouseOver}" Value="True">
-                    <Setter Property="BorderBrush" Value="#C4B9A8"/>
-                    <Setter Property="Effect">
-                        <Setter.Value>
-                            <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.2"/>
-                        </Setter.Value>
-                    </Setter>
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentSoftBrush}"/>
+                    <Setter Property="Effect" Value="{DynamicResource CardHoverShadow}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -39,8 +33,8 @@
             <!-- 封面区域 -->
             <Border Grid.Column="0" 
                     Width="70" Height="100" 
-                    Background="#F0E9DD" 
-                    CornerRadius="4"
+                    Background="{DynamicResource Surface3Brush}" 
+                    CornerRadius="10"
                     HorizontalAlignment="Left">
                 <Grid>                          
                     <Image x:Name="CoverImage" 
@@ -62,7 +56,7 @@
                         Text="{Binding Title}"
                         FontSize="14" 
                         FontWeight="Bold"
-                        Foreground="#5C4E3D"
+                        Foreground="{DynamicResource TextPrimaryBrush}"
                         TextWrapping="Wrap"
                         MaxHeight="40"/>
 
@@ -70,7 +64,7 @@
                 <TextBlock x:Name="InfoTextBlock" 
                         Text="{Binding Info}"
                         FontSize="11" 
-                        Foreground="#A89F91"
+                        Foreground="{DynamicResource TextMutedBrush}"
                         Margin="0,4,0,0"/>
                 
                 <!-- 进度条区域 -->
@@ -83,8 +77,8 @@
                     <ProgressBar x:Name="ProgressBar"
                                  Grid.Column="0"
                                  Height="6"
-                                 Background="#E0D5C0"
-                                 Foreground="#A8D8EA"
+                                 Background="{DynamicResource Surface3Brush}"
+                                 Foreground="{DynamicResource AccentBrush}"
                                  Value="{Binding ProgressValue}"
                                  Maximum="100"/>
                     
@@ -92,7 +86,7 @@
                             Grid.Column="1"
                             Text="{Binding ProgressText}"
                             FontSize="10"
-                            Foreground="#7F6E5A"
+                            Foreground="{DynamicResource TextSecondaryBrush}"
                             Margin="5,0,0,0"/>
                 </Grid>
                 
@@ -100,7 +94,7 @@
                 <TextBlock x:Name="RatingTextBlock" 
                         Text="{Binding RatingDisplay}"
                         FontSize="12"
-                        Foreground="#F4B942"
+                        Foreground="{DynamicResource AccentStrongBrush}"
                         Margin="0,4,0,0"/>
             </StackPanel>
         </Grid>

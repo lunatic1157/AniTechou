@@ -24,31 +24,17 @@ namespace AniTechou.Views
         private string _currentStudio = "全部制作";
         private string _currentRating = "全部评分";
         private List<string> _selectedTags = new List<string>();
-        private bool _isGridView = true;
         private bool _isInitializing = true;
         private bool _isTagsExpanded = false;
         private DispatcherTimer _tagSearchTimer;
         private List<string> _allTags = new List<string>();
 
-        private SolidColorBrush _selectedBrush = new SolidColorBrush(Color.FromRgb(224, 213, 192));
-        private SolidColorBrush _normalBrush = new SolidColorBrush(Color.FromRgb(240, 233, 221));
-
-        /// <summary>
-        /// 设置标签筛选（用于从个人主页跳转到作品列表）
-        /// </summary>
         public void SetTagFilter(string tag)
         {
-            // 先重新加载标签（确保包含目标标签）
             _allTags = _workService.GetAllTags();
-
-            // 选中目标标签
             _selectedTags.Clear();
             _selectedTags.Add(tag);
-
-            // 重新显示
             FilterAndDisplayTags();
-
-            // 加载数据
             LoadWorks();
         }
 
@@ -59,56 +45,53 @@ namespace AniTechou.Views
             _currentType = type;
             _currentStatus = status;
 
-            // 初始化搜索定时器
             _tagSearchTimer = new DispatcherTimer();
             _tagSearchTimer.Interval = TimeSpan.FromMilliseconds(300);
             _tagSearchTimer.Tick += TagSearchTimer_Tick;
 
-            // 加载年份选项
+            InitializeFilterOptions();
             LoadYearOptions();
-            // 加载制作公司选项
             LoadStudioOptions();
-            // 加载标签筛选
             LoadTagFilters();
 
-            // 设置选中状态
             UpdateTypeButtonStyles();
             UpdateStatusButtonStyles();
-
-            // 设置标题
             UpdateTitleText();
-
-            // 设置初始按钮样式
-            UpdateButtonStyles();
-
-            // 标记初始化完成
             _isInitializing = false;
-
-            // 加载数据
             LoadWorks();
+        }
+
+        private void InitializeFilterOptions()
+        {
+            SeasonFilter.ItemsSource = new List<string> { "全部季节", "春", "夏", "秋", "冬" };
+            SeasonFilter.SelectedIndex = 0;
+
+            SourceTypeFilter.ItemsSource = new List<string> { "全部原作", "原创", "漫改", "小说改", "游戏改", "其他" };
+            SourceTypeFilter.SelectedIndex = 0;
+
+            RatingFilter.ItemsSource = new List<string> { "全部评分", "★ 1-2分", "★★ 3-4分", "★★★ 5-6分", "★★★★ 7-8分", "★★★★★ 9-10分" };
+            RatingFilter.SelectedIndex = 0;
         }
 
         private void LoadYearOptions()
         {
             var years = _workService.GetAllYears();
-            YearFilter.Items.Clear();
-            YearFilter.Items.Add(new ComboBoxItem { Content = "全部年份", IsSelected = true });
-            foreach (var year in years)
-            {
-                YearFilter.Items.Add(new ComboBoxItem { Content = year });
-            }
+            var items = new List<string> { "全部年份" };
+            items.AddRange(years);
+            YearFilter.ItemsSource = items;
+            YearFilter.SelectedIndex = 0;
         }
 
         private void LoadStudioOptions()
         {
             var studios = _workService.GetAllStudios();
-            StudioFilter.Items.Clear();
-            StudioFilter.Items.Add(new ComboBoxItem { Content = "全部制作", IsSelected = true });
+            var items = new List<string> { "全部制作" };
             foreach (var studio in studios)
             {
-                if (!string.IsNullOrEmpty(studio))
-                    StudioFilter.Items.Add(new ComboBoxItem { Content = studio });
+                if (!string.IsNullOrEmpty(studio)) items.Add(studio);
             }
+            StudioFilter.ItemsSource = items;
+            StudioFilter.SelectedIndex = 0;
         }
 
         private void LoadTagFilters()
@@ -119,15 +102,16 @@ namespace AniTechou.Views
 
         private void FilterAndDisplayTags(string filterText = "")
         {
-            var filteredTags = string.IsNullOrEmpty(filterText)
+            string normalizedFilter = (filterText ?? string.Empty).Trim();
+
+            var filteredTags = string.IsNullOrEmpty(normalizedFilter)
                 ? _allTags
                 : _allTags.Where(t => 
-                    t.Contains(filterText, StringComparison.OrdinalIgnoreCase) || 
-                    WordsHelper.GetPinyin(t).Replace(" ", "").Contains(filterText, StringComparison.OrdinalIgnoreCase) ||
-                    WordsHelper.GetFirstPinyin(t).Replace(" ", "").Contains(filterText, StringComparison.OrdinalIgnoreCase)
+                    t.Contains(normalizedFilter, StringComparison.OrdinalIgnoreCase) || 
+                    WordsHelper.GetPinyin(t).Replace(" ", "").Contains(normalizedFilter, StringComparison.OrdinalIgnoreCase) ||
+                    WordsHelper.GetFirstPinyin(t).Replace(" ", "").Contains(normalizedFilter, StringComparison.OrdinalIgnoreCase)
                 ).ToList();
 
-            // 如果没有展开，只显示前3行（假设每行约8个标签）
             bool showExpandButton = false;
             if (!_isTagsExpanded && filteredTags.Count > 24)
             {
@@ -141,9 +125,9 @@ namespace AniTechou.Views
                 {
                     Content = tag,
                     Tag = tag,
-                    Style = (Style)FindResource("FilterButton"),
-                    Background = _selectedTags.Contains(tag) ? _selectedBrush : _normalBrush
+                    Style = (Style)FindResource("FilterButton")
                 };
+                ApplySelectableButtonState(btn, _selectedTags.Contains(tag));
                 btn.Click += TagFilter_Click;
                 return btn;
             });
@@ -167,22 +151,17 @@ namespace AniTechou.Views
         private void ExpandTags_Click(object sender, RoutedEventArgs e)
         {
             _isTagsExpanded = !_isTagsExpanded;
-
-            // 停止任何正在进行的动画
-            TagsFilterItemsControl.BeginAnimation(ItemsControl.MaxHeightProperty, null);
-
             if (_isTagsExpanded)
             {
-                // 展开时，直接设置最大高度为无穷大，不使用动画，避免冲突
-                TagsFilterItemsControl.MaxHeight = double.PositiveInfinity;
+                TagsScrollViewer.MaxHeight = 220;
+                TagsScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
             }
             else
             {
-                // 收起时，直接设置回固定的高度
-                TagsFilterItemsControl.MaxHeight = 100;
+                TagsScrollViewer.MaxHeight = 104;
+                TagsScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
             }
 
-            // 更新按钮文本和重新筛选显示
             FilterAndDisplayTags(TagSearchBox.Text.Trim());
         }
 
@@ -195,12 +174,12 @@ namespace AniTechou.Views
             if (_selectedTags.Contains(tag))
             {
                 _selectedTags.Remove(tag);
-                btn.Background = _normalBrush;
+                ApplySelectableButtonState(btn, false);
             }
             else
             {
                 _selectedTags.Add(tag);
-                btn.Background = _selectedBrush;
+                ApplySelectableButtonState(btn, true);
             }
             LoadWorks();
         }
@@ -229,19 +208,19 @@ namespace AniTechou.Views
 
         private void UpdateTypeButtonStyles()
         {
-            AllButton.Background = _currentType == "all" ? _selectedBrush : new SolidColorBrush(Color.FromRgb(240, 233, 221));
-            AnimeButton.Background = _currentType == "Anime" ? _selectedBrush : new SolidColorBrush(Color.FromRgb(240, 233, 221));
-            MangaButton.Background = _currentType == "Manga" ? _selectedBrush : new SolidColorBrush(Color.FromRgb(240, 233, 221));
-            LightNovelButton.Background = _currentType == "LightNovel" ? _selectedBrush : new SolidColorBrush(Color.FromRgb(240, 233, 221));
-            GameButton.Background = _currentType == "Game" ? _selectedBrush : new SolidColorBrush(Color.FromRgb(240, 233, 221));
+            ApplySelectableButtonState(AllButton, _currentType == "all");
+            ApplySelectableButtonState(AnimeButton, _currentType == "Anime");
+            ApplySelectableButtonState(MangaButton, _currentType == "Manga");
+            ApplySelectableButtonState(LightNovelButton, _currentType == "LightNovel");
+            ApplySelectableButtonState(GameButton, _currentType == "Game");
         }
 
         private void UpdateStatusButtonStyles()
         {
-            AllStatusButton.Background = _currentStatus == "all" ? _selectedBrush : new SolidColorBrush(Color.FromRgb(240, 233, 221));
-            WishButton.Background = _currentStatus == "wish" ? _selectedBrush : new SolidColorBrush(Color.FromRgb(240, 233, 221));
-            DoingButton.Background = _currentStatus == "doing" ? _selectedBrush : new SolidColorBrush(Color.FromRgb(240, 233, 221));
-            DoneButton.Background = _currentStatus == "done" ? _selectedBrush : new SolidColorBrush(Color.FromRgb(240, 233, 221));
+            ApplySelectableButtonState(AllStatusButton, _currentStatus == "all");
+            ApplySelectableButtonState(WishButton, _currentStatus == "wish");
+            ApplySelectableButtonState(DoingButton, _currentStatus == "doing");
+            ApplySelectableButtonState(DoneButton, _currentStatus == "done");
         }
 
         private void TypeFilter_Click(object sender, RoutedEventArgs e)
@@ -265,40 +244,35 @@ namespace AniTechou.Views
         private void YearFilter_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (_isInitializing) return;
-            var item = YearFilter.SelectedItem as ComboBoxItem;
-            _currentYear = item?.Content?.ToString() ?? "全部年份";
+            _currentYear = YearFilter.SelectedItem as string ?? "全部年份";
             LoadWorks();
         }
 
         private void SeasonFilter_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (_isInitializing) return;
-            var item = SeasonFilter.SelectedItem as ComboBoxItem;
-            _currentSeason = item?.Content?.ToString() ?? "全部季节";
+            _currentSeason = SeasonFilter.SelectedItem as string ?? "全部季节";
             LoadWorks();
         }
 
         private void SourceTypeFilter_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (_isInitializing) return;
-            var item = SourceTypeFilter.SelectedItem as ComboBoxItem;
-            _currentSourceType = item?.Content?.ToString() ?? "全部原作";
+            _currentSourceType = SourceTypeFilter.SelectedItem as string ?? "全部原作";
             LoadWorks();
         }
 
         private void StudioFilter_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (_isInitializing) return;
-            var item = StudioFilter.SelectedItem as ComboBoxItem;
-            _currentStudio = item?.Content?.ToString() ?? "全部制作";
+            _currentStudio = StudioFilter.SelectedItem as string ?? "全部制作";
             LoadWorks();
         }
 
         private void RatingFilter_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (_isInitializing) return;
-            var item = RatingFilter.SelectedItem as ComboBoxItem;
-            _currentRating = item?.Content?.ToString() ?? "全部评分";
+            _currentRating = RatingFilter.SelectedItem as string ?? "全部评分";
             LoadWorks();
         }
 
@@ -310,14 +284,17 @@ namespace AniTechou.Views
             _currentStudio = "全部制作";
             _currentRating = "全部评分";
             _selectedTags.Clear();
+            _isTagsExpanded = false;
 
             YearFilter.SelectedIndex = 0;
             SeasonFilter.SelectedIndex = 0;
             SourceTypeFilter.SelectedIndex = 0;
             StudioFilter.SelectedIndex = 0;
             RatingFilter.SelectedIndex = 0;
+            TagSearchBox.Text = string.Empty;
+            TagsScrollViewer.MaxHeight = 104;
+            TagsScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
 
-            // 重置标签按钮样式
             FilterAndDisplayTags();
 
             LoadWorks();
@@ -331,7 +308,6 @@ namespace AniTechou.Views
                 if (WorksItemsControl != null) WorksItemsControl.Visibility = Visibility.Collapsed;
                 if (EmptyText != null) EmptyText.Visibility = Visibility.Collapsed;
 
-                // 异步获取数据，不在 UI 线程等待
                 var works = await Task.Run(() => _workService.GetWorksAsync(
                     _currentType, _currentStatus, _currentYear, _currentSeason,
                     _currentSourceType, _currentStudio, _currentRating, _selectedTags));
@@ -370,7 +346,6 @@ namespace AniTechou.Views
             var card = sender as WorkCard;
             if (card != null)
             {
-                // 获取完整的作品信息
                 var work = _workService.GetWorkById(card.WorkId);
                 var userWork = _workService.GetUserWorkByWorkId(card.WorkId);
 
@@ -383,44 +358,28 @@ namespace AniTechou.Views
             }
         }
 
-        private void SetGridView_Click(object sender, RoutedEventArgs e)
-        {
-            if (_isGridView) return;
-            _isGridView = true;
-
-            // 切换面板模板
-            WorksItemsControl.ItemsPanel = (ItemsPanelTemplate)FindResource("GridPanel");
-            UpdateButtonStyles();
-        }
-
-        private void SetListView_Click(object sender, RoutedEventArgs e)
-        {
-            if (!_isGridView) return;
-            _isGridView = false;
-
-            // 切换面板模板
-            WorksItemsControl.ItemsPanel = (ItemsPanelTemplate)FindResource("ListPanel");
-            UpdateButtonStyles();
-        }
-
-        private void UpdateButtonStyles()
-        {
-            if (_isGridView)
-            {
-                GridButton.Background = _selectedBrush;
-                ListButton.Background = _normalBrush;
-            }
-            else
-            {
-                GridButton.Background = _normalBrush;
-                ListButton.Background = _selectedBrush;
-            }
-        }
-
         private void AddWork_Click(object sender, RoutedEventArgs e)
         {
             var mainWindow = Application.Current.MainWindow as MainWindow;
             mainWindow?.ShowAddWorkOptions();
+        }
+
+        private static void ApplySelectableButtonState(Button button, bool isSelected)
+        {
+            if (button == null) return;
+
+            button.ClearValue(Control.BackgroundProperty);
+            button.ClearValue(Control.BorderBrushProperty);
+            if (isSelected)
+            {
+                button.SetResourceReference(Control.BackgroundProperty, "AccentSoftBrush");
+                button.SetResourceReference(Control.BorderBrushProperty, "AccentSoftBrush");
+            }
+            else
+            {
+                button.SetResourceReference(Control.BackgroundProperty, "Surface3Brush");
+                button.BorderBrush = Brushes.Transparent;
+            }
         }
     }
 }
