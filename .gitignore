@@ -12,6 +12,8 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 *_wpftmp.csproj
+TestResults/
+*.trx
 
 ## [Common](file:///f:/AniTechou/AniTechou/.gitignore)
 .DS_Store

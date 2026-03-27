@@ -6,8 +6,10 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using AniTechou.Services;
+using AniTechou.Utilities;
 
 namespace AniTechou
 {
@@ -15,12 +17,15 @@ namespace AniTechou
     {
         public AccountManager _accountManager;
         private bool _isAIPanelVisible = true;
-
+        private readonly Dictionary<string, Button> _topThemeButtons = new Dictionary<string, Button>(StringComparer.OrdinalIgnoreCase);
         private double _lastAIPanelWidth = 320;
         public MainWindow()
         {
             InitializeComponent();
             _accountManager = new AccountManager();
+            InitializeTopThemeSwitcher();
+            StateChanged += (s, e) => UpdateWindowControlGlyph();
+            Loaded += (s, e) => UpdateWindowControlGlyph();
             
             _accountManager.AccountSwitched += OnAccountSwitched;
 
@@ -50,6 +55,8 @@ namespace AniTechou
 
             // 尝试自动登录
             var config = ConfigManager.Load();
+            ApplyTopThemeSelection(ThemeManager.NormalizeAccent(config.ThemeAccent));
+            ApplyTopThemeModeSelection(ThemeManager.NormalizeMode(config.ThemeMode));
             System.Diagnostics.Debug.WriteLine($"[MainWindow] AutoLogin: {config.AutoLogin}");
 
             if (config.AutoLogin && _accountManager.TryAutoLogin())
@@ -85,6 +92,7 @@ namespace AniTechou
         private void MaximizeWindow_Click(object sender, RoutedEventArgs e)
         {
             this.WindowState = this.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            UpdateWindowControlGlyph();
         }
 
         private void CloseWindow_Click(object sender, RoutedEventArgs e)
@@ -116,6 +124,7 @@ namespace AniTechou
         // ========== 侧边栏功能 ==========
         private void QuickNote_Click(object sender, RoutedEventArgs e)
         {
+            SetSidebarSelection(QuickNoteButton);
             // 打开空白笔记编辑器
             var editor = new Views.NoteEditor(_currentAccountName, null, Views.EditorSource.QuickNote);
             editor.NoteSaved += () => RefreshCurrentView();
@@ -127,6 +136,7 @@ namespace AniTechou
         {
             var button = sender as Button;
             if (button == null) return;
+            SetSidebarSelection(button);
 
             string tag = button.Tag?.ToString() ?? "";
             string type = "all";
@@ -252,6 +262,26 @@ namespace AniTechou
             ShowDetailView(settingsView);
         }
 
+        private void ThemeQuickButton_Click(object sender, RoutedEventArgs e)
+        {
+            TopThemePopup.IsOpen = !TopThemePopup.IsOpen;
+        }
+
+        private void TopThemeModeButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not System.Windows.Controls.Primitives.ToggleButton button || button.Tag is not string modeKey)
+            {
+                return;
+            }
+
+            var config = ConfigManager.Load();
+            config.ThemeMode = ThemeManager.NormalizeMode(modeKey);
+            ConfigManager.Save(config);
+            ThemeManager.ApplyTheme(config.ThemeAccent, config.ThemeMode);
+            ApplyTopThemeModeSelection(config.ThemeMode);
+            ApplyTopThemeSelection(config.ThemeAccent);
+        }
+
         private void ToggleAIPanel_Click(object sender, RoutedEventArgs e)
         {
             _isAIPanelVisible = !_isAIPanelVisible;
@@ -313,7 +343,8 @@ namespace AniTechou
                 {
                     Text = message,
                     TextWrapping = TextWrapping.Wrap,
-                    FontSize = 12
+                    FontSize = 12,
+                    Foreground = ThemeManager.GetBrush("TextPrimaryBrush")
                 }
             };
 
@@ -491,31 +522,6 @@ namespace AniTechou
             };
         }
 
-        private static string NormalizeTypeToEnglish(string type)
-        {
-            return type?.Trim() switch
-            {
-                "动画" or "Anime" => "Anime",
-                "漫画" or "Manga" => "Manga",
-                "轻小说" or "LightNovel" => "LightNovel",
-                "游戏" or "Game" => "Game",
-                _ => type?.Trim() ?? ""
-            };
-        }
-
-        private static string NormalizeSourceType(string sourceType)
-        {
-            var v = sourceType?.Trim() ?? "";
-            if (string.IsNullOrEmpty(v)) return "";
-            if (v is "无" or "none" or "None") return "";
-            if (v.Contains("原创")) return "原创";
-            if (v.Contains("漫改") || v.Contains("漫画")) return "漫改";
-            if (v.Contains("小说") || v.Contains("书") || v.Contains("轻小说")) return "小说改";
-            if (v.Contains("游戏")) return "游戏改";
-            if (v.Contains("其他") || v.Contains("改编")) return "其他";
-            return v;
-        }
-
         private System.Threading.CancellationTokenSource _batchUpdateCancellationTokenSource;
 
         private async Task HandleBatchWorkUpdate(AIUpdateInfo info)
@@ -605,8 +611,8 @@ namespace AniTechou
                             
                             if (string.IsNullOrEmpty(existingWork.SourceType) || existingWork.SourceType == "未知")
                             {
-                                var normalizedSourceType = NormalizeSourceType(enhancedInfo.sourceType);
-                                var currentType = NormalizeTypeToEnglish(existingWork.Type);
+                                var normalizedSourceType = WorkDataRules.NormalizeSourceType(enhancedInfo.sourceType);
+                                var currentType = WorkDataRules.NormalizeTypeToEnglish(existingWork.Type);
                                 if (!string.IsNullOrEmpty(normalizedSourceType) && !(currentType == "Game" && normalizedSourceType == "游戏改"))
                                 {
                                     if (workService.UpdateWorkSourceType(workItem.Id, normalizedSourceType)) updated = true;
@@ -912,11 +918,11 @@ namespace AniTechou
             }
 
             // 如果有多个同名作品，尝试优先匹配类型一致的
-            var requestedType = NormalizeTypeToEnglish(info.type);
+            var requestedType = WorkDataRules.NormalizeTypeToEnglish(info.type);
             var work = works[0];
             if (!string.IsNullOrEmpty(requestedType))
             {
-                var matchedWork = works.FirstOrDefault(w => string.Equals(NormalizeTypeToEnglish(w.Type), requestedType, StringComparison.OrdinalIgnoreCase));
+                var matchedWork = works.FirstOrDefault(w => string.Equals(WorkDataRules.NormalizeTypeToEnglish(w.Type), requestedType, StringComparison.OrdinalIgnoreCase));
                 if (matchedWork != null)
                 {
                     work = matchedWork;
@@ -993,10 +999,10 @@ namespace AniTechou
                         break;
 
                     case "sourcetype":
-                        var normalizedSourceType = NormalizeSourceType(value);
+                        var normalizedSourceType = WorkDataRules.NormalizeSourceType(value);
                         if (!string.IsNullOrEmpty(normalizedSourceType))
                         {
-                            var currentType = NormalizeTypeToEnglish(detailedWork?.Type ?? work.Type);
+                            var currentType = WorkDataRules.NormalizeTypeToEnglish(detailedWork?.Type ?? work.Type);
                             var currentSourceType = detailedWork?.SourceType ?? "";
                             var canUpdateSourceType =
                                 string.IsNullOrEmpty(currentSourceType) ||
@@ -1102,9 +1108,9 @@ namespace AniTechou
             stackPanel.Children.Add(new TextBlock
             {
                 Text = $"🎯 为你推荐以下作品：",
-                FontSize = 12,
+                FontSize = 13,
                 FontWeight = System.Windows.FontWeights.Bold,
-                Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(92, 78, 61)),
+                Foreground = ThemeManager.GetBrush("TextPrimaryBrush"),
                 Margin = new Thickness(0, 0, 0, 10)
             });
 
@@ -1112,10 +1118,12 @@ namespace AniTechou
             {
                 var workBorder = new Border
                 {
-                    Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(248, 244, 233)),
-                    CornerRadius = new CornerRadius(8),
-                    Padding = new Thickness(10),
-                    Margin = new Thickness(0, 0, 0, 10)
+                    Background = ThemeManager.GetBrush("Surface2Brush"),
+                    BorderBrush = ThemeManager.GetBrush("BorderSubtleBrush"),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(14),
+                    Padding = new Thickness(14),
+                    Margin = new Thickness(0, 0, 0, 12)
                 };
 
                 var workStack = new StackPanel();
@@ -1125,15 +1133,15 @@ namespace AniTechou
                 headerStack.Children.Add(new TextBlock
                 {
                     Text = $"📖 {work.title}",
-                    FontSize = 13,
+                    FontSize = 14,
                     FontWeight = System.Windows.FontWeights.Bold,
-                    Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(92, 78, 61))
+                    Foreground = ThemeManager.GetBrush("TextPrimaryBrush")
                 });
                 headerStack.Children.Add(new TextBlock
                 {
                     Text = $" [{GetTypeDisplay(work.type)}]",
-                    FontSize = 10,
-                    Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(127, 110, 90)),
+                    FontSize = 11,
+                    Foreground = ThemeManager.GetBrush("TextSecondaryBrush"),
                     Margin = new Thickness(5, 2, 0, 0),
                     VerticalAlignment = VerticalAlignment.Center
                 });
@@ -1147,7 +1155,7 @@ namespace AniTechou
                         Text = $"🎙️ {work.voiceActorInfo}",
                         FontSize = 11,
                         FontWeight = System.Windows.FontWeights.SemiBold,
-                        Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(180, 80, 80)),
+                        Foreground = ThemeManager.GetBrush("AccentStrongBrush"),
                         Margin = new Thickness(0, 4, 0, 2)
                     });
                 }
@@ -1162,8 +1170,8 @@ namespace AniTechou
                     workStack.Children.Add(new TextBlock
                     {
                         Text = info,
-                        FontSize = 10,
-                        Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(127, 110, 90)),
+                        FontSize = 11,
+                        Foreground = ThemeManager.GetBrush("TextSecondaryBrush"),
                         Margin = new Thickness(0, 2, 0, 0)
                     });
                 }
@@ -1174,10 +1182,10 @@ namespace AniTechou
                     workStack.Children.Add(new TextBlock
                     {
                         Text = work.synopsis.Length > 80 ? work.synopsis.Substring(0, 80) + "..." : work.synopsis,
-                        FontSize = 10,
-                        Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(127, 110, 90)),
+                        FontSize = 11,
+                        Foreground = ThemeManager.GetBrush("TextSecondaryBrush"),
                         TextWrapping = TextWrapping.Wrap,
-                        Margin = new Thickness(0, 4, 0, 0)
+                        Margin = new Thickness(0, 6, 0, 0)
                     });
                 }
 
@@ -1189,7 +1197,7 @@ namespace AniTechou
                     {
                         tagsPanel.Children.Add(new Border
                         {
-                            Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(224, 213, 192)),
+                            Background = ThemeManager.GetBrush("AccentSoftBrush"),
                             CornerRadius = new CornerRadius(10),
                             Padding = new Thickness(6, 2, 6, 2),
                             Margin = new Thickness(0, 0, 4, 2),
@@ -1197,7 +1205,7 @@ namespace AniTechou
                             {
                                 Text = $"#{tag}",
                                 FontSize = 9,
-                                Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(92, 78, 61))
+                                Foreground = ThemeManager.GetBrush("TextPrimaryBrush")
                             }
                         });
                     }
@@ -1208,10 +1216,9 @@ namespace AniTechou
                 var addBtn = new Button
                 {
                     Content = "+ 添加到列表",
-                    Width = 90,
-                    Height = 26,
-                    Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(92, 78, 61)),
-                    Foreground = System.Windows.Media.Brushes.White,
+                    Width = 108,
+                    Height = 32,
+                    Style = (Style)FindResource("AppPrimaryButtonStyle"),
                     Margin = new Thickness(0, 8, 0, 0),
                     Tag = work,
                     Cursor = System.Windows.Input.Cursors.Hand
@@ -1228,8 +1235,8 @@ namespace AniTechou
             {
                 Text = "✨ 如果喜欢这些，还可以试试问：'更多治愈系作品'",
                 FontSize = 10,
-                Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(127, 110, 90)),
-                Margin = new Thickness(0, 5, 0, 0)
+                Foreground = ThemeManager.GetBrush("TextMutedBrush"),
+                Margin = new Thickness(0, 6, 0, 0)
             });
 
             resultBorder.Child = stackPanel;
@@ -1249,14 +1256,11 @@ namespace AniTechou
             try
             {
                 // 转换类型
-                string typeEn = work.type switch
+                string typeEn = WorkDataRules.NormalizeTypeToEnglish(work.type);
+                if (string.IsNullOrEmpty(typeEn))
                 {
-                    "动画" or "Anime" => "Anime",
-                    "漫画" or "Manga" => "Manga",
-                    "轻小说" or "LightNovel" => "LightNovel",
-                    "游戏" or "Game" => "Game",
-                    _ => "Anime"
-                };
+                    typeEn = "Anime";
+                }
 
                 System.Diagnostics.Debug.WriteLine($"[AddWorkFromSearch] 转换后的type: {typeEn}");
 
@@ -1277,10 +1281,10 @@ namespace AniTechou
                 }
 
                 // 过滤掉类型不一致的
-                existingWorks = existingWorks.Where(w => string.Equals(w.Type, typeEn, StringComparison.OrdinalIgnoreCase)).ToList();
+                existingWorks = existingWorks.Where(w => WorkDataRules.IsSameWork(w.Title, w.OriginalTitle, w.Type, work.title, work.originalTitle, typeEn)).ToList();
 
                 int workId = 0;
-                var existingWork = existingWorks.FirstOrDefault(w => w.Title == work.title) ?? existingWorks.FirstOrDefault();
+                var existingWork = existingWorks.FirstOrDefault();
 
                 if (existingWork != null)
                 {
@@ -1295,7 +1299,7 @@ namespace AniTechou
                         // 更新已有作品的信息 (补全空白)
                         if (!string.IsNullOrEmpty(work.company) && string.IsNullOrEmpty(detailedWork.Company)) workService.UpdateWorkCompany(workId, work.company);
                         if (!string.IsNullOrEmpty(work.season) && string.IsNullOrEmpty(detailedWork.Season)) workService.UpdateWorkSeason(workId, work.season);
-                        var normalizedSourceType = NormalizeSourceType(work.sourceType);
+                        var normalizedSourceType = WorkDataRules.NormalizeSourceType(work.sourceType);
                         if (!string.IsNullOrEmpty(normalizedSourceType) && string.IsNullOrEmpty(detailedWork.SourceType))
                         {
                             if (!(typeEn == "Game" && normalizedSourceType == "游戏改"))
@@ -1313,7 +1317,7 @@ namespace AniTechou
                 if (workId == 0)
                 {
                     // 处理原作类型
-                    string sourceType = NormalizeSourceType(work.sourceType);
+                    string sourceType = WorkDataRules.NormalizeSourceType(work.sourceType);
                     if (typeEn == "Game" && sourceType == "游戏改") sourceType = "";
 
                     // 确保所有参数完整（Rating 为 0 表示未评分，数据库允许 0-10）
@@ -1452,6 +1456,29 @@ namespace AniTechou
             }
         }
 
+        private void AIChatInputBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (sender is not TextBox textBox)
+            {
+                return;
+            }
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                double targetHeight = 42;
+                int lastCharacterIndex = Math.Max(textBox.Text.Length - 1, 0);
+                Rect contentRect = textBox.GetRectFromCharacterIndex(lastCharacterIndex, true);
+
+                if (!contentRect.IsEmpty)
+                {
+                    targetHeight = Math.Max(42, contentRect.Bottom + 20);
+                }
+
+                textBox.Height = Math.Min(180, targetHeight);
+                textBox.ScrollToEnd();
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
         private string GetAIReply(string userMessage)
         {
             // 模拟回复，后续替换为真实的AI API调用
@@ -1480,36 +1507,15 @@ namespace AniTechou
             MainContentArea.Content = worksView;
             ContentPlaceholder.Visibility = Visibility.Collapsed;
             MainContentArea.Visibility = Visibility.Visible;
+            SetSidebarSelectionByTag("all");
         }
 
         // 显示添加作品选择界面
         public void ShowAddWorkOptions()
         {
-            var addWorkView = new Views.AddWorkChoiceView();
-            addWorkView.AIAddRequested += () =>
-            {
-                // 展开AI面板
-                if (!_isAIPanelVisible)
-                {
-                    ToggleAIPanel_Click(AIAssistantButton, null);
-                }
-                AIChatInputBox.Focus();
-                AIChatInputBox.Text = "";
-                AIChatInputBox.ToolTip = "输入作品名称，AI帮你搜索";
-
-                // 返回主内容
-                RefreshCurrentView();
-            };
-            addWorkView.ManualAddRequested += () =>
-            {
-                var addForm = new Views.AddWorkForm(_currentAccountName);
-                addForm.WorkAdded += () => RefreshCurrentView();
-                MainContentArea.Content = addForm;
-                ContentPlaceholder.Visibility = Visibility.Collapsed;
-                MainContentArea.Visibility = Visibility.Visible;
-            };
-
-            MainContentArea.Content = addWorkView;
+            var addForm = new Views.AddWorkForm(_currentAccountName);
+            addForm.WorkAdded += () => RefreshCurrentView();
+            MainContentArea.Content = addForm;
             ContentPlaceholder.Visibility = Visibility.Collapsed;
             MainContentArea.Visibility = Visibility.Visible;
         }
@@ -1521,6 +1527,7 @@ namespace AniTechou
             MainContentArea.Content = worksView;
             ContentPlaceholder.Visibility = Visibility.Collapsed;
             MainContentArea.Visibility = Visibility.Visible;
+            SetSidebarSelectionByTag("all");
         }
 
         // 显示笔记列表
@@ -1530,6 +1537,7 @@ namespace AniTechou
             MainContentArea.Content = notesView;
             ContentPlaceholder.Visibility = Visibility.Collapsed;
             MainContentArea.Visibility = Visibility.Visible;
+            SetSidebarSelectionByTag("notes");
         }
 
         public void ShowDetailView(UserControl detailView)
@@ -1537,6 +1545,117 @@ namespace AniTechou
             MainContentArea.Content = detailView;
             ContentPlaceholder.Visibility = Visibility.Collapsed;
             MainContentArea.Visibility = Visibility.Visible;
+        }
+
+        private void InitializeTopThemeSwitcher()
+        {
+            if (TopThemePalettePanel == null) return;
+
+            TopThemePalettePanel.Children.Clear();
+            _topThemeButtons.Clear();
+
+            foreach (var accent in ThemeManager.AccentOptions)
+            {
+                var button = new Button
+                {
+                    ToolTip = accent.Label,
+                    Tag = accent.Key,
+                    Background = new SolidColorBrush(accent.Color),
+                    Style = (Style)FindResource("TopThemeSwatchButtonStyle")
+                };
+                button.SetResourceReference(Button.BorderBrushProperty, "BorderBrush");
+                button.Click += TopThemeAccentButton_Click;
+                _topThemeButtons[accent.Key] = button;
+                TopThemePalettePanel.Children.Add(button);
+            }
+        }
+
+        private void TopThemeAccentButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button || button.Tag is not string accentKey)
+            {
+                return;
+            }
+
+            var config = ConfigManager.Load();
+            config.ThemeAccent = ThemeManager.NormalizeAccent(accentKey);
+            ConfigManager.Save(config);
+            ThemeManager.ApplyTheme(config.ThemeAccent, config.ThemeMode);
+            ApplyTopThemeSelection(config.ThemeAccent);
+            ApplyTopThemeModeSelection(config.ThemeMode);
+            TopThemePopup.IsOpen = false;
+        }
+
+        private void ApplyTopThemeSelection(string accentKey)
+        {
+            var accent = ThemeManager.GetAccentOption(accentKey);
+            TopThemeHintText.Text = $"主题色 · {accent.Label}";
+            ThemeQuickButton.ToolTip = $"当前主题色：{accent.Label}";
+
+            foreach (var pair in _topThemeButtons)
+            {
+                if (pair.Key.Equals(accent.Key, StringComparison.OrdinalIgnoreCase))
+                {
+                    pair.Value.SetResourceReference(Button.BorderBrushProperty, "TextPrimaryBrush");
+                }
+                else
+                {
+                    pair.Value.SetResourceReference(Button.BorderBrushProperty, "BorderBrush");
+                }
+            }
+        }
+
+        private void ApplyTopThemeModeSelection(string modeKey)
+        {
+            bool isDark = string.Equals(modeKey, "Dark", StringComparison.OrdinalIgnoreCase);
+            if (TopLightModeButton != null) TopLightModeButton.IsChecked = !isDark;
+            if (TopDarkModeButton != null) TopDarkModeButton.IsChecked = isDark;
+        }
+
+        private void UpdateWindowControlGlyph()
+        {
+            if (MaximizeRestoreButton == null)
+            {
+                return;
+            }
+
+            if (WindowState == WindowState.Maximized)
+            {
+                MaximizeRestoreButton.Content = "\uE923";
+                MaximizeRestoreButton.ToolTip = "还原";
+            }
+            else
+            {
+                MaximizeRestoreButton.Content = "\uE922";
+                MaximizeRestoreButton.ToolTip = "最大化";
+            }
+        }
+
+        private void SetSidebarSelectionByTag(string tag)
+        {
+            if (SidebarPanel == null) return;
+            var targetButton = SidebarPanel.Children.OfType<Button>().FirstOrDefault(x => string.Equals(x.Tag as string, tag, StringComparison.OrdinalIgnoreCase));
+            if (targetButton != null)
+            {
+                SetSidebarSelection(targetButton);
+            }
+        }
+
+        private void SetSidebarSelection(Button selectedButton)
+        {
+            if (SidebarPanel == null) return;
+
+            foreach (var button in SidebarPanel.Children.OfType<Button>())
+            {
+                button.ClearValue(Button.BackgroundProperty);
+                button.ClearValue(Button.BorderBrushProperty);
+            }
+
+            if (selectedButton != null)
+            {
+                selectedButton.SetResourceReference(Button.BackgroundProperty, "AccentSoftBrush");
+                selectedButton.SetResourceReference(Button.BorderBrushProperty, "AccentSoftBrush");
+            }
         }
 
         public void Logout()

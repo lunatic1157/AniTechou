@@ -5,96 +5,51 @@
         Width="1400" Height="800"
         MinWidth="1000" MinHeight="600"
         WindowStartupLocation="CenterScreen"
-        Background="#F8F4E9"
+        Background="{DynamicResource WindowBackgroundBrush}"
         FontFamily="Microsoft YaHei"
         WindowStyle="None"
         ResizeMode="CanResizeWithGrip">
     
     <Window.Resources>
-        <!-- 颜色资源 -->
-        <SolidColorBrush x:Key="5C4E3D" Color="#5C4E3D"/>
-        <SolidColorBrush x:Key="7F6E5A" Color="#7F6E5A"/>
-        <SolidColorBrush x:Key="A89F91" Color="#A89F91"/>
-        <SolidColorBrush x:Key="E0D5C0" Color="#E0D5C0"/>
-        <SolidColorBrush x:Key="F8F4E9" Color="#F8F4E9"/>
-
-        <!-- 分割条样式 -->
+        <Style x:Key="TopThemeSwatchButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="9"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style TargetType="GridSplitter">
-            <Setter Property="Background" Value="#E0D5C0"/>
+            <Setter Property="Background" Value="{DynamicResource BorderSubtleBrush}"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="VerticalAlignment" Value="Stretch"/>
-            <Setter Property="Width" Value="4"/>
+            <Setter Property="Width" Value="2"/>
             <Setter Property="ResizeBehavior" Value="PreviousAndNext"/>
             <Setter Property="ShowsPreview" Value="True"/>
         </Style>
-        
-        <!-- 侧边栏按钮样式 -->
-        <Style x:Key="SidebarButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="35"/>
-            <Setter Property="Margin" Value="5,2"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#5C4E3D"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
-            <Setter Property="Padding" Value="10,0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#E0D5C0"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-        
-        <!-- 分组标题样式 -->
-        <Style x:Key="GroupHeaderStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="#5C4E3D"/>
-            <Setter Property="Margin" Value="10,10,0,5"/>
-        </Style>
-        
-        <!-- 顶部栏按钮样式 -->
-        <Style x:Key="TopBarButton" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Padding" Value="10,5"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#E0D5C0"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-        
-        <!-- 窗口控制按钮样式 -->
-        <Style x:Key="WindowControlButton" TargetType="Button">
-            <Setter Property="Width" Value="45"/>
-            <Setter Property="Height" Value="30"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#E0D5C0"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-        
-        <!-- AI对话消息样式 -->
         <Style x:Key="UserMessageStyle" TargetType="Border">
-            <Setter Property="Background" Value="#E8F0FE"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="12"/>
             <Setter Property="Margin" Value="0,0,0,8"/>
             <Setter Property="HorizontalAlignment" Value="Right"/>
             <Setter Property="MaxWidth" Value="280"/>
         </Style>
         
         <Style x:Key="AIMessageStyle" TargetType="Border">
-            <Setter Property="Background" Value="#F0E9DD"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Background" Value="{DynamicResource Surface3Brush}"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="12"/>
             <Setter Property="Margin" Value="0,0,0,8"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="MaxWidth" Value="280"/>
@@ -103,15 +58,17 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="40"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <!-- ========== 顶部栏 ========== -->
         <Border Grid.Row="0" 
-                Background="#F0E9DD" 
-                BorderBrush="#E0D5C0" 
-                BorderThickness="0,0,0,1"
+                Margin="12,0,12,2"
+                Background="{DynamicResource WindowBackgroundBrush}" 
+                BorderThickness="0"
+                CornerRadius="0"
+                MinHeight="64"
                 MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -121,15 +78,15 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- 左侧Logo文字 -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,0,0,0">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="16,0,0,0">
                     <TextBlock Text="追番手账" 
                                FontSize="14" 
                                FontWeight="Bold" 
-                               Foreground="#5C4E3D"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center"/>
                     <TextBlock Text="AniTechou" 
                                FontSize="12" 
-                               Foreground="#A89F91"
+                               Foreground="{DynamicResource TextMutedBrush}"
                                VerticalAlignment="Center"
                                Margin="5,0,0,0"/>
                 </StackPanel>
@@ -138,33 +95,86 @@
                 <Grid Grid.Column="1"/>
 
                 <!-- 右侧按钮区 -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,4,8,4" VerticalAlignment="Center">
                     <Button Content="📊 核查"
-                            Style="{StaticResource TopBarButton}"
+                            Style="{StaticResource AppIconButtonStyle}"
                             Click="RunAudit_Click"
                             ToolTip="运行数据库封面数据核查"/>
+                    <Button x:Name="ThemeQuickButton"
+                            Content="🎨 主题"
+                            Style="{StaticResource AppIconButtonStyle}"
+                            Click="ThemeQuickButton_Click"
+                            ToolTip="快速切换主题色"/>
                     <Button x:Name="AIAssistantButton"
                             Content="🤖 AI助手"
-                            Style="{StaticResource TopBarButton}"
+                            Style="{StaticResource AppIconButtonStyle}"
                             Click="ToggleAIPanel_Click"/>
                     <Button Content="👤 个人主页"
-                            Style="{StaticResource TopBarButton}"
+                            Style="{StaticResource AppIconButtonStyle}"
                             Click="Profile_Click"/>
                     <Button Content="⚙️ 设置"
-                            Style="{StaticResource TopBarButton}"
+                            Style="{StaticResource AppIconButtonStyle}"
                             Click="Settings_Click"/>
-                    <Button Content="─" 
-                            Style="{StaticResource WindowControlButton}"
+                    <Button Content="&#xE921;"
+                            FontFamily="Segoe MDL2 Assets"
+                            Style="{StaticResource AppWindowControlButtonStyle}"
+                            ToolTip="最小化"
                             Click="MinimizeWindow_Click"/>
-                    <Button Content="□" 
-                            Style="{StaticResource WindowControlButton}"
+                    <Button x:Name="MaximizeRestoreButton"
+                            Content="&#xE922;"
+                            FontFamily="Segoe MDL2 Assets"
+                            Style="{StaticResource AppWindowControlButtonStyle}"
+                            ToolTip="最大化"
                             Click="MaximizeWindow_Click"/>
-                    <Button Content="✕" 
-                            Style="{StaticResource WindowControlButton}"
-                            Background="#E06C6C"
-                            Foreground="White"
+                    <Button Content="&#xE8BB;"
+                            FontFamily="Segoe MDL2 Assets"
+                            Style="{StaticResource AppWindowControlButtonStyle}"
+                            ToolTip="关闭"
                             Click="CloseWindow_Click"/>
                 </StackPanel>
+
+                <Popup x:Name="TopThemePopup"
+                       PlacementTarget="{Binding ElementName=ThemeQuickButton}"
+                       Placement="Bottom"
+                       VerticalOffset="10"
+                       StaysOpen="False"
+                       AllowsTransparency="True">
+                    <Border Background="{DynamicResource Surface1Brush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="14"
+                            Padding="14"
+                            Effect="{DynamicResource PopupShadow}">
+                        <StackPanel>
+                            <TextBlock x:Name="TopThemeHintText"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       Margin="0,0,0,10"/>
+                            <WrapPanel x:Name="TopThemePalettePanel" MaxWidth="240"/>
+                            <TextBlock Text="明暗模式"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,6,0,8"/>
+                            <WrapPanel>
+                                <ToggleButton x:Name="TopLightModeButton"
+                                              Content="Light"
+                                              Width="82"
+                                              Height="34"
+                                              Margin="0,0,8,0"
+                                              Style="{StaticResource AppToggleButtonStyle}"
+                                              Click="TopThemeModeButton_Click"
+                                              Tag="Light"/>
+                                <ToggleButton x:Name="TopDarkModeButton"
+                                              Content="Dark"
+                                              Width="82"
+                                              Height="34"
+                                              Style="{StaticResource AppToggleButtonStyle}"
+                                              Click="TopThemeModeButton_Click"
+                                              Tag="Dark"/>
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+                </Popup>
             </Grid>
         </Border>
 
@@ -181,52 +191,52 @@
             <!-- ========== 左侧边栏 ========== -->
             <ScrollViewer Grid.Column="0" 
                           VerticalScrollBarVisibility="Auto"
-                          Background="#F0E9DD"
+                          Margin="12,0,10,12"
+                          Background="{DynamicResource Surface1Brush}"
                           HorizontalScrollBarVisibility="Disabled">
-                <StackPanel>
+                <StackPanel x:Name="SidebarPanel" Margin="12">
 
                     <!-- 快速笔记按钮 -->
-                    <Button Content="📝 随手记 (Ctrl+N)"
-                            Style="{StaticResource SidebarButtonStyle}"
-                            Background="#D4C9B8"
+                    <Button x:Name="QuickNoteButton"
+                            Content="📝 快速笔记"
+                            Style="{StaticResource AppSidebarButtonStyle}"
                             FontWeight="Bold"
-                            Margin="5"
                             Click="QuickNote_Click"/>
 
                     <!-- 作品库 -->
-                    <TextBlock Text="📁 作品库" Style="{StaticResource GroupHeaderStyle}"/>
-                    <Button Content="📋 全部作品" Style="{StaticResource SidebarButtonStyle}" Tag="all" Click="SidebarMenu_Click"/>
-                    <Button Content="🎬 动画" Style="{StaticResource SidebarButtonStyle}" Tag="anime" Click="SidebarMenu_Click"/>
-                    <Button Content="📚 漫画" Style="{StaticResource SidebarButtonStyle}" Tag="manga" Click="SidebarMenu_Click"/>
-                    <Button Content="📖 轻小说" Style="{StaticResource SidebarButtonStyle}" Tag="lightnovel" Click="SidebarMenu_Click"/>
-                    <Button Content="🎮 游戏" Style="{StaticResource SidebarButtonStyle}" Tag="game" Click="SidebarMenu_Click"/>
-                    <Button Content="👀 想看" Style="{StaticResource SidebarButtonStyle}" Tag="wish" Click="SidebarMenu_Click"/>
-                    <Button Content="▶️ 在看" Style="{StaticResource SidebarButtonStyle}" Tag="doing" Click="SidebarMenu_Click"/>
-                    <Button Content="✅ 看过" Style="{StaticResource SidebarButtonStyle}" Tag="done" Click="SidebarMenu_Click"/>
+                    <TextBlock Text="📁 作品库" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="8,14,0,10"/>
+                    <Button Content="📋 全部作品" Style="{StaticResource AppSidebarButtonStyle}" Tag="all" Click="SidebarMenu_Click"/>
+                    <Button Content="🎬 动画" Style="{StaticResource AppSidebarButtonStyle}" Tag="anime" Click="SidebarMenu_Click"/>
+                    <Button Content="📚 漫画" Style="{StaticResource AppSidebarButtonStyle}" Tag="manga" Click="SidebarMenu_Click"/>
+                    <Button Content="📖 轻小说" Style="{StaticResource AppSidebarButtonStyle}" Tag="lightnovel" Click="SidebarMenu_Click"/>
+                    <Button Content="🎮 游戏" Style="{StaticResource AppSidebarButtonStyle}" Tag="game" Click="SidebarMenu_Click"/>
+                    <Button Content="👀 想看" Style="{StaticResource AppSidebarButtonStyle}" Tag="wish" Click="SidebarMenu_Click"/>
+                    <Button Content="▶️ 在看" Style="{StaticResource AppSidebarButtonStyle}" Tag="doing" Click="SidebarMenu_Click"/>
+                    <Button Content="✅ 看过" Style="{StaticResource AppSidebarButtonStyle}" Tag="done" Click="SidebarMenu_Click"/>
 
                     <!-- 笔记中心 -->
-                    <TextBlock Text="📝 笔记中心" Style="{StaticResource GroupHeaderStyle}"/>
-                    <Button Content="📌 全部笔记" Style="{StaticResource SidebarButtonStyle}" Tag="notes" Click="SidebarMenu_Click"/>
+                    <TextBlock Text="📝 笔记中心" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="8,14,0,10"/>
+                    <Button Content="📌 全部笔记" Style="{StaticResource AppSidebarButtonStyle}" Tag="notes" Click="SidebarMenu_Click"/>
                 </StackPanel>
             </ScrollViewer>
 
             <GridSplitter Grid.Column="1" Width="4" ResizeDirection="Columns"/>
 
             <!-- ========== 中间内容区 ========== -->
-            <Grid Grid.Column="2" Background="White">
+            <Grid Grid.Column="2" Margin="0,0,10,12" Background="{DynamicResource Surface1Brush}">
                 <TextBlock x:Name="ContentPlaceholder"
                            Text="👈 从左侧选择要查看的内容"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
-                           Foreground="#A89F91"
+                           Foreground="{DynamicResource TextMutedBrush}"
                            FontSize="16"/>
                 <ContentControl x:Name="MainContentArea" Visibility="Collapsed"/>
             </Grid>
 
-            <GridSplitter Grid.Column="3" Width="4" ResizeDirection="Columns"/>
+            <GridSplitter x:Name="AIPanelSplitter" Grid.Column="3" Width="4" ResizeDirection="Columns"/>
 
             <!-- ========== 右侧AI对话面板 ========== -->
-            <Grid x:Name="AIPanel" Grid.Column="4" Background="#F8F4E9">
+            <Grid x:Name="AIPanel" Grid.Column="4" Margin="0,0,12,12" Background="{DynamicResource Surface1Brush}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
@@ -235,14 +245,12 @@
 
                 <!-- AI面板头部 -->
                 <Border Grid.Row="0" 
-                        Background="#F0E9DD" 
-                        BorderBrush="#E0D5C0" 
-                        BorderThickness="0,0,0,1"
-                        Padding="12,8">
+                        Background="{DynamicResource Surface2Brush}" 
+                        Padding="14,12">
                     <TextBlock Text="🤖 AI助手" 
                                FontSize="14" 
                                FontWeight="Bold" 
-                               Foreground="#5C4E3D"/>
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
                 </Border>
 
                 <!-- 对话记录区域 -->
@@ -254,16 +262,15 @@
                         <Border Style="{StaticResource AIMessageStyle}">
                             <TextBlock Text="👋 你好！我是你的AI助手。我可以帮你：&#x0a;• 搜索动漫、漫画、轻小说、游戏信息&#x0a;• 推荐相似作品&#x0a;• 帮你批量添加作品到列表&#x0a;• 回答关于ACGN的问题" 
                                        TextWrapping="Wrap"
-                                       FontSize="12"/>
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
                         </Border>
                     </StackPanel>
                 </ScrollViewer>
 
                 <!-- 输入区域（底部） -->
                 <Border Grid.Row="2"
-                        Background="#F0E9DD"
-                        BorderBrush="#E0D5C0"
-                        BorderThickness="0,1,0,0"
+                        Background="{DynamicResource Surface2Brush}"
                         Padding="10">
                     <StackPanel>
                         <Grid>
@@ -274,13 +281,19 @@
 
                             <TextBox x:Name="AIChatInputBox"
                                      Grid.Column="0"
-                                     Height="35"
-                                     Padding="8,5"
+                                     Height="42"
+                                     MinHeight="42"
+                                     MaxHeight="180"
                                      TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     VerticalScrollBarVisibility="Disabled"
                                      FontSize="13"
-                                     Background="White"
+                                     Foreground="{DynamicResource TextPrimaryBrush}"
+                                     CaretBrush="{DynamicResource TextPrimaryBrush}"
+                                     Style="{StaticResource AppTextBoxStyle}"
                                      ToolTip="输入你想问的问题..."
                                      VerticalAlignment="Center"
+                                     TextChanged="AIChatInputBox_TextChanged"
                                      KeyDown="AIChatInputBox_KeyDown"/>
 
                             <Button Grid.Column="1"
@@ -288,10 +301,7 @@
                                     Width="60"
                                     Height="32"
                                     Margin="8,0,0,0"
-                                    Background="#5C4E3D"
-                                    Foreground="White"
-                                    BorderThickness="0"
-                                    Cursor="Hand"
+                                    Style="{StaticResource AppPrimaryButtonStyle}"
                                     Click="SendAIChat_Click"/>
                         </Grid>
                     </StackPanel>

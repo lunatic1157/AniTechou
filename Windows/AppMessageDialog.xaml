@@ -1,0 +1,35 @@
+<Window x:Class="AniTechou.Windows.AppMessageDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="提示"
+        Width="420"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="Transparent"
+        AllowsTransparency="True"
+        WindowStyle="None"
+        ShowInTaskbar="False">
+    <Border Margin="18"
+            Padding="20"
+            Background="{DynamicResource Surface1Brush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource CardCornerRadius}"
+            Effect="{DynamicResource PopupShadow}">
+        <StackPanel>
+            <TextBlock x:Name="DialogTitleText"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
+                       Margin="0,0,0,12"/>
+            <TextBlock x:Name="DialogMessageText"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       Margin="0,0,0,20"/>
+            <StackPanel x:Name="ButtonPanel"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"/>
+        </StackPanel>
+    </Border>
+</Window>

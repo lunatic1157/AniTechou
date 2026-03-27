@@ -7,6 +7,7 @@ using AniTechou.Services;
 
 using System.IO;
 using Microsoft.Win32;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace AniTechou.Views
@@ -55,7 +56,7 @@ namespace AniTechou.Views
 
                 // 昵称 - 从数据库获取
                 string nickname = _workService.GetNickname();
-                NicknameBox.Text = string.IsNullOrEmpty(nickname) ? "ACGN爱好者" : nickname;
+                NicknameText.Text = string.IsNullOrEmpty(nickname) ? "ACGN爱好者" : nickname;
 
                 // 年度总结
                 LoadYearStats(stats.YearStats);
@@ -126,14 +127,11 @@ namespace AniTechou.Views
                 {
                     Content = kv.Key,
                     Tag = kv.Key,
-                    Background = System.Windows.Media.Brushes.Transparent,
-                    BorderThickness = new Thickness(0),
-                    Cursor = System.Windows.Input.Cursors.Hand,
                     Margin = new Thickness(5, 3, 5, 3),
-                    FontSize = fontSize,
-                    Foreground = new System.Windows.Media.SolidColorBrush(
-                        System.Windows.Media.Color.FromRgb(92, 78, 61))
+                    FontSize = fontSize
                 };
+                tagButton.Style = (Style)FindResource("AppGhostButtonStyle");
+                tagButton.SetResourceReference(Control.ForegroundProperty, "TextPrimaryBrush");
                 tagButton.Click += TagButton_Click;
                 TagCloudPanel.Children.Add(tagButton);
             }
@@ -156,19 +154,23 @@ namespace AniTechou.Views
             var inputDialog = new Window
             {
                 Title = "编辑昵称",
-                Width = 300,
-                Height = 150,
+                Width = 360,
+                Height = 200,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Owner = Application.Current.MainWindow,
-                ResizeMode = ResizeMode.NoResize
+                ResizeMode = ResizeMode.NoResize,
+                FontFamily = FontFamily
             };
+            inputDialog.SetResourceReference(Window.BackgroundProperty, "WindowBackgroundBrush");
 
             var panel = new StackPanel { Margin = new Thickness(20) };
             var label = new TextBlock { Text = "请输入新昵称：" };
-            var textBox = new TextBox { Text = NicknameBox.Text };
+            label.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+            var textBox = new TextBox { Text = NicknameText.Text, Height = 42, Padding = new Thickness(12, 6, 12, 6) };
+            textBox.Style = (Style)FindResource("AppTextBoxStyle");
             var buttonPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 20, 0, 0) };
-            var okButton = new Button { Content = "确定", Width = 80, Margin = new Thickness(0, 0, 10, 0) };
-            var cancelButton = new Button { Content = "取消", Width = 80 };
+            var okButton = new Button { Content = "确定", Width = 88, Height = 36, Margin = new Thickness(0, 0, 10, 0), Style = (Style)FindResource("AppPrimaryButtonStyle") };
+            var cancelButton = new Button { Content = "取消", Width = 88, Height = 36, Style = (Style)FindResource("AppSecondaryButtonStyle") };
 
             okButton.Click += (s, args) =>
             {
@@ -177,12 +179,12 @@ namespace AniTechou.Views
                 {
                     if (_workService.UpdateNickname(newNickname))
                     {
-                        NicknameBox.Text = newNickname;
-                        MessageBox.Show("昵称更新成功！");
+                        NicknameText.Text = newNickname;
+                        Windows.AppMessageDialog.Show(Application.Current.MainWindow, "成功", "昵称更新成功！");
                     }
                     else
                     {
-                        MessageBox.Show("昵称更新失败");
+                        Windows.AppMessageDialog.Show(Application.Current.MainWindow, "失败", "昵称更新失败");
                     }
                 }
                 inputDialog.DialogResult = true;

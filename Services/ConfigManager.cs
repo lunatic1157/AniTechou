@@ -12,7 +12,9 @@ namespace AniTechou.Services
         public string Model { get; set; } = "deepseek-chat";
         public bool AutoLogin { get; set; } = true;
         public string LastAccount { get; set; } = "";
-        public string CustomSystemPrompt { get; set; } = ""; // 新增：用户自定义的系统提示词
+        public string CustomSystemPrompt { get; set; } = "";
+        public string ThemeAccent { get; set; } = "Aurora";
+        public string ThemeMode { get; set; } = "Light";
     }
 
     public static class ConfigManager

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using AniTechou.Services;
@@ -17,7 +18,20 @@ namespace AniTechou.Windows
             _workId = workId;
             _accountName = accountName;
             _workService = new WorkService(accountName);
+            InitializeOptions();
             LoadData();
+        }
+
+        private void InitializeOptions()
+        {
+            TypeBox.ItemsSource = new List<string> { "动画", "漫画", "轻小说", "游戏" };
+            TypeBox.SelectedIndex = 0;
+
+            SeasonBox.ItemsSource = new List<string> { "", "春", "夏", "秋", "冬" };
+            SeasonBox.SelectedIndex = 0;
+
+            SourceTypeBox.ItemsSource = new List<string> { "无", "原创", "漫改", "小说改", "游戏改", "其他" };
+            SourceTypeBox.SelectedIndex = 0;
         }
 
         private void LoadData()
@@ -42,17 +56,8 @@ namespace AniTechou.Windows
                     _ => "动画"
                 };
 
-                for (int i = 0; i < TypeBox.Items.Count; i++)
-                {
-                    if (TypeBox.Items[i] is ComboBoxItem item)
-                    {
-                        if (item.Content.ToString() == displayType)
-                        {
-                            TypeBox.SelectedIndex = i;
-                            break;
-                        }
-                    }
-                }
+                TypeBox.SelectedItem = displayType;
+                if (TypeBox.SelectedItem == null) TypeBox.SelectedIndex = 0;
 
                 // 动态更新标签文本
                 UpdateDynamicLabels(displayType);
@@ -92,17 +97,8 @@ namespace AniTechou.Windows
                 string sourceType = work.SourceType ?? "";
                 if (string.IsNullOrEmpty(sourceType)) sourceType = "无";
 
-                for (int i = 0; i < SourceTypeBox.Items.Count; i++)
-                {
-                    if (SourceTypeBox.Items[i] is ComboBoxItem item)
-                    {
-                        if (item.Content.ToString() == sourceType)
-                        {
-                            SourceTypeBox.SelectedIndex = i;
-                            break;
-                        }
-                    }
-                }
+                SourceTypeBox.SelectedItem = sourceType;
+                if (SourceTypeBox.SelectedItem == null) SourceTypeBox.SelectedIndex = 0;
 
                 EpisodesBox.Text = work.EpisodesVolumes ?? "";
                 SynopsisBox.Text = work.Synopsis ?? "";
@@ -112,9 +108,9 @@ namespace AniTechou.Windows
 
         private void TypeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (TypeBox.SelectedItem is ComboBoxItem selectedItem)
+            if (TypeBox.SelectedItem is string selectedItem)
             {
-                UpdateDynamicLabels(selectedItem.Content.ToString());
+                UpdateDynamicLabels(selectedItem);
             }
         }
 
@@ -152,8 +148,7 @@ namespace AniTechou.Windows
         {
             try
             {
-                var selectedItem = TypeBox.SelectedItem as ComboBoxItem;
-                string type = selectedItem?.Content?.ToString() switch
+                string type = (TypeBox.SelectedItem as string) switch
                 {
                     "动画" => "Anime",
                     "漫画" => "Manga",
@@ -164,8 +159,8 @@ namespace AniTechou.Windows
 
                 // 分别获取年份和季度
                 string year = YearBox.Text.Trim();
-                string season = (SeasonBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "";
-                string sourceType = (SourceTypeBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "";
+                string season = SeasonBox.SelectedItem as string ?? "";
+                string sourceType = SourceTypeBox.SelectedItem as string ?? "";
                 if (sourceType == "无") sourceType = "";
 
                 string company = type == "Anime" || type == "Game" ? CompanyBox.Text.Trim() : "";
@@ -195,18 +190,18 @@ namespace AniTechou.Windows
 
                 if (success)
                 {
-                    MessageBox.Show("保存成功！");
+                    AppMessageDialog.Show(this, "成功", "保存成功！");
                     DialogResult = true;
                     Close();
                 }
                 else
                 {
-                    MessageBox.Show("保存失败，请重试");
+                    AppMessageDialog.Show(this, "失败", "保存失败，请重试");
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"保存失败：{ex.Message}");
+                AppMessageDialog.Show(this, "错误", $"保存失败：{ex.Message}");
             }
         }
 

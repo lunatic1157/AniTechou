@@ -2,23 +2,27 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="编辑作品信息"
-        Width="550" Height="600"
+        Width="640" Height="720"
+        MinWidth="640" MinHeight="720"
         WindowStartupLocation="CenterOwner"
-        Background="#F8F4E9"
-        ResizeMode="NoResize">
+        Background="{DynamicResource WindowBackgroundBrush}"
+        ResizeMode="CanResizeWithGrip"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="20">
+        <StackPanel Margin="24">
             <TextBlock Text="编辑作品信息"
                        FontSize="20"
                        FontWeight="Bold"
-                       Foreground="#5C4E3D"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
                        HorizontalAlignment="Center"
                        Margin="0,0,0,20"/>
 
+            <Border Style="{StaticResource AppSectionCardStyle}" Padding="18">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="112"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
@@ -35,83 +39,66 @@
                 </Grid.RowDefinitions>
 
                 <!-- 标题 -->
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="标题" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
-                <TextBox x:Name="TitleBox" Grid.Row="0" Grid.Column="1" Margin="5" Height="30"/>
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="标题" Foreground="{DynamicResource TextPrimaryBrush}" Margin="5" VerticalAlignment="Center"/>
+                <TextBox x:Name="TitleBox" Grid.Row="0" Grid.Column="1" Margin="5" Height="40" Style="{StaticResource AppTextBoxStyle}"/>
 
                 <!-- 原名 -->
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="原名" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
-                <TextBox x:Name="OriginalTitleBox" Grid.Row="1" Grid.Column="1" Margin="5" Height="30"/>
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="原名" Foreground="{DynamicResource TextPrimaryBrush}" Margin="5" VerticalAlignment="Center"/>
+                <TextBox x:Name="OriginalTitleBox" Grid.Row="1" Grid.Column="1" Margin="5" Height="40" Style="{StaticResource AppTextBoxStyle}"/>
 
                 <!-- 类型 -->
-                <TextBlock Grid.Row="2" Grid.Column="0" Text="类型" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
-                <ComboBox x:Name="TypeBox" Grid.Row="2" Grid.Column="1" Margin="5" Height="30" SelectionChanged="TypeBox_SelectionChanged">
-                    <ComboBoxItem Content="动画"/>
-                    <ComboBoxItem Content="漫画"/>
-                    <ComboBoxItem Content="轻小说"/>
-                    <ComboBoxItem Content="游戏"/>
-                </ComboBox>
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="类型" Foreground="{DynamicResource TextPrimaryBrush}" Margin="5" VerticalAlignment="Center"/>
+                <ComboBox x:Name="TypeBox" Grid.Row="2" Grid.Column="1" Margin="5" Height="40" Style="{StaticResource AppComboBoxStyle}" SelectionChanged="TypeBox_SelectionChanged"/>
 
                 <!-- 制作 -->
-                <TextBlock x:Name="CompanyLabel" Grid.Row="3" Grid.Column="0" Text="制作" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
+                <TextBlock x:Name="CompanyLabel" Grid.Row="3" Grid.Column="0" Text="制作" Foreground="{DynamicResource TextPrimaryBrush}" Margin="5" VerticalAlignment="Center"/>
                 <Grid Grid.Row="3" Grid.Column="1">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBox x:Name="CompanyBox" Grid.Column="0" Margin="5" Height="30" ToolTip="制作公司/出版社/作者"/>
-                    <TextBlock Grid.Column="1" Text="原作" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
-                    <TextBox x:Name="OriginalWorkBox" Grid.Column="2" Margin="5" Height="30" ToolTip="原作作者（如小说作者）"/>
+                    <TextBox x:Name="CompanyBox" Grid.Column="0" Margin="5" Height="40" ToolTip="制作公司/出版社/作者" Style="{StaticResource AppTextBoxStyle}"/>
+                    <TextBlock Grid.Column="1" Text="原作" Foreground="{DynamicResource TextPrimaryBrush}" Margin="5" VerticalAlignment="Center"/>
+                    <TextBox x:Name="OriginalWorkBox" Grid.Column="2" Margin="5" Height="40" ToolTip="原作作者（如小说作者）" Style="{StaticResource AppTextBoxStyle}"/>
                 </Grid>
 
                 <!-- 年份 -->
-                <TextBlock Grid.Row="4" Grid.Column="0" Text="年份" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
-                <TextBox x:Name="YearBox" Grid.Row="4" Grid.Column="1" Margin="5" Height="30"/>
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="年份" Foreground="{DynamicResource TextPrimaryBrush}" Margin="5" VerticalAlignment="Center"/>
+                <TextBox x:Name="YearBox" Grid.Row="4" Grid.Column="1" Margin="5" Height="40" Style="{StaticResource AppTextBoxStyle}"/>
 
                 <!-- 季度 -->
-                <TextBlock Grid.Row="5" Grid.Column="0" Text="季度" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
-                <ComboBox x:Name="SeasonBox" Grid.Row="5" Grid.Column="1" Margin="5" Height="30" SelectedIndex="0">
-                    <ComboBoxItem Content=""/>
-                    <ComboBoxItem Content="春"/>
-                    <ComboBoxItem Content="夏"/>
-                    <ComboBoxItem Content="秋"/>
-                    <ComboBoxItem Content="冬"/>
-                </ComboBox>
+                <TextBlock Grid.Row="5" Grid.Column="0" Text="季度" Foreground="{DynamicResource TextPrimaryBrush}" Margin="5" VerticalAlignment="Center"/>
+                <ComboBox x:Name="SeasonBox" Grid.Row="5" Grid.Column="1" Margin="5" Height="40" Style="{StaticResource AppComboBoxStyle}"/>
 
                 <!-- 原作类型（新增） -->
-                <TextBlock Grid.Row="6" Grid.Column="0" Text="原作类型" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
-                <ComboBox x:Name="SourceTypeBox" Grid.Row="6" Grid.Column="1" Margin="5" Height="30" SelectedIndex="0">
-                    <ComboBoxItem Content="无"/>
-                    <ComboBoxItem Content="原创"/>
-                    <ComboBoxItem Content="漫改"/>
-                    <ComboBoxItem Content="小说改"/>
-                    <ComboBoxItem Content="游戏改"/>
-                    <ComboBoxItem Content="其他"/>
-                </ComboBox>
+                <TextBlock Grid.Row="6" Grid.Column="0" Text="原作类型" Foreground="{DynamicResource TextPrimaryBrush}" Margin="5" VerticalAlignment="Center"/>
+                <ComboBox x:Name="SourceTypeBox" Grid.Row="6" Grid.Column="1" Margin="5" Height="40" Style="{StaticResource AppComboBoxStyle}"/>
 
                 <!-- 集数/卷数 -->
-                <TextBlock Grid.Row="7" Grid.Column="0" Text="集数/卷数" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
-                <TextBox x:Name="EpisodesBox" Grid.Row="7" Grid.Column="1" Margin="5" Height="30"/>
+                <TextBlock Grid.Row="7" Grid.Column="0" Text="集数/卷数" Foreground="{DynamicResource TextPrimaryBrush}" Margin="5" VerticalAlignment="Center"/>
+                <TextBox x:Name="EpisodesBox" Grid.Row="7" Grid.Column="1" Margin="5" Height="40" Style="{StaticResource AppTextBoxStyle}"/>
 
                 <!-- 简介 -->
-                <TextBlock Grid.Row="8" Grid.Column="0" Text="简介" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Top"/>
-                <TextBox x:Name="SynopsisBox" Grid.Row="8" Grid.Column="1" Height="100" TextWrapping="Wrap" AcceptsReturn="True" Margin="5"/>
+                <TextBlock Grid.Row="8" Grid.Column="0" Text="简介" Foreground="{DynamicResource TextPrimaryBrush}" Margin="5" VerticalAlignment="Top"/>
+                <TextBox x:Name="SynopsisBox" Grid.Row="8" Grid.Column="1" Height="120" TextWrapping="Wrap" AcceptsReturn="True" Margin="5" Style="{StaticResource AppTextBoxStyle}"/>
 
                 <!-- 封面路径 -->
-                <TextBlock Grid.Row="9" Grid.Column="0" Text="封面" Foreground="#5C4E3D" Margin="5" VerticalAlignment="Center"/>
+                <TextBlock Grid.Row="9" Grid.Column="0" Text="封面" Foreground="{DynamicResource TextPrimaryBrush}" Margin="5" VerticalAlignment="Center"/>
                 <Grid Grid.Row="9" Grid.Column="1" Margin="5">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBox x:Name="CoverPathBox" Grid.Column="0" Height="30" VerticalAlignment="Center"/>
-                    <Button Content="浏览" Grid.Column="1" Width="60" Height="30" Margin="5,0,0,0" Click="BrowseCover_Click"/>
+                    <TextBox x:Name="CoverPathBox" Grid.Column="0" Height="40" VerticalAlignment="Center" Style="{StaticResource AppTextBoxStyle}"/>
+                    <Button Content="浏览" Grid.Column="1" Width="80" Height="40" Margin="8,0,0,0" Style="{StaticResource AppSecondaryButtonStyle}" Click="BrowseCover_Click"/>
                 </Grid>
             </Grid>
+            </Border>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20">
-                <Button Content="保存" Width="80" Height="35" Background="#5C4E3D" Foreground="White" Click="Save_Click" Margin="0,0,10,0"/>
-                <Button Content="取消" Width="80" Height="35" Click="Cancel_Click"/>
+                <Button Content="保存" Width="96" Height="40" Style="{StaticResource AppPrimaryButtonStyle}" Click="Save_Click" Margin="0,0,10,0"/>
+                <Button Content="取消" Width="96" Height="40" Style="{StaticResource AppSecondaryButtonStyle}" Click="Cancel_Click"/>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

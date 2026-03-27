@@ -1,0 +1,17 @@
+* text=auto eol=crlf
+*.cs text eol=crlf
+*.xaml text eol=crlf
+*.json text eol=crlf
+*.md text eol=crlf
+*.yml text eol=crlf
+*.yaml text eol=crlf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.dll binary
+*.db binary
+*.db-shm binary
+*.db-wal binary
