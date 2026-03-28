@@ -27,3 +27,6 @@ desktop.ini
 
 ## [Config](file:///f:/AniTechou/AniTechou/.gitignore)
 config.json
+publish/
+Installer/output/
+AniTechou-win-x64.zip
