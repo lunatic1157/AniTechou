@@ -160,7 +160,7 @@ namespace AniTechou.Services
                         CREATE INDEX idx_userlist_status ON UserList(Status);
                         CREATE INDEX idx_noteworks_note ON NoteWorks(NoteId);
                         CREATE INDEX idx_noteworks_work ON NoteWorks(WorkId);
-                        CREATE INDEX idx_worktags_work ON WorkTags(WorkId);
+                        CREATE UNIQUE INDEX ux_worktags_workid_tagname ON WorkTags(WorkId, TagName);
                         CREATE INDEX idx_workrelations_source ON WorkRelations(SourceWorkId);
                     ";
 
@@ -237,11 +237,39 @@ namespace AniTechou.Services
 
                     // 检查并创建 WorkRelations 表 (如果不存在)
                     MigrateWorkRelationsTable(conn);
+
+                    MigrateWorkTagsTable(conn);
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Migration error: {ex.Message}");
+            }
+        }
+
+        private static void MigrateWorkTagsTable(SQLiteConnection conn)
+        {
+            try
+            {
+                using (var deleteCmd = new SQLiteCommand(@"
+DELETE FROM WorkTags
+WHERE Id NOT IN (
+    SELECT MIN(Id)
+    FROM WorkTags
+    GROUP BY WorkId, TagName
+);", conn))
+                {
+                    deleteCmd.ExecuteNonQuery();
+                }
+
+                using (var cmd = new SQLiteCommand("CREATE UNIQUE INDEX IF NOT EXISTS ux_worktags_workid_tagname ON WorkTags(WorkId, TagName);", conn))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] MigrateWorkTagsTable error: {ex.Message}");
             }
         }
 

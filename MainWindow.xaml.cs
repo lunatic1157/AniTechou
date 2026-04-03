@@ -1366,14 +1366,18 @@ namespace AniTechou
                     if (work.tags != null && work.tags.Count > 0)
                     {
                         var currentTags = workService.GetWorkTags(workId);
+                        var currentTagSet = new HashSet<string>(currentTags.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()), StringComparer.OrdinalIgnoreCase);
                         var newTags = new List<string>();
                         foreach (var tag in work.tags)
                         {
-                            if (!currentTags.Contains(tag.Trim()))
+                            string trimmed = (tag ?? "").Trim();
+                            if (string.IsNullOrWhiteSpace(trimmed)) continue;
+                            if (!currentTagSet.Contains(trimmed))
                             {
-                                if (workService.AddWorkTag(workId, tag))
+                                if (workService.AddWorkTag(workId, trimmed, source: "AI"))
                                 {
-                                    newTags.Add(tag);
+                                    newTags.Add(trimmed);
+                                    currentTagSet.Add(trimmed);
                                 }
                             }
                         }
@@ -1381,11 +1385,13 @@ namespace AniTechou
                         // 特殊处理：如果是漫画或小说，并且有作者，把作者也当作一个标签加进去
                         if ((typeEn == "Manga" || typeEn == "LightNovel") && !string.IsNullOrEmpty(work.author))
                         {
-                            if (!currentTags.Contains(work.author.Trim()))
+                            string author = work.author.Trim();
+                            if (!string.IsNullOrWhiteSpace(author) && !currentTagSet.Contains(author))
                             {
-                                if (workService.AddWorkTag(workId, work.author.Trim()))
+                                if (workService.AddWorkTag(workId, author, category: "作者", source: "AI"))
                                 {
-                                    newTags.Add(work.author.Trim());
+                                    newTags.Add(author);
+                                    currentTagSet.Add(author);
                                 }
                             }
                         }
@@ -1393,11 +1399,13 @@ namespace AniTechou
                         // 特殊处理：如果是动画，并且有原作，把原作也当作一个标签加进去
                         if (typeEn == "Anime" && !string.IsNullOrEmpty(work.originalWork))
                         {
-                            if (!currentTags.Contains(work.originalWork.Trim()))
+                            string originalWork = work.originalWork.Trim();
+                            if (!string.IsNullOrWhiteSpace(originalWork) && !currentTagSet.Contains(originalWork))
                             {
-                                if (workService.AddWorkTag(workId, work.originalWork.Trim()))
+                                if (workService.AddWorkTag(workId, originalWork, category: "原作", source: "AI"))
                                 {
-                                    newTags.Add(work.originalWork.Trim());
+                                    newTags.Add(originalWork);
+                                    currentTagSet.Add(originalWork);
                                 }
                             }
                         }

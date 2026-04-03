@@ -221,16 +221,25 @@ namespace AniTechou.Views
             var dialog = new Microsoft.Win32.SaveFileDialog
             {
                 Title = "导出数据",
-                Filter = "JSON文件|*.json|所有文件|*.*",
-                FileName = $"anitechou_export_{DateTime.Now:yyyyMMdd}"
+                Filter = "AniTechou备份文件|*.zip|JSON文件|*.json|所有文件|*.*",
+                FileName = $"anitechou_backup_{DateTime.Now:yyyyMMdd}"
             };
 
             if (dialog.ShowDialog() == true)
             {
                 var workService = new WorkService(_accountName);
-                var data = workService.ExportAllData();
-                File.WriteAllText(dialog.FileName, data);
-                Windows.AppMessageDialog.Show(Application.Current.MainWindow, "导出成功", $"数据已导出到：{dialog.FileName}");
+                string ext = Path.GetExtension(dialog.FileName) ?? "";
+                if (string.Equals(ext, ".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    workService.ExportPortableBackup(dialog.FileName);
+                    Windows.AppMessageDialog.Show(Application.Current.MainWindow, "导出成功", $"可移植备份已导出到：{dialog.FileName}");
+                }
+                else
+                {
+                    var data = workService.ExportAllData();
+                    File.WriteAllText(dialog.FileName, data);
+                    Windows.AppMessageDialog.Show(Application.Current.MainWindow, "导出成功", $"数据已导出到：{dialog.FileName}");
+                }
             }
         }
 
@@ -239,24 +248,32 @@ namespace AniTechou.Views
             var dialog = new Microsoft.Win32.OpenFileDialog
             {
                 Title = "导入数据",
-                Filter = "JSON文件|*.json|所有文件|*.*"
+                Filter = "AniTechou备份文件|*.zip|JSON文件|*.json|所有文件|*.*"
             };
 
             if (dialog.ShowDialog() == true)
             {
-                string json;
-                try
-                {
-                    json = File.ReadAllText(dialog.FileName);
-                }
-                catch (Exception ex)
-                {
-                    Windows.AppMessageDialog.Show(Application.Current.MainWindow, "导入失败", $"读取文件失败：{ex.Message}");
-                    return;
-                }
-
                 var workService = new WorkService(_accountName);
-                var result = workService.ImportAllData(json);
+                WorkService.ImportResult result;
+                string ext = Path.GetExtension(dialog.FileName) ?? "";
+                if (string.Equals(ext, ".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    result = workService.ImportPortableBackup(dialog.FileName);
+                }
+                else
+                {
+                    string json;
+                    try
+                    {
+                        json = File.ReadAllText(dialog.FileName);
+                    }
+                    catch (Exception ex)
+                    {
+                        Windows.AppMessageDialog.Show(Application.Current.MainWindow, "导入失败", $"读取文件失败：{ex.Message}");
+                        return;
+                    }
+                    result = workService.ImportAllData(json);
+                }
                 if (!result.Success)
                 {
                     Windows.AppMessageDialog.Show(Application.Current.MainWindow, "导入失败", result.ErrorMessage);

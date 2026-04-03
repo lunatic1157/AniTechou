@@ -2,11 +2,12 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="注册新账号 · 追番手账"
-        Width="430" Height="430"
+        Width="460" Height="560"
+        MinWidth="430" MinHeight="520"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBackgroundBrush}"
         FontFamily="Microsoft YaHei"
-        ResizeMode="NoResize">
+        ResizeMode="CanResize">
 
     <Grid Margin="28">
         <Grid.RowDefinitions>
@@ -23,7 +24,8 @@
                    Margin="0,12,0,18"/>
 
         <Border Grid.Row="1" Style="{StaticResource AppSectionCardStyle}" Padding="22">
-            <StackPanel>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
                 <StackPanel Margin="0,0,0,16">
                     <TextBlock Text="用户名"
                                FontSize="14"
@@ -76,7 +78,8 @@
                            HorizontalAlignment="Center"
                            Margin="0,18,0,0"
                            TextWrapping="Wrap"/>
-            </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
         </Border>
     </Grid>
 </Window>

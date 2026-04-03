@@ -2,7 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
 using System.IO;
+using System.IO.Compression;
+using System.Linq;
 using System.Net.Http;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AniTechou.Models;
 using AniTechou.Utilities;
@@ -257,7 +261,7 @@ namespace AniTechou.Services
             using (var conn = DatabaseHelper.GetConnection(_currentAccount))
             {
                 conn.Open();
-                string sql = "SELECT TagName FROM WorkTags WHERE WorkId = @WorkId ORDER BY TagName";
+                string sql = "SELECT DISTINCT TagName FROM WorkTags WHERE WorkId = @WorkId ORDER BY TagName";
                 using (var cmd = new SQLiteCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@WorkId", workId);
@@ -1999,6 +2003,20 @@ namespace AniTechou.Services
             public string ModifiedTime { get; set; }
         }
 
+        private sealed class PortableBackupManifest
+        {
+            public string Version { get; set; }
+            public DateTime CreatedTime { get; set; }
+            public List<PortableAssetEntry> Assets { get; set; }
+        }
+
+        private sealed class PortableAssetEntry
+        {
+            public string Kind { get; set; }
+            public string OriginalPath { get; set; }
+            public string ArchivePath { get; set; }
+        }
+
         private sealed class ExistingWorkRecord
         {
             public int Id { get; set; }
@@ -2386,7 +2404,7 @@ namespace AniTechou.Services
             {
                 conn.Open();
 
-                var data = new
+                var data = new ExportDataDto
                 {
                     Works = GetWorksForExport(conn),
                     Notes = GetNotesForExport(conn),
@@ -2397,16 +2415,225 @@ namespace AniTechou.Services
             }
         }
 
-        private List<object> GetWorksForExport(SQLiteConnection conn)
+        public void ExportPortableBackup(string zipFilePath)
         {
-            var works = new List<object>();
+            if (string.IsNullOrWhiteSpace(zipFilePath)) throw new Exception("导出路径为空");
+
+            ExportDataDto data;
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                data = new ExportDataDto
+                {
+                    Works = GetWorksForExport(conn),
+                    Notes = GetNotesForExport(conn),
+                    ExportTime = DateTime.Now
+                };
+            }
+
+            var manifest = new PortableBackupManifest
+            {
+                Version = "1",
+                CreatedTime = DateTime.Now,
+                Assets = new List<PortableAssetEntry>()
+            };
+
+            var assetsToWrite = new List<(string kind, string originalPath, string archivePath, string sourceFilePath)>();
+
+            foreach (var work in data.Works ?? new List<WorkExportDto>())
+            {
+                if (work == null) continue;
+                string coverPath = (work.CoverPath ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(coverPath)) continue;
+
+                string resolvedCover = ResolveCoverFilePath(coverPath);
+                if (string.IsNullOrWhiteSpace(resolvedCover) || !File.Exists(resolvedCover)) continue;
+
+                string fileName = Path.GetFileName(resolvedCover);
+                if (string.IsNullOrWhiteSpace(fileName)) continue;
+
+                string archivePath = $"assets/covers/{fileName}";
+                assetsToWrite.Add(("cover", coverPath, archivePath, resolvedCover));
+            }
+
+            foreach (var note in data.Notes ?? new List<NoteExportDto>())
+            {
+                if (note == null) continue;
+                string content = note.Content ?? "";
+                foreach (var imgPath in ExtractNoteImagePaths(content))
+                {
+                    string resolved = imgPath;
+                    if (string.IsNullOrWhiteSpace(resolved) || !File.Exists(resolved)) continue;
+
+                    string fileName = Path.GetFileName(resolved);
+                    if (string.IsNullOrWhiteSpace(fileName)) continue;
+
+                    string archivePath = $"assets/note-images/{fileName}";
+                    assetsToWrite.Add(("note-image", resolved, archivePath, resolved));
+                }
+            }
+
+            var dedup = new Dictionary<string, (string kind, string originalPath, string archivePath, string sourceFilePath)>(StringComparer.OrdinalIgnoreCase);
+            foreach (var a in assetsToWrite)
+            {
+                string key = $"{a.kind}|{a.archivePath}";
+                if (dedup.ContainsKey(key)) continue;
+                dedup[key] = a;
+            }
+
+            foreach (var a in dedup.Values)
+            {
+                manifest.Assets.Add(new PortableAssetEntry { Kind = a.kind, OriginalPath = a.originalPath, ArchivePath = a.archivePath });
+            }
+
+            var jsonOptions = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+            string dataJson = System.Text.Json.JsonSerializer.Serialize(data, jsonOptions);
+            string manifestJson = System.Text.Json.JsonSerializer.Serialize(manifest, jsonOptions);
+
+            if (File.Exists(zipFilePath)) File.Delete(zipFilePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(zipFilePath) ?? ".");
+
+            using var fs = new FileStream(zipFilePath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+            using var zip = new ZipArchive(fs, ZipArchiveMode.Create, leaveOpen: false);
+
+            WriteTextEntry(zip, "data.json", dataJson);
+            WriteTextEntry(zip, "manifest.json", manifestJson);
+
+            foreach (var a in dedup.Values)
+            {
+                var entry = zip.CreateEntry(a.archivePath, CompressionLevel.Optimal);
+                using var entryStream = entry.Open();
+                using var fileStream = new FileStream(a.sourceFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                fileStream.CopyTo(entryStream);
+            }
+        }
+
+        public ImportResult ImportPortableBackup(string zipFilePath)
+        {
+            if (string.IsNullOrWhiteSpace(zipFilePath)) return new ImportResult { Success = false, ErrorMessage = "导入路径为空" };
+            if (!File.Exists(zipFilePath)) return new ImportResult { Success = false, ErrorMessage = "备份文件不存在" };
+
+            using var fs = new FileStream(zipFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var zip = new ZipArchive(fs, ZipArchiveMode.Read, leaveOpen: false);
+
+            var dataEntry = zip.GetEntry("data.json");
+            if (dataEntry == null) return new ImportResult { Success = false, ErrorMessage = "备份文件缺少 data.json" };
+
+            string dataJson;
+            using (var sr = new StreamReader(dataEntry.Open(), Encoding.UTF8))
+            {
+                dataJson = sr.ReadToEnd();
+            }
+
+            ExportDataDto data;
+            try
+            {
+                data = System.Text.Json.JsonSerializer.Deserialize<ExportDataDto>(
+                    dataJson,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
+            }
+            catch (Exception ex)
+            {
+                return new ImportResult { Success = false, ErrorMessage = $"备份解析失败：{ex.Message}" };
+            }
+
+            if (data == null) return new ImportResult { Success = false, ErrorMessage = "备份解析失败：数据为空" };
+
+            var manifestEntry = zip.GetEntry("manifest.json");
+            PortableBackupManifest manifest = null;
+            if (manifestEntry != null)
+            {
+                try
+                {
+                    using var sr = new StreamReader(manifestEntry.Open(), Encoding.UTF8);
+                    string manifestJson = sr.ReadToEnd();
+                    manifest = System.Text.Json.JsonSerializer.Deserialize<PortableBackupManifest>(
+                        manifestJson,
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    );
+                }
+                catch
+                {
+                    manifest = null;
+                }
+            }
+
+            var mapByOriginal = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var mapByFileName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var asset in manifest?.Assets ?? new List<PortableAssetEntry>())
+            {
+                if (asset == null) continue;
+                string kind = (asset.Kind ?? "").Trim();
+                string originalPath = (asset.OriginalPath ?? "").Trim();
+                string archivePath = (asset.ArchivePath ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(kind) || string.IsNullOrWhiteSpace(archivePath)) continue;
+
+                var entry = zip.GetEntry(archivePath);
+                if (entry == null) continue;
+
+                string fileName = Path.GetFileName(archivePath);
+                if (string.IsNullOrWhiteSpace(fileName)) continue;
+
+                string destPath = kind == "cover"
+                    ? Path.Combine(GetCoversDirectory(), fileName)
+                    : kind == "note-image"
+                        ? Path.Combine(GetNotesImagesDirectory(), fileName)
+                        : "";
+
+                if (string.IsNullOrWhiteSpace(destPath)) continue;
+
+                Directory.CreateDirectory(Path.GetDirectoryName(destPath) ?? ".");
+                using (var entryStream = entry.Open())
+                using (var outStream = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    entryStream.CopyTo(outStream);
+                }
+
+                if (!string.IsNullOrWhiteSpace(originalPath)) mapByOriginal[originalPath] = destPath;
+                mapByFileName[fileName] = destPath;
+            }
+
+            foreach (var work in data.Works ?? new List<WorkExportDto>())
+            {
+                if (work == null) continue;
+                string coverPath = (work.CoverPath ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(coverPath)) continue;
+
+                if (mapByOriginal.TryGetValue(coverPath, out var mapped))
+                {
+                    work.CoverPath = mapped;
+                    continue;
+                }
+
+                string fileName = Path.GetFileName(coverPath);
+                if (!string.IsNullOrWhiteSpace(fileName) && mapByFileName.TryGetValue(fileName, out var mappedByName))
+                {
+                    work.CoverPath = mappedByName;
+                }
+            }
+
+            foreach (var note in data.Notes ?? new List<NoteExportDto>())
+            {
+                if (note == null) continue;
+                note.Content = RewriteNoteContentPaths(note.Content ?? "", mapByOriginal, mapByFileName);
+            }
+
+            string rewrittenJson = System.Text.Json.JsonSerializer.Serialize(data, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            return ImportAllData(rewrittenJson);
+        }
+
+        private List<WorkExportDto> GetWorksForExport(SQLiteConnection conn)
+        {
+            var works = new List<WorkExportDto>();
             string sql = "SELECT Id, Title, OriginalTitle, Type, Company, Year, Season, SourceType, EpisodesVolumes, Synopsis, CoverPath, AddedTime FROM Works";
             using (var cmd = new SQLiteCommand(sql, conn))
             using (var reader = cmd.ExecuteReader())
             {
                 while (reader.Read())
                 {
-                    works.Add(new
+                    works.Add(new WorkExportDto
                     {
                         Id = SafeGetInt(reader, 0),
                         Title = SafeGetString(reader, 1),
@@ -2426,16 +2653,16 @@ namespace AniTechou.Services
             return works;
         }
 
-        private List<object> GetNotesForExport(SQLiteConnection conn)
+        private List<NoteExportDto> GetNotesForExport(SQLiteConnection conn)
         {
-            var notes = new List<object>();
+            var notes = new List<NoteExportDto>();
             string sql = "SELECT Id, Title, Content, CreatedTime, ModifiedTime FROM Notes";
             using (var cmd = new SQLiteCommand(sql, conn))
             using (var reader = cmd.ExecuteReader())
             {
                 while (reader.Read())
                 {
-                    notes.Add(new
+                    notes.Add(new NoteExportDto
                     {
                         Id = SafeGetInt(reader, 0),
                         Title = SafeGetString(reader, 1),
@@ -2446,6 +2673,86 @@ namespace AniTechou.Services
                 }
             }
             return notes;
+        }
+
+        private static void WriteTextEntry(ZipArchive zip, string entryName, string content)
+        {
+            var entry = zip.CreateEntry(entryName, CompressionLevel.Optimal);
+            using var stream = entry.Open();
+            using var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            writer.Write(content ?? "");
+        }
+
+        private static string GetAppDataRoot()
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AniTechou");
+        }
+
+        private static string GetCoversDirectory()
+        {
+            string dir = Path.Combine(GetAppDataRoot(), "covers");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+
+        private static string GetNotesImagesDirectory()
+        {
+            string dir = Path.Combine(GetAppDataRoot(), "Images", "Notes");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+
+        private static string ResolveCoverFilePath(string coverPath)
+        {
+            string p = (coverPath ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(p)) return "";
+            if (File.Exists(p)) return p;
+
+            string fileName = Path.GetFileName(p);
+            if (string.IsNullOrWhiteSpace(fileName)) return "";
+            string fallback = Path.Combine(GetCoversDirectory(), fileName);
+            return File.Exists(fallback) ? fallback : "";
+        }
+
+        private static IEnumerable<string> ExtractNoteImagePaths(string content)
+        {
+            if (string.IsNullOrEmpty(content)) yield break;
+
+            foreach (Match match in Regex.Matches(content, "ani-image:(?<path>[^\"]+)", RegexOptions.IgnoreCase))
+            {
+                var p = (match.Groups["path"]?.Value ?? "").Trim();
+                if (!string.IsNullOrWhiteSpace(p)) yield return p;
+            }
+        }
+
+        private static string RewriteNoteContentPaths(string content, Dictionary<string, string> mapByOriginal, Dictionary<string, string> mapByFileName)
+        {
+            if (string.IsNullOrEmpty(content)) return content;
+            if ((mapByOriginal == null || mapByOriginal.Count == 0) && (mapByFileName == null || mapByFileName.Count == 0)) return content;
+
+            return Regex.Replace(
+                content,
+                "ani-image:(?<path>[^\"]+)",
+                m =>
+                {
+                    string p = (m.Groups["path"]?.Value ?? "").Trim();
+                    if (string.IsNullOrWhiteSpace(p)) return m.Value;
+
+                    if (mapByOriginal != null && mapByOriginal.TryGetValue(p, out var mapped))
+                    {
+                        return $"ani-image:{mapped}";
+                    }
+
+                    string fileName = Path.GetFileName(p);
+                    if (!string.IsNullOrWhiteSpace(fileName) && mapByFileName != null && mapByFileName.TryGetValue(fileName, out var mappedByName))
+                    {
+                        return $"ani-image:{mappedByName}";
+                    }
+
+                    return m.Value;
+                },
+                RegexOptions.IgnoreCase
+            );
         }
     }
 }
