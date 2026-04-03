@@ -31,6 +31,12 @@ AniTechou 是一款「AI + 笔记驱动」的 ACGN 作品管理工具。
 - 数据导入与导出
 - 主题切换与界面风格统一
 
+## 功能概览
+- 作品管理：添加/编辑、进度与状态、封面与详情、筛选与搜索
+- AI 辅助：作品搜索/推荐、批量补全与导入、作品信息结构化补齐
+- 笔记系统：富文本编辑、插图/链接/标签、作品关联、自动保存
+- 数据能力：本地 SQLite 落盘、导入/导出（便于备份迁移）
+
 ## 界面预览
 
 ### 主界面
@@ -50,18 +56,28 @@ AniTechou 是一款「AI + 笔记驱动」的 ACGN 作品管理工具。
 - 前往 GitHub Releases 下载：<https://github.com/lunatic1157/AniTechou/releases>
 - 安装包为 self-contained 版本，无需额外安装 .NET 运行时
 
+## 快速开始
+1. 安装并启动 AniTechou
+2. 在设置页配置 AI 提供商与 Key（可选）
+3. 添加作品或使用 AI 搜索/批量导入完善作品信息
+4. 在作品详情或笔记页创建笔记，记录截图、链接与标签，并关联到作品
+
 ## 数据存储位置
 - 软件数据默认保存在 `%LocalAppData%\AniTechou`
 - 包含配置、账号信息、数据库、封面、头像与笔记插图
 
+## 隐私与安全
+- 项目不会把 API Key 写入仓库，Key 仅保存在本机数据目录中
+- 安装/升级不会默认清空个人数据；如需“彻底重置”，删除 `%LocalAppData%\AniTechou` 即可
+
 ## 项目文档
-- 开发说明：[docs/DEVELOPMENT.md](file:///f:/AniTechou/AniTechou/docs/DEVELOPMENT.md)
-- AI 协作开发说明：[docs/AI_WORKFLOW.md](file:///f:/AniTechou/AniTechou/docs/AI_WORKFLOW.md)
-- 首次发布说明：[docs/RELEASE_NOTES_v0.9.0.md](file:///f:/AniTechou/AniTechou/docs/RELEASE_NOTES_v0.9.0.md)
+- 开发说明：[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- AI 协作开发说明：[docs/AI_WORKFLOW.md](docs/AI_WORKFLOW.md)
+- 发布说明： [docs/RELEASE_NOTES_v0.9.0.md](docs/RELEASE_NOTES_v0.9.0.md)、[docs/RELEASE_NOTES_v0.9.1.md](docs/RELEASE_NOTES_v0.9.1.md)
 
 ## 从源码运行
 ```powershell
 dotnet build -c Release
 dotnet test Tests\AniTechou.Tests.csproj -c Release
-dotnet run
+dotnet run --project AniTechou.csproj
 ```
