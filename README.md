@@ -73,7 +73,7 @@ AniTechou 是一款「AI + 笔记驱动」的 ACGN 作品管理工具。
 ## 项目文档
 - 开发说明：[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
 - AI 协作开发说明：[docs/AI_WORKFLOW.md](docs/AI_WORKFLOW.md)
-- 发布说明： [docs/RELEASE_NOTES_v0.9.0.md](docs/RELEASE_NOTES_v0.9.0.md)、[docs/RELEASE_NOTES_v0.9.1.md](docs/RELEASE_NOTES_v0.9.1.md)
+- 发布说明： [docs/RELEASE_NOTES_v0.9.0.md](docs/RELEASE_NOTES_v0.9.0.md)、[docs/RELEASE_NOTES_v0.9.1.md](docs/RELEASE_NOTES_v0.9.1.md)、[docs/RELEASE_NOTES_v0.9.2.md](docs/RELEASE_NOTES_v0.9.2.md)
 
 ## 从源码运行
 ```powershell
