@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using AniTechou.Services;
@@ -16,6 +17,7 @@ namespace AniTechou.Views
         private WorkService _workService;
         private List<string> _currentTags = new List<string>();
         private List<WorkService.NoteListItem> _relatedNotes = new List<WorkService.NoteListItem>();
+        private int? _progressTotal;
 
         public WorkDetailView(int workId, int userListId, string accountName)
         {
@@ -48,6 +50,7 @@ namespace AniTechou.Views
 
             if (work != null)
             {
+                _progressTotal = ExtractFirstPositiveInt(work.EpisodesVolumes);
                 TitleText.Text = work.Title;
                 OriginalTitleText.Text = work.OriginalTitle ?? "";
                 TypeText.Text = $"类型：{GetTypeDisplayName(work.Type)}";
@@ -138,7 +141,7 @@ namespace AniTechou.Views
                 if (StatusBox.SelectedItem == null) StatusBox.SelectedIndex = 0;
                 
                 // 设置进度
-                ProgressBox.Text = userWork.Progress ?? "";
+                ProgressBox.Text = NormalizeProgressInput(userWork.Progress ?? "");
                 
                 // 设置评分
                 int ratingIndex = userWork.Rating switch
@@ -159,6 +162,9 @@ namespace AniTechou.Views
 
             // 加载关联作品
             LoadRelatedWorks();
+
+            // 加载关联笔记
+            LoadRelatedNotes();
         }
 
         private void LoadRelatedWorks()
@@ -492,7 +498,8 @@ namespace AniTechou.Views
                 };
                 
                 // 进度
-                string progress = ProgressBox.Text.Trim();
+                string progress = NormalizeProgressInput(ProgressBox.Text);
+                ProgressBox.Text = progress;
                 
                 // 更新数据库
                 _workService.UpdateUserWork(_userListId, statusEn, progress, rating);
@@ -506,6 +513,46 @@ namespace AniTechou.Views
             {
                 Windows.AppMessageDialog.Show(Application.Current.MainWindow, "错误", $"更新失败：{ex.Message}");
             }
+        }
+
+        private string NormalizeProgressInput(string rawProgress)
+        {
+            string progress = (rawProgress ?? "").Trim();
+            if (string.IsNullOrEmpty(progress)) return "";
+
+            if (progress.Contains("/"))
+            {
+                var match = Regex.Match(progress, @"^\s*(\d+)\s*/\s*(\d*)\s*$");
+                if (match.Success)
+                {
+                    string current = match.Groups[1].Value;
+                    string total = match.Groups[2].Value;
+                    if (string.IsNullOrEmpty(total) && _progressTotal.HasValue)
+                    {
+                        total = _progressTotal.Value.ToString();
+                    }
+                    return string.IsNullOrEmpty(total) ? current : $"{current}/{total}";
+                }
+
+                return progress;
+            }
+
+            if (_progressTotal.HasValue && int.TryParse(progress, out int currentValue))
+            {
+                return $"{currentValue}/{_progressTotal.Value}";
+            }
+
+            return progress;
+        }
+
+        private static int? ExtractFirstPositiveInt(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return null;
+
+            var match = Regex.Match(text, @"\d+");
+            if (!match.Success) return null;
+
+            return int.TryParse(match.Value, out int value) && value > 0 ? value : null;
         }
 
         private void EditInfo_Click(object sender, RoutedEventArgs e)

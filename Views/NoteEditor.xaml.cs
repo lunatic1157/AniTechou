@@ -6,9 +6,12 @@ using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Markup;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using AniTechou.Services;
 using AniTechou.Windows;
@@ -25,6 +28,15 @@ namespace AniTechou.Views
 
     public partial class NoteEditor : UserControl
     {
+        private const string ResizableImageHostTag = "ResizableNoteImageHost";
+        private const string ResizableImagePathPrefix = "ani-image:";
+        private const string NoteImageMoveDataFormat = "AniTechou.NoteImageMoveV2";
+        private const double MinImageWidth = 120;
+        private const double MinImageHeight = 90;
+        private const double MaxImageWidth = 900;
+        private const double MaxImageHeight = 900;
+        private const double ResizeHitThickness = 10;
+
         private sealed class PaletteColor
         {
             public PaletteColor(string name, string hex)
@@ -104,6 +116,15 @@ namespace AniTechou.Views
         private List<string> _allNoteTags = new List<string>();
         private TextPointer _selectionStartSnapshot;
         private TextPointer _selectionEndSnapshot;
+        private int _changeVersion;
+        private Grid _activeResizeHost;
+        private Point _resizeStartPoint;
+        private double _resizeStartWidth;
+        private double _resizeStartHeight;
+        private string _resizeMode;
+        private Grid _pendingMoveHost;
+        private Point _pendingMoveStartPoint;
+        private Grid _movingSourceHost;
 
         public NoteEditor(string accountName, WorkService.NoteInfo note = null, EditorSource source = EditorSource.NotesList, int workId = 0)
         {
@@ -114,6 +135,7 @@ namespace AniTechou.Views
             _source = source;
             _sourceWorkId = workId;
             RichEditor.AddHandler(Hyperlink.ClickEvent, new RoutedEventHandler(Hyperlink_Click));
+            DataObject.AddPastingHandler(RichEditor, RichEditor_Pasting);
 
             LoadWorks();
             LoadData();
@@ -149,7 +171,9 @@ namespace AniTechou.Views
             }
             RefreshWorksPanel();
             RefreshTagsPanel();
+            AttachResizableImagesToDocument();
             _suppressTextEvents = false;
+            _changeVersion = 0;
             MarkSaved();
         }
 
@@ -310,12 +334,12 @@ namespace AniTechou.Views
         private void InitializeAutoSave()
         {
             _autoSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-            _autoSaveTimer.Tick += (s, e) =>
+            _autoSaveTimer.Tick += async (s, e) =>
             {
                 _autoSaveTimer.Stop();
                 if (AutoSaveToggle.IsChecked == true)
                 {
-                    SaveNoteInternal(false);
+                    await SaveNoteInternalAsync(false);
                 }
             };
         }
@@ -328,6 +352,7 @@ namespace AniTechou.Views
 
         private void MarkDirtyAndScheduleSave()
         {
+            _changeVersion++;
             _isDirty = true;
             if (SaveStatusText == null) return;
             SaveStatusText.Text = "保存中";
@@ -376,48 +401,84 @@ namespace AniTechou.Views
 
         private void LoadRichTextContent(string content)
         {
-            var document = new FlowDocument { PagePadding = new Thickness(0) };
-            RichEditor.Document = document;
             if (string.IsNullOrWhiteSpace(content))
             {
-                document.Blocks.Add(new Paragraph());
+                RichEditor.Document = CreateEmptyDocument();
                 return;
             }
 
             try
             {
-                var range = new TextRange(document.ContentStart, document.ContentEnd);
-                using var stream = new MemoryStream(Encoding.UTF8.GetBytes(content));
-                range.Load(stream, DataFormats.Xaml);
+                if (content.TrimStart().StartsWith("<FlowDocument", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (XamlReader.Parse(content) is FlowDocument parsedDocument)
+                    {
+                        RichEditor.Document = parsedDocument;
+                        AttachResizableImagesToDocument();
+                        return;
+                    }
+                }
             }
             catch
             {
-                document.Blocks.Clear();
-                document.Blocks.Add(new Paragraph(new Run(StripMarkup(content))));
+            }
+
+            var fallbackDocument = CreateEmptyDocument();
+            try
+            {
+                var range = new TextRange(fallbackDocument.ContentStart, fallbackDocument.ContentEnd);
+                using var stream = new MemoryStream(Encoding.UTF8.GetBytes(content));
+                range.Load(stream, DataFormats.Xaml);
+                RichEditor.Document = fallbackDocument;
+                AttachResizableImagesToDocument();
+            }
+            catch
+            {
+                fallbackDocument.Blocks.Clear();
+                fallbackDocument.Blocks.Add(new Paragraph(new Run(StripMarkup(content))));
+                RichEditor.Document = fallbackDocument;
             }
         }
 
         private string GetRichTextContent()
         {
-            var range = new TextRange(RichEditor.Document.ContentStart, RichEditor.Document.ContentEnd);
-            if (string.IsNullOrWhiteSpace(range.Text)) return "";
+            if (IsDocumentEffectivelyEmpty()) return "";
             try
             {
-                using var stream = new MemoryStream();
-                range.Save(stream, DataFormats.Xaml);
-                return Encoding.UTF8.GetString(stream.ToArray());
+                return XamlWriter.Save(RichEditor.Document);
             }
             catch
             {
+                var range = new TextRange(RichEditor.Document.ContentStart, RichEditor.Document.ContentEnd);
                 return range.Text;
             }
         }
 
-        private bool SaveNoteInternal(bool manual)
+        private FlowDocument CreateEmptyDocument()
+        {
+            var document = new FlowDocument { PagePadding = new Thickness(0) };
+            document.Blocks.Add(new Paragraph());
+            return document;
+        }
+
+        private bool IsDocumentEffectivelyEmpty()
+        {
+            var range = new TextRange(RichEditor.Document.ContentStart, RichEditor.Document.ContentEnd);
+            if (!string.IsNullOrWhiteSpace(range.Text))
+            {
+                return false;
+            }
+
+            return !EnumerateResizableImageHosts(RichEditor.Document).Any();
+        }
+
+        private async System.Threading.Tasks.Task<bool> SaveNoteInternalAsync(bool manual)
         {
             if (_isSaving) return false;
             if (!_isDirty && !manual) return true;
 
+            int versionAtSaveStart = _changeVersion;
+            string title = (TitleBox.Text ?? "").Trim();
             string content = GetRichTextContent();
             if (string.IsNullOrEmpty(content))
             {
@@ -431,21 +492,48 @@ namespace AniTechou.Views
             try
             {
                 _isSaving = true;
-                _autoSaveTimer.Stop();
+                _autoSaveTimer?.Stop();
                 SaveStatusText.Text = "保存中";
 
-                _note.Title = (TitleBox.Text ?? "").Trim();
-                _note.Content = content;
-                _note.WorkIds = _selectedWorkIds.ToList();
-                _note.Tags = _tags.ToList();
+                var noteSnapshot = new WorkService.NoteInfo
+                {
+                    Id = _note.Id,
+                    Title = title,
+                    Content = content,
+                    CreatedTime = _note.CreatedTime,
+                    ModifiedTime = _note.ModifiedTime,
+                    WorkIds = _selectedWorkIds.ToList(),
+                    Tags = _tags.ToList()
+                };
 
-                var workService = new WorkService(_accountName);
-                int noteId = workService.SaveNote(_note);
+                int noteId = await System.Threading.Tasks.Task.Run(() =>
+                {
+                    var workService = new WorkService(_accountName);
+                    return workService.SaveNote(noteSnapshot);
+                });
+
                 if (noteId > 0)
                 {
                     _note.Id = noteId;
-                    MarkSaved();
-                    NoteSaved?.Invoke();
+                    _note.Title = noteSnapshot.Title;
+                    _note.Content = noteSnapshot.Content;
+                    _note.WorkIds = noteSnapshot.WorkIds;
+                    _note.Tags = noteSnapshot.Tags;
+
+                    if (_changeVersion == versionAtSaveStart)
+                    {
+                        MarkSaved();
+                    }
+                    else
+                    {
+                        _isDirty = true;
+                        SaveStatusText.Text = "已保存（有新修改）";
+                    }
+
+                    if (manual)
+                    {
+                        NoteSaved?.Invoke();
+                    }
                     return true;
                 }
                 MarkSaveFailed("");
@@ -459,10 +547,15 @@ namespace AniTechou.Views
             finally
             {
                 _isSaving = false;
+                if (_isDirty && _autoSaveTimer != null && AutoSaveToggle?.IsChecked == true)
+                {
+                    _autoSaveTimer.Stop();
+                    _autoSaveTimer.Start();
+                }
             }
         }
 
-        private void SaveButton_Click(object sender, RoutedEventArgs e) => SaveNoteInternal(true);
+        private async void SaveButton_Click(object sender, RoutedEventArgs e) => await SaveNoteInternalAsync(true);
 
         private void UndoButton_Click(object sender, RoutedEventArgs e)
         {
@@ -474,7 +567,7 @@ namespace AniTechou.Views
             if (RichEditor.CanRedo) RichEditor.Redo();
         }
 
-        private void SaveCommand_Executed(object sender, ExecutedRoutedEventArgs e) => SaveNoteInternal(true);
+        private async void SaveCommand_Executed(object sender, ExecutedRoutedEventArgs e) => await SaveNoteInternalAsync(true);
 
         private void UndoCommand_Executed(object sender, ExecutedRoutedEventArgs e)
         {
@@ -601,40 +694,632 @@ namespace AniTechou.Views
             };
             if (dlg.ShowDialog() == true)
             {
-                try
+                TryInsertImageFromFile(dlg.FileName);
+            }
+        }
+
+        private bool TryInsertImageFromFile(string filePath)
+        {
+            try
+            {
+                string dest = CopyImageToNotesStorage(filePath);
+                InsertImageAtSelection(dest);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool TryInsertImageFromBitmap(BitmapSource bitmapSource)
+        {
+            try
+            {
+                string dest = SaveBitmapToNotesStorage(bitmapSource);
+                InsertImageAtSelection(dest);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private string CopyImageToNotesStorage(string sourceFilePath)
+        {
+            string ext = Path.GetExtension(sourceFilePath);
+            if (string.IsNullOrWhiteSpace(ext)) ext = ".png";
+            string dest = Path.Combine(GetNotesImageDirectory(), Guid.NewGuid().ToString("N") + ext);
+            File.Copy(sourceFilePath, dest, true);
+            return dest;
+        }
+
+        private string SaveBitmapToNotesStorage(BitmapSource bitmapSource)
+        {
+            string dest = Path.Combine(GetNotesImageDirectory(), Guid.NewGuid().ToString("N") + ".png");
+            using var stream = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
+            encoder.Save(stream);
+            return dest;
+        }
+
+        private string GetNotesImageDirectory()
+        {
+            string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AniTechou", "Images", "Notes");
+            Directory.CreateDirectory(baseDir);
+            return baseDir;
+        }
+
+        private void InsertImageAtSelection(string imagePath, double? width = null, double? height = null)
+        {
+            var imageHost = CreateResizableImageHost(imagePath, width, height);
+
+            RichEditor.Focus();
+            RestoreSelectionSnapshot();
+            if (RichEditor.Selection != null)
+            {
+                RichEditor.Selection.Text = "";
+                new InlineUIContainer(imageHost, RichEditor.Selection.Start);
+                MarkDirtyAndScheduleSave();
+                SaveSelectionSnapshot();
+            }
+        }
+
+        private void InsertImageAtPosition(TextPointer position, string imagePath, double? width, double? height)
+        {
+            if (position == null) return;
+
+            var imageHost = CreateResizableImageHost(imagePath, width, height);
+            new InlineUIContainer(imageHost, position);
+            MarkDirtyAndScheduleSave();
+        }
+
+        private Grid CreateResizableImageHost(string imagePath, double? width = null, double? height = null)
+        {
+            var source = CreateBitmapFromPath(imagePath);
+            (double defaultWidth, double defaultHeight) = GetInitialImageSize(source);
+            double imageWidth = width ?? defaultWidth;
+            double imageHeight = height ?? defaultHeight;
+
+            var host = new Grid
+            {
+                Width = imageWidth,
+                Height = imageHeight,
+                Margin = new Thickness(0, 6, 0, 6),
+                Background = Brushes.Transparent,
+                Tag = ResizableImageHostTag,
+                Cursor = Cursors.Arrow
+            };
+
+            var border = new Border
+            {
+                Background = Brushes.Transparent
+            };
+
+            var image = new Image
+            {
+                Source = source,
+                Stretch = Stretch.Uniform,
+                Uid = $"{ResizableImagePathPrefix}{imagePath}",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
+
+            border.Child = image;
+            host.Children.Add(border);
+
+            AttachResizableImageHandlers(host);
+            return host;
+        }
+
+        private BitmapImage CreateBitmapFromPath(string imagePath)
+        {
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.UriSource = new Uri(imagePath, UriKind.Absolute);
+            bitmap.EndInit();
+            bitmap.Freeze();
+            return bitmap;
+        }
+
+        private static (double width, double height) GetInitialImageSize(BitmapSource bitmapSource)
+        {
+            double width = 320;
+            double height = 220;
+
+            if (bitmapSource.PixelWidth > 0 && bitmapSource.PixelHeight > 0)
+            {
+                width = bitmapSource.PixelWidth;
+                height = bitmapSource.PixelHeight;
+                double scale = Math.Min(1.0, 360.0 / Math.Max(width, height));
+                width = Math.Max(MinImageWidth, width * scale);
+                height = Math.Max(MinImageHeight, height * scale);
+            }
+
+            return (width, height);
+        }
+
+        private void AttachResizableImagesToDocument()
+        {
+            foreach (var host in EnumerateResizableImageHosts(RichEditor.Document))
+            {
+                if (host.Children.OfType<Border>().FirstOrDefault() is Border border)
                 {
-                    string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AniTechou", "Images", "Notes");
-                    Directory.CreateDirectory(baseDir);
-                    string ext = Path.GetExtension(dlg.FileName);
-                    string fileName = Guid.NewGuid().ToString("N") + ext;
-                    string dest = Path.Combine(baseDir, fileName);
-                    File.Copy(dlg.FileName, dest, true);
-
-                    var bitmap = new System.Windows.Media.Imaging.BitmapImage();
-                    bitmap.BeginInit();
-                    bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-                    bitmap.UriSource = new Uri(dest);
-                    bitmap.EndInit();
-
-                    var img = new Image
+                    if (border.Child is Image image && image.Source == null)
                     {
-                        Source = bitmap,
-                        Stretch = System.Windows.Media.Stretch.Uniform,
-                        MaxHeight = 240,
-                        Margin = new Thickness(0, 6, 0, 6)
-                    };
-
-                    RichEditor.Focus();
-                    RestoreSelectionSnapshot();
-                    if (RichEditor.Selection != null)
-                    {
-                        RichEditor.Selection.Text = "";
-                        new InlineUIContainer(img, RichEditor.Selection.Start);
-                        MarkDirtyAndScheduleSave();
-                        SaveSelectionSnapshot();
+                        string imagePath = GetImagePathFromElement(image);
+                        if (!string.IsNullOrWhiteSpace(imagePath) && File.Exists(imagePath))
+                        {
+                            image.Source = CreateBitmapFromPath(imagePath);
+                        }
                     }
+
+                    AttachResizableImageHandlers(host);
                 }
-                catch { }
+            }
+        }
+
+        private IEnumerable<Grid> EnumerateResizableImageHosts(FlowDocument document)
+        {
+            if (document == null) yield break;
+
+            foreach (var block in document.Blocks)
+            {
+                foreach (var host in EnumerateResizableImageHosts(block))
+                {
+                    yield return host;
+                }
+            }
+        }
+
+        private IEnumerable<Grid> EnumerateResizableImageHosts(Block block)
+        {
+            switch (block)
+            {
+                case Paragraph paragraph:
+                    foreach (var inline in paragraph.Inlines)
+                    {
+                        foreach (var host in EnumerateResizableImageHosts(inline))
+                        {
+                            yield return host;
+                        }
+                    }
+                    break;
+                case Section section:
+                    foreach (var child in section.Blocks)
+                    {
+                        foreach (var host in EnumerateResizableImageHosts(child))
+                        {
+                            yield return host;
+                        }
+                    }
+                    break;
+                case List list:
+                    foreach (var item in list.ListItems)
+                    {
+                        foreach (var child in item.Blocks)
+                        {
+                            foreach (var host in EnumerateResizableImageHosts(child))
+                            {
+                                yield return host;
+                            }
+                        }
+                    }
+                    break;
+                case BlockUIContainer blockUi when blockUi.Child is Grid grid && Equals(grid.Tag, ResizableImageHostTag):
+                    yield return grid;
+                    break;
+            }
+        }
+
+        private IEnumerable<Grid> EnumerateResizableImageHosts(Inline inline)
+        {
+            switch (inline)
+            {
+                case Span span:
+                    foreach (var child in span.Inlines)
+                    {
+                        foreach (var host in EnumerateResizableImageHosts(child))
+                        {
+                            yield return host;
+                        }
+                    }
+                    break;
+                case InlineUIContainer inlineUi when inlineUi.Child is Grid grid && Equals(grid.Tag, ResizableImageHostTag):
+                    yield return grid;
+                    break;
+            }
+        }
+
+        private void AttachResizableImageHandlers(Grid host)
+        {
+            host.PreviewMouseMove -= ResizableImageHost_PreviewMouseMove;
+            host.PreviewMouseMove += ResizableImageHost_PreviewMouseMove;
+            host.PreviewMouseLeftButtonDown -= ResizableImageHost_PreviewMouseLeftButtonDown;
+            host.PreviewMouseLeftButtonDown += ResizableImageHost_PreviewMouseLeftButtonDown;
+            host.PreviewMouseLeftButtonUp -= ResizableImageHost_PreviewMouseLeftButtonUp;
+            host.PreviewMouseLeftButtonUp += ResizableImageHost_PreviewMouseLeftButtonUp;
+            host.MouseLeave -= ResizableImageHost_MouseLeave;
+            host.MouseLeave += ResizableImageHost_MouseLeave;
+        }
+
+        private void ResizableImageHost_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not Grid host) return;
+
+            string mode = GetResizeMode(host, e.GetPosition(host));
+            if (!string.IsNullOrEmpty(mode))
+            {
+                _activeResizeHost = host;
+                _resizeMode = mode;
+                _resizeStartPoint = e.GetPosition(this);
+                _resizeStartWidth = host.Width;
+                _resizeStartHeight = host.Height;
+                host.CaptureMouse();
+                host.Cursor = GetResizeCursor(mode);
+                e.Handled = true;
+                return;
+            }
+
+            _pendingMoveHost = host;
+            _pendingMoveStartPoint = e.GetPosition(this);
+            e.Handled = true;
+        }
+
+        private void ResizableImageHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not Grid host) return;
+            host.ReleaseMouseCapture();
+            _activeResizeHost = null;
+            _resizeMode = null;
+            _pendingMoveHost = null;
+            UpdateResizeCursor(host, e.GetPosition(host));
+            e.Handled = true;
+        }
+
+        private void ResizableImageHost_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (_activeResizeHost == null && sender is Grid host)
+            {
+                host.Cursor = Cursors.Arrow;
+            }
+        }
+
+        private void ResizableImageHost_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (sender is not Grid host) return;
+
+            if (_activeResizeHost == host && e.LeftButton == MouseButtonState.Pressed && !string.IsNullOrWhiteSpace(_resizeMode))
+            {
+                ResizeImageHost(host, e.GetPosition(this));
+                host.Cursor = GetResizeCursor(_resizeMode);
+                e.Handled = true;
+                return;
+            }
+
+            if (_pendingMoveHost == host && e.LeftButton == MouseButtonState.Pressed)
+            {
+                var currentPoint = e.GetPosition(this);
+                if (Math.Abs(currentPoint.X - _pendingMoveStartPoint.X) >= 6 ||
+                    Math.Abs(currentPoint.Y - _pendingMoveStartPoint.Y) >= 6)
+                {
+                    _pendingMoveHost = null;
+                    StartMoveImageDrag(host);
+                    e.Handled = true;
+                    return;
+                }
+            }
+
+            UpdateResizeCursor(host, e.GetPosition(host));
+        }
+
+        private void ResizeImageHost(Grid host, Point currentPoint)
+        {
+            if (host.Width <= 0 || host.Height <= 0) return;
+
+            double aspectRatio = _resizeStartWidth / _resizeStartHeight;
+            if (aspectRatio <= 0) aspectRatio = 1;
+
+            double dx = currentPoint.X - _resizeStartPoint.X;
+            double dy = currentPoint.Y - _resizeStartPoint.Y;
+            double newWidth = _resizeStartWidth;
+            double newHeight = _resizeStartHeight;
+
+            if (_resizeMode == "right" || _resizeMode == "left")
+            {
+                double signedDelta = _resizeMode == "right" ? dx : -dx;
+                newWidth = _resizeStartWidth + signedDelta;
+                newWidth = Math.Clamp(newWidth, MinImageWidth, MaxImageWidth);
+                newHeight = newWidth / aspectRatio;
+            }
+            else if (_resizeMode == "bottom" || _resizeMode == "top")
+            {
+                double signedDelta = _resizeMode == "bottom" ? dy : -dy;
+                newHeight = _resizeStartHeight + signedDelta;
+                newHeight = Math.Clamp(newHeight, MinImageHeight, MaxImageHeight);
+                newWidth = newHeight * aspectRatio;
+            }
+            else
+            {
+                double widthDelta = _resizeMode.Contains("left") ? -dx : dx;
+                double heightDelta = _resizeMode.Contains("top") ? -dy : dy;
+                double widthCandidate = Math.Clamp(_resizeStartWidth + widthDelta, MinImageWidth, MaxImageWidth);
+                double heightCandidate = Math.Clamp(_resizeStartHeight + heightDelta, MinImageHeight, MaxImageHeight);
+
+                if (Math.Abs(widthDelta) >= Math.Abs(heightDelta))
+                {
+                    newWidth = widthCandidate;
+                    newHeight = newWidth / aspectRatio;
+                }
+                else
+                {
+                    newHeight = heightCandidate;
+                    newWidth = newHeight * aspectRatio;
+                }
+            }
+
+            host.Width = Math.Clamp(newWidth, MinImageWidth, MaxImageWidth);
+            host.Height = Math.Clamp(newHeight, MinImageHeight, MaxImageHeight);
+            MarkDirtyAndScheduleSave();
+        }
+
+        private void UpdateResizeCursor(FrameworkElement element, Point point)
+        {
+            element.Cursor = GetResizeCursor(GetResizeMode(element, point));
+        }
+
+        private string GetResizeMode(FrameworkElement element, Point point)
+        {
+            if (element.ActualWidth <= 0 || element.ActualHeight <= 0) return "";
+
+            bool left = point.X <= ResizeHitThickness;
+            bool right = point.X >= element.ActualWidth - ResizeHitThickness;
+            bool top = point.Y <= ResizeHitThickness;
+            bool bottom = point.Y >= element.ActualHeight - ResizeHitThickness;
+
+            if (left && top) return "top-left";
+            if (right && top) return "top-right";
+            if (left && bottom) return "bottom-left";
+            if (right && bottom) return "bottom-right";
+            if (left) return "left";
+            if (right) return "right";
+            if (top) return "top";
+            if (bottom) return "bottom";
+            return "";
+        }
+
+        private static Cursor GetResizeCursor(string resizeMode)
+        {
+            return resizeMode switch
+            {
+                "left" or "right" => Cursors.SizeWE,
+                "top" or "bottom" => Cursors.SizeNS,
+                "top-left" or "bottom-right" => Cursors.SizeNWSE,
+                "top-right" or "bottom-left" => Cursors.SizeNESW,
+                _ => Cursors.Arrow
+            };
+        }
+
+        private string GetImagePathFromElement(Image image)
+        {
+            if (image == null || string.IsNullOrWhiteSpace(image.Uid)) return "";
+            return image.Uid.StartsWith(ResizableImagePathPrefix, StringComparison.OrdinalIgnoreCase)
+                ? image.Uid.Substring(ResizableImagePathPrefix.Length)
+                : "";
+        }
+
+        private void RichEditor_PreviewDragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data != null && e.Data.GetDataPresent(NoteImageMoveDataFormat))
+            {
+                e.Effects = DragDropEffects.Move;
+                e.Handled = true;
+                return;
+            }
+
+            if (ContainsImageData(e.Data))
+            {
+                e.Effects = DragDropEffects.Copy;
+                e.Handled = true;
+            }
+        }
+
+        private void RichEditor_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data != null && e.Data.GetDataPresent(NoteImageMoveDataFormat) &&
+                e.Data.GetData(NoteImageMoveDataFormat) is string payload &&
+                TryParseImageMovePayload(payload, out string path, out double width, out double height))
+            {
+                var pos = RichEditor.GetPositionFromPoint(e.GetPosition(RichEditor), true) ?? RichEditor.Document.ContentEnd;
+                InsertImageAtPosition(pos, path, width, height);
+                e.Effects = DragDropEffects.Move;
+                e.Handled = true;
+                return;
+            }
+
+            if (TryInsertImagesFromDataObject(e.Data))
+            {
+                e.Handled = true;
+            }
+        }
+
+        private void RichEditor_Pasting(object sender, DataObjectPastingEventArgs e)
+        {
+            if (TryInsertImagesFromDataObject(e.DataObject))
+            {
+                e.CancelCommand();
+            }
+        }
+
+        private bool ContainsImageData(IDataObject dataObject)
+        {
+            if (dataObject == null) return false;
+            if (dataObject.GetDataPresent(NoteImageMoveDataFormat)) return true;
+            if (dataObject.GetDataPresent(DataFormats.Bitmap)) return true;
+            if (!dataObject.GetDataPresent(DataFormats.FileDrop)) return false;
+
+            if (dataObject.GetData(DataFormats.FileDrop) is not string[] files) return false;
+            return files.Any(IsSupportedImageFile);
+        }
+
+        private bool TryInsertImagesFromDataObject(IDataObject dataObject)
+        {
+            if (dataObject == null) return false;
+
+            bool inserted = false;
+
+            if (dataObject.GetDataPresent(DataFormats.FileDrop) &&
+                dataObject.GetData(DataFormats.FileDrop) is string[] files)
+            {
+                foreach (string file in files.Where(IsSupportedImageFile))
+                {
+                    inserted |= TryInsertImageFromFile(file);
+                }
+            }
+            else if (dataObject.GetDataPresent(DataFormats.Bitmap) &&
+                     dataObject.GetData(DataFormats.Bitmap) is BitmapSource bitmapSource)
+            {
+                inserted = TryInsertImageFromBitmap(bitmapSource);
+            }
+
+            return inserted;
+        }
+
+        private static bool IsSupportedImageFile(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath)) return false;
+            string ext = Path.GetExtension(filePath).ToLowerInvariant();
+            return ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".bmp";
+        }
+
+        private void StartMoveImageDrag(Grid host)
+        {
+            if (host == null) return;
+
+            string imagePath = "";
+            if (host.Children.OfType<Border>().FirstOrDefault()?.Child is Image image)
+            {
+                imagePath = GetImagePathFromElement(image);
+            }
+            if (string.IsNullOrWhiteSpace(imagePath)) return;
+
+            _movingSourceHost = host;
+            string payload = BuildImageMovePayload(imagePath, host.Width, host.Height);
+            var data = new DataObject();
+            data.SetData(NoteImageMoveDataFormat, payload);
+
+            var effect = DragDrop.DoDragDrop(host, data, DragDropEffects.Move);
+            if (effect == DragDropEffects.Move)
+            {
+                RemoveImageHostFromDocument(_movingSourceHost);
+            }
+            _movingSourceHost = null;
+        }
+
+        private void RemoveImageHostFromDocument(Grid host)
+        {
+            if (host == null) return;
+
+            var container = FindInlineContainerForHostInDocument(RichEditor.Document, host);
+            if (container == null) return;
+
+            if (container.Parent is Paragraph paragraph)
+            {
+                paragraph.Inlines.Remove(container);
+                MarkDirtyAndScheduleSave();
+            }
+        }
+
+        private InlineUIContainer FindInlineContainerForHostInDocument(FlowDocument document, Grid host)
+        {
+            if (document == null || host == null) return null;
+
+            foreach (var block in document.Blocks)
+            {
+                var found = FindInlineContainerForHostInBlock(block, host);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        private InlineUIContainer FindInlineContainerForHostInBlock(Block block, Grid host)
+        {
+            switch (block)
+            {
+                case Paragraph paragraph:
+                    foreach (var inline in paragraph.Inlines)
+                    {
+                        var found = FindInlineContainerForHostInInline(inline, host);
+                        if (found != null) return found;
+                    }
+                    break;
+                case Section section:
+                    foreach (var child in section.Blocks)
+                    {
+                        var found = FindInlineContainerForHostInBlock(child, host);
+                        if (found != null) return found;
+                    }
+                    break;
+                case List list:
+                    foreach (var item in list.ListItems)
+                    {
+                        foreach (var child in item.Blocks)
+                        {
+                            var found = FindInlineContainerForHostInBlock(child, host);
+                            if (found != null) return found;
+                        }
+                    }
+                    break;
+            }
+            return null;
+        }
+
+        private InlineUIContainer FindInlineContainerForHostInInline(Inline inline, Grid host)
+        {
+            switch (inline)
+            {
+                case InlineUIContainer ui when ui.Child == host:
+                    return ui;
+                case Span span:
+                    foreach (var child in span.Inlines)
+                    {
+                        var found = FindInlineContainerForHostInInline(child, host);
+                        if (found != null) return found;
+                    }
+                    break;
+            }
+            return null;
+        }
+
+        private static string BuildImageMovePayload(string imagePath, double width, double height)
+        {
+            string b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(imagePath));
+            return $"{b64}|{width}|{height}";
+        }
+
+        private static bool TryParseImageMovePayload(string payload, out string imagePath, out double width, out double height)
+        {
+            imagePath = "";
+            width = 0;
+            height = 0;
+
+            if (string.IsNullOrWhiteSpace(payload)) return false;
+            var parts = payload.Split('|');
+            if (parts.Length != 3) return false;
+
+            try
+            {
+                imagePath = Encoding.UTF8.GetString(Convert.FromBase64String(parts[0]));
+                if (!double.TryParse(parts[1], out width)) return false;
+                if (!double.TryParse(parts[2], out height)) return false;
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
 

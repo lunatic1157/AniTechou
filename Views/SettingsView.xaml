@@ -167,7 +167,8 @@
                     <TextBlock Text="追番手账 AniTechou"
                                FontWeight="Bold"
                                Foreground="{DynamicResource TextPrimaryBrush}"/>
-                    <TextBlock Text="版本 1.0"
+                    <TextBlock x:Name="VersionText"
+                               Text="版本"
                                FontSize="12"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,6,0,0"/>

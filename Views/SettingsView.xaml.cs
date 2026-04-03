@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -35,6 +36,7 @@ namespace AniTechou.Views
                 "accounts"
             );
             DataPathText.Text = dataPath;
+            VersionText.Text = $"版本 {GetAppVersion()}";
         }
 
         private void InitializePlatforms()
@@ -80,6 +82,22 @@ namespace AniTechou.Views
         {
             ApiUrlBox.Text = item.ApiUrl ?? "";
             ModelBox.Text = item.Model ?? "";
+        }
+
+        private static string GetAppVersion()
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            var informationalVersion = assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+                .InformationalVersion;
+
+            if (!string.IsNullOrWhiteSpace(informationalVersion))
+            {
+                int plusIndex = informationalVersion.IndexOf('+');
+                return plusIndex > 0 ? informationalVersion.Substring(0, plusIndex) : informationalVersion;
+            }
+
+            return assembly.GetName().Version?.ToString(3) ?? "未知";
         }
 
         private async void TestConnection_Click(object sender, RoutedEventArgs e)
