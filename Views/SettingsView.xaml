@@ -97,7 +97,22 @@
                               Margin="0,14,0,0"
                               Style="{StaticResource AppCheckBoxStyle}"/>
 
-                    <WrapPanel Margin="0,18,0,0">
+                    <TextBlock Text="🔍 搜索数据源" Margin="0,18,0,6"
+                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"/>
+                    <CheckBox x:Name="BangumiSearchBox"
+                              Content="Bangumi (bgm.tv) — 中文 ACGN 数据库"
+                              Margin="0,0,0,4"
+                              Style="{StaticResource AppCheckBoxStyle}"/>
+                    <CheckBox x:Name="MALSearchBox"
+                              Content="MyAnimeList (Jikan API) — 国际动画数据库"
+                              Margin="0,0,0,4"
+                              Style="{StaticResource AppCheckBoxStyle}"/>
+                    <CheckBox x:Name="AniListSearchBox"
+                              Content="AniList (GraphQL) — 详细元数据与标签"
+                              Margin="0,0,0,4"
+                              Style="{StaticResource AppCheckBoxStyle}"/>
+
+                    <WrapPanel Margin="0,14,0,0">
                         <Button Content="测试连接"
                                 Width="96"
                                 Height="36"

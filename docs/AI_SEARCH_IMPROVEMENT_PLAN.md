@@ -222,7 +222,7 @@ query ($search: String) {
 
 ---
 
-### 任务 7：设置页搜索源开关 ⬜
+### 任务 7：设置页搜索源开关 ✅
 
 **优先级**：P3（用户体验）  
 **预计**：30 分钟  
@@ -237,7 +237,7 @@ query ($search: String) {
 
 ---
 
-### 任务 8：作品详情页外部链接 ⬜
+### 任务 8：作品详情页外部链接 ✅
 
 **优先级**：P3（用户体验）  
 **预计**：30 分钟  
@@ -252,7 +252,7 @@ query ($search: String) {
 
 ---
 
-### 任务 9：封面下载缓存 ⬜
+### 任务 9：封面下载缓存 ✅
 
 **优先级**：P3（性能优化）  
 **预计**：30 分钟  
@@ -325,7 +325,7 @@ git push origin main
   - ✅ 任务 4：新增 42 个单元测试（17→59），覆盖 AIService/SearchProviders/WorkDataRules
   - ✅ 任务 5：MAL 搜索源（Jikan API v4）
   - ✅ 任务 6：AniList 搜索源（GraphQL API）
+  - ✅ 任务 7：设置页搜索源开关（Bangumi/MAL/AniList CheckBox，默认 Bangumi 开启）
+  - ✅ 任务 8：作品详情页外部链接（Bangumi/MAL/AniList 直达按钮）
+  - ✅ 任务 9：封面下载缓存（本地缓存检查 + 数据库 BangumiId 复用）
   - ⬜ 任务 3：拆分 WorkService.cs（下一会话）
-  - ⬜ 任务 7：设置页搜索源开关
-  - ⬜ 任务 8：作品详情页外部链接
-  - ⬜ 任务 9：封面下载缓存

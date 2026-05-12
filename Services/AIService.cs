@@ -45,7 +45,10 @@ namespace AniTechou.Services
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
             }
 
-            _searchProvider = new CompositeSearchProvider();
+            _searchProvider = new CompositeSearchProvider(
+                config.EnableBangumiSearch,
+                config.EnableMALSearch,
+                config.EnableAniListSearch);
         }
 
         public static string GetDefaultSystemPrompt()

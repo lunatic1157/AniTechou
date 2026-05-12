@@ -13,14 +13,23 @@ namespace AniTechou.Services.SearchProviders
     {
         private readonly List<ISearchProvider> _providers;
 
-        public CompositeSearchProvider()
+        public CompositeSearchProvider(
+            bool enableBangumi = true,
+            bool enableMAL = false,
+            bool enableAniList = false)
         {
-            _providers = new List<ISearchProvider>
-            {
-                new BangumiSearchProvider(),
-                new MALSearchProvider(),
-                new AniListSearchProvider()
-            };
+            _providers = new List<ISearchProvider>();
+
+            if (enableBangumi)
+                _providers.Add(new BangumiSearchProvider());
+            if (enableMAL)
+                _providers.Add(new MALSearchProvider());
+            if (enableAniList)
+                _providers.Add(new AniListSearchProvider());
+
+            // 始终至少保留一个搜索源
+            if (_providers.Count == 0)
+                _providers.Add(new BangumiSearchProvider());
         }
 
         /// <summary>

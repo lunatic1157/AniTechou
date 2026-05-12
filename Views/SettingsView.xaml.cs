@@ -69,6 +69,9 @@ namespace AniTechou.Views
             ApiKeyBox.Password = config.ApiKey;
             AutoLoginBox.IsChecked = config.AutoLogin;
             WebSearchBox.IsChecked = config.EnableWebSearch;
+            BangumiSearchBox.IsChecked = config.EnableBangumiSearch;
+            MALSearchBox.IsChecked = config.EnableMALSearch;
+            AniListSearchBox.IsChecked = config.EnableAniListSearch;
         }
 
         private void Platform_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -332,6 +335,9 @@ namespace AniTechou.Views
                 config.Model = ModelBox.Text;
                 config.AutoLogin = AutoLoginBox.IsChecked ?? true;
                 config.EnableWebSearch = WebSearchBox.IsChecked ?? false;
+                config.EnableBangumiSearch = BangumiSearchBox.IsChecked ?? true;
+                config.EnableMALSearch = MALSearchBox.IsChecked ?? false;
+                config.EnableAniListSearch = AniListSearchBox.IsChecked ?? false;
 
                 ConfigManager.Save(config);
 

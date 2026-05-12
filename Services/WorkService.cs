@@ -810,6 +810,29 @@ namespace AniTechou.Services
         {
             if (string.IsNullOrWhiteSpace(urlOrBangumiInfo)) return "";
 
+            // === 缓存检查：本地文件已存在则直接返回 ===
+            try
+            {
+                using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+                {
+                    conn.Open();
+                    using (var cmd = new SQLiteCommand("SELECT CoverPath FROM Works WHERE Id = @Id", conn))
+                    {
+                        cmd.Parameters.AddWithValue("@Id", workId);
+                        var existingPath = cmd.ExecuteScalar() as string;
+                        if (!string.IsNullOrEmpty(existingPath) && File.Exists(existingPath))
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[WorkService] 封面缓存命中: {existingPath}");
+                            return existingPath;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WorkService] 封面缓存检查异常: {ex.Message}");
+            }
+
             var targetUrls = new List<string>();
             string originalUrl = urlOrBangumiInfo;
             string bangumiId = "";
@@ -850,13 +873,13 @@ namespace AniTechou.Services
                 
                 string jikanSearchQuery = searchTitle;
                 
-                // 如果没有传入 searchTitle，从数据库中获取标题用于搜索
-                if (string.IsNullOrEmpty(jikanSearchQuery))
+                // 如果没有传入 searchTitle，从数据库中获取标题和已存储的 Bangumi ID
+                if (string.IsNullOrEmpty(jikanSearchQuery) || string.IsNullOrEmpty(bangumiId))
                 {
                     using (var conn = DatabaseHelper.GetConnection(_currentAccount))
                     {
                         conn.Open();
-                        using (var cmd = new SQLiteCommand("SELECT Title, OriginalTitle, Year FROM Works WHERE Id = @Id", conn))
+                        using (var cmd = new SQLiteCommand("SELECT Title, OriginalTitle, Year, BangumiId FROM Works WHERE Id = @Id", conn))
                         {
                             cmd.Parameters.AddWithValue("@Id", workId);
                             using (var reader = cmd.ExecuteReader())
@@ -866,14 +889,21 @@ namespace AniTechou.Services
                                     string title = SafeGetString(reader, 0);
                                     string originalTitle = SafeGetString(reader, 1);
                                     string year = SafeGetString(reader, 2);
-                                    
+                                    string storedBangumiId = SafeGetString(reader, 3);
+
+                                    // 如果未传入 Bangumi ID 但数据库中已存储，优先使用
+                                    if (string.IsNullOrEmpty(bangumiId) && !string.IsNullOrEmpty(storedBangumiId))
+                                    {
+                                        bangumiId = storedBangumiId;
+                                        System.Diagnostics.Debug.WriteLine($"[WorkService] 使用数据库中已存储的 Bangumi ID: {bangumiId}");
+                                    }
+
                                     // 基础关键词
                                     jikanSearchQuery = string.IsNullOrEmpty(originalTitle) ? title : originalTitle;
-                                    
-                                    // 【优化】多季度作品防误伤：把年份加进搜索词，防止“咒术回战 第2季”搜出第一季的图
+
+                                    // 【优化】多季度作品防误伤：把年份加进搜索词
                                     if (!string.IsNullOrEmpty(year))
                                     {
-                                        // 提取年份数字
                                         var match = System.Text.RegularExpressions.Regex.Match(year, @"\d{4}");
                                         if (match.Success)
                                         {
@@ -891,7 +921,7 @@ namespace AniTechou.Services
                 {
                     try
                     {
-                        System.Diagnostics.Debug.WriteLine($"[WorkService] 尝试通过 Bangumi API 获取真实封面，ID: {bangumiId}");
+                        System.Diagnostics.Debug.WriteLine($"[WorkService] 封面来源: Bangumi API (ID: {bangumiId})");
                         client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "AniTechou/1.0 (https://github.com/your-repo/AniTechou)");
                         
                         var apiResponse = await client.GetAsync($"https://api.bgm.tv/v0/subjects/{bangumiId}");
@@ -921,7 +951,7 @@ namespace AniTechou.Services
                 {
                     try
                     {
-                        System.Diagnostics.Debug.WriteLine($"[WorkService] 启动 Bangumi 关键词搜索，关键词: {jikanSearchQuery}");
+                        System.Diagnostics.Debug.WriteLine($"[WorkService] 封面来源: Bangumi 标题搜索 (关键词: {jikanSearchQuery})");
                         client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "AniTechou/1.0 (https://github.com/your-repo/AniTechou)");
                         
                         // 调用 Bangumi 的搜索 API
@@ -956,7 +986,7 @@ namespace AniTechou.Services
                 {
                     try
                     {
-                        System.Diagnostics.Debug.WriteLine($"[WorkService] 启动 Jikan API (MAL) 备用搜索，关键词: {jikanSearchQuery}");
+                        System.Diagnostics.Debug.WriteLine($"[WorkService] 封面来源: Jikan API (MAL) 备用搜索 (关键词: {jikanSearchQuery})");
                         // Jikan 搜索动画
                         var jikanResponse = await client.GetAsync($"https://api.jikan.moe/v4/anime?q={Uri.EscapeDataString(jikanSearchQuery)}&limit=1");
                         if (jikanResponse.IsSuccessStatusCode)
@@ -975,7 +1005,7 @@ namespace AniTechou.Services
                                         string malUrl = imgUrl.GetString();
                                         if (!string.IsNullOrEmpty(malUrl))
                                         {
-                                            System.Diagnostics.Debug.WriteLine($"[WorkService] 从 MAL 获取到封面: {malUrl}");
+                                            System.Diagnostics.Debug.WriteLine($"[WorkService] 封面来源: MAL 匹配成功 ({malUrl})");
                                             targetUrls.Add(malUrl);
                                         }
                                     }
@@ -1063,7 +1093,7 @@ namespace AniTechou.Services
 
                         await File.WriteAllBytesAsync(localPath, bytes);
                         UpdateCoverPath(workId, localPath);
-                        System.Diagnostics.Debug.WriteLine($"[WorkService] 封面保存成功: {localPath}");
+                        System.Diagnostics.Debug.WriteLine($"[WorkService] 封面下载成功并保存: {localPath}");
                         return localPath;
                     }
                     catch (Exception ex)

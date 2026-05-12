@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -124,6 +125,9 @@ namespace AniTechou.Views
 
                 // 加载封面
                 LoadCoverImage(work.CoverPath);
+
+                // 设置外部链接
+                SetupExternalLinks(work);
             }
 
             // 加载个人状态
@@ -165,6 +169,63 @@ namespace AniTechou.Views
 
             // 加载关联笔记
             LoadRelatedNotes();
+        }
+
+        private void SetupExternalLinks(Models.WorkInfo work)
+        {
+            ExternalLinksWrap.Children.Clear();
+            bool hasLinks = false;
+
+            if (!string.IsNullOrEmpty(work.BangumiId))
+            {
+                var btn = CreateLinkButton("Bangumi 番组计划", $"https://bgm.tv/subject/{work.BangumiId}");
+                ExternalLinksWrap.Children.Add(btn);
+                hasLinks = true;
+            }
+
+            if (!string.IsNullOrEmpty(work.MALId))
+            {
+                var btn = CreateLinkButton("MyAnimeList", $"https://myanimelist.net/anime/{work.MALId}");
+                ExternalLinksWrap.Children.Add(btn);
+                hasLinks = true;
+            }
+
+            if (!string.IsNullOrEmpty(work.AniListId))
+            {
+                var btn = CreateLinkButton("AniList", $"https://anilist.co/anime/{work.AniListId}");
+                ExternalLinksWrap.Children.Add(btn);
+                hasLinks = true;
+            }
+
+            ExternalLinksPanel.Visibility = hasLinks ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private Button CreateLinkButton(string label, string url)
+        {
+            var btn = new Button
+            {
+                Content = $"🔗 {label}",
+                Width = 160,
+                Height = 34,
+                Margin = new Thickness(0, 0, 10, 6),
+                Tag = url
+            };
+            btn.Style = (Style)FindResource("AppSecondaryButtonStyle");
+            btn.Click += (s, e) =>
+            {
+                if ((s as Button)?.Tag is string link)
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo(link) { UseShellExecute = true });
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[WorkDetail] 打开链接失败: {ex.Message}");
+                    }
+                }
+            };
+            return btn;
         }
 
         private void LoadRelatedWorks()

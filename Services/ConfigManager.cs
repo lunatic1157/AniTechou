@@ -14,6 +14,9 @@ namespace AniTechou.Services
         public string LastAccount { get; set; } = "";
         public string CustomSystemPrompt { get; set; } = "";
         public bool EnableWebSearch { get; set; } = false; // 第3层：DeepSeek 联网搜索
+        public bool EnableBangumiSearch { get; set; } = true;
+        public bool EnableMALSearch { get; set; } = false;
+        public bool EnableAniListSearch { get; set; } = false;
         public string ThemeAccent { get; set; } = "Aurora";
         public string ThemeMode { get; set; } = "Light";
     }

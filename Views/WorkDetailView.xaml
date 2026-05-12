@@ -73,6 +73,16 @@
             </Grid>
             </Border>
             
+            <!-- 外部链接 -->
+            <Border Style="{StaticResource AppSectionCardStyle}" Padding="16" Margin="0,15,0,0"
+                    x:Name="ExternalLinksPanel" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="🌐 外部链接" FontSize="14" FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8"/>
+                    <WrapPanel x:Name="ExternalLinksWrap"/>
+                </StackPanel>
+            </Border>
+
             <TextBlock Text="简介" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,20,0,10"/>
             <TextBlock x:Name="SynopsisTextBlock" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}"/>
 
