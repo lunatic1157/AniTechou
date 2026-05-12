@@ -128,7 +128,7 @@ MainWindow.xaml.cs       — 主窗口、AI 对话面板、意图分发
 
 ---
 
-### 任务 3：拆分 WorkService.cs ⬜
+### 任务 3：拆分 WorkService.cs ✅
 
 **优先级**：P1（架构改善）  
 **预计**：90 分钟  
@@ -328,4 +328,4 @@ git push origin main
   - ✅ 任务 7：设置页搜索源开关（Bangumi/MAL/AniList CheckBox，默认 Bangumi 开启）
   - ✅ 任务 8：作品详情页外部链接（Bangumi/MAL/AniList 直达按钮）
   - ✅ 任务 9：封面下载缓存（本地缓存检查 + 数据库 BangumiId 复用）
-  - ⬜ 任务 3：拆分 WorkService.cs（下一会话）
+  - ✅ 任务 3：拆分 WorkService.cs → 3 文件（partial class: ImportExport 814行 + Cover 330行 + 主文件 1704行）
