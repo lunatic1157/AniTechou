@@ -33,39 +33,65 @@ namespace AniTechou.Services.SearchProviders
         }
 
         /// <summary>
-        /// 跨多个数据源搜索作品
+        /// 跨多个数据源搜索作品（并发执行，按优先级: Bangumi > AniList > MAL）
         /// </summary>
         /// <param name="query">用户搜索词</param>
         /// <param name="typeHint">类型提示 (Anime/Manga/Game/LightNovel)</param>
         /// <param name="maxResults">最大结果数</param>
         public async Task<List<ExternalSearchResult>> SearchAsync(string query, string typeHint = null, int maxResults = 8)
         {
-            var allResults = new List<ExternalSearchResult>();
-            var seenTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var provider in _providers)
+            if (_providers.Count == 1)
             {
+                // 单源直接调用，无需并发开销
                 try
                 {
-                    var results = await provider.SearchAsync(query, typeHint);
-                    foreach (var result in results)
-                    {
-                        string key = (result.Title + result.OriginalTitle).ToLowerInvariant();
-                        if (!seenTitles.Contains(key))
-                        {
-                            seenTitles.Add(key);
-                            allResults.Add(result);
-                        }
-                    }
+                    return (await _providers[0].SearchAsync(query, typeHint)).Take(maxResults).ToList();
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine(
-                        $"[CompositeSearch] {provider.ProviderName} 搜索失败: {ex.Message}");
+                        $"[CompositeSearch] {_providers[0].ProviderName} 搜索失败: {ex.Message}");
+                    return new List<ExternalSearchResult>();
+                }
+            }
+
+            // 多源并发搜索
+            var tasks = _providers.Select(p => SearchProviderSafe(p, query, typeHint)).ToArray();
+            var resultsArrays = await Task.WhenAll(tasks);
+
+            // 合并去重（保持优先级顺序）
+            var allResults = new List<ExternalSearchResult>();
+            var seenTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            for (int i = 0; i < resultsArrays.Length; i++)
+            {
+                foreach (var result in resultsArrays[i])
+                {
+                    string key = (result.Title + result.OriginalTitle).ToLowerInvariant();
+                    if (!seenTitles.Contains(key))
+                    {
+                        seenTitles.Add(key);
+                        allResults.Add(result);
+                    }
                 }
             }
 
             return allResults.Take(maxResults).ToList();
+        }
+
+        private static async Task<List<ExternalSearchResult>> SearchProviderSafe(
+            ISearchProvider provider, string query, string typeHint)
+        {
+            try
+            {
+                return await provider.SearchAsync(query, typeHint);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[CompositeSearch] {provider.ProviderName} 搜索失败: {ex.Message}");
+                return new List<ExternalSearchResult>();
+            }
         }
 
         /// <summary>

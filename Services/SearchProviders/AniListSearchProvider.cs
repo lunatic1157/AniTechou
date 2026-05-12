@@ -198,7 +198,8 @@ namespace AniTechou.Services.SearchProviders
             }
 
             // AniList ID
-            if (item.TryGetProperty("id", out var idProp) && idProp.TryGetInt32(out int anilistId))
+            int anilistId = SafeGetInt(item, "id");
+            if (anilistId > 0)
                 result.AniListId = anilistId.ToString();
 
             // 类型
@@ -216,7 +217,8 @@ namespace AniTechou.Services.SearchProviders
                 result.Type = "LightNovel";
 
             // 年份和季节
-            if (item.TryGetProperty("seasonYear", out var seasonYear) && seasonYear.TryGetInt32(out int year))
+            int year = SafeGetInt(item, "seasonYear");
+            if (year > 0)
                 result.Year = year.ToString();
 
             result.Season = SafeGetString(item, "season") switch
@@ -234,10 +236,15 @@ namespace AniTechou.Services.SearchProviders
                 result.Synopsis = result.Synopsis[..300] + "...";
 
             // 集数/卷数
-            if (item.TryGetProperty("episodes", out var eps) && eps.TryGetInt32(out int epCount) && epCount > 0)
+            int epCount = SafeGetInt(item, "episodes");
+            if (epCount > 0)
                 result.Episodes = epCount.ToString();
-            if (string.IsNullOrEmpty(result.Episodes) && item.TryGetProperty("volumes", out var vols) && vols.TryGetInt32(out int volCount) && volCount > 0)
-                result.Episodes = $"{volCount}卷";
+            if (string.IsNullOrEmpty(result.Episodes))
+            {
+                int volCount = SafeGetInt(item, "volumes");
+                if (volCount > 0)
+                    result.Episodes = $"{volCount}卷";
+            }
 
             // 封面
             if (item.TryGetProperty("coverImage", out var cover))
@@ -274,7 +281,8 @@ namespace AniTechou.Services.SearchProviders
             };
 
             // 评分
-            if (item.TryGetProperty("averageScore", out var score) && score.TryGetInt32(out int avgScore) && avgScore > 0)
+            int avgScore = SafeGetInt(item, "averageScore");
+            if (avgScore > 0)
                 result.Tags.Add($"AniList评分:{avgScore}%");
 
             // 流派
@@ -310,6 +318,16 @@ namespace AniTechou.Services.SearchProviders
                 return string.IsNullOrWhiteSpace(val) ? "" : val;
             }
             return "";
+        }
+
+        // 安全获取整数（Null 不会抛异常）
+        private static int SafeGetInt(JsonElement element, string property)
+        {
+            if (element.TryGetProperty(property, out var prop) &&
+                prop.ValueKind != System.Text.Json.JsonValueKind.Null &&
+                prop.TryGetInt32(out int val))
+                return val;
+            return 0;
         }
     }
 }

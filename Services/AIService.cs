@@ -36,9 +36,11 @@ namespace AniTechou.Services
             _model = model ?? config.Model;
             _enableWebSearch = config.EnableWebSearch;
 
+            // 联网搜索需要更长时间（LLM 需先搜索网络再生成回复）
+            double timeoutSec = config.EnableWebSearch ? 60 : 30;
             _httpClient = new HttpClient
             {
-                Timeout = TimeSpan.FromSeconds(30)
+                Timeout = TimeSpan.FromSeconds(timeoutSec)
             };
             if (!string.IsNullOrEmpty(_apiKey))
             {

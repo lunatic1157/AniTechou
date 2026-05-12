@@ -164,8 +164,7 @@ namespace AniTechou.Services.SearchProviders
                 result.OriginalTitle = "";
 
             // MAL ID
-            if (item.TryGetProperty("mal_id", out var malId))
-                result.MALId = malId.GetInt32().ToString();
+            result.MALId = SafeGetInt(item, "mal_id").ToString();
 
             // 类型映射
             result.Type = mediaType switch
@@ -182,8 +181,9 @@ namespace AniTechou.Services.SearchProviders
             };
 
             // 年份
-            if (item.TryGetProperty("year", out var yearProp) && yearProp.TryGetInt32(out int year))
-                result.Year = year.ToString();
+            int yearValue = SafeGetInt(item, "year");
+            if (yearValue > 0)
+                result.Year = yearValue.ToString();
 
             // 或从 aired/from 中提取
             if (string.IsNullOrEmpty(result.Year) && item.TryGetProperty("aired", out var aired))
@@ -216,10 +216,15 @@ namespace AniTechou.Services.SearchProviders
                 result.Synopsis = result.Synopsis[..300] + "...";
 
             // 集数/卷数
-            if (item.TryGetProperty("episodes", out var episodes) && episodes.TryGetInt32(out int epCount) && epCount > 0)
+            int epCount = SafeGetInt(item, "episodes");
+            if (epCount > 0)
                 result.Episodes = epCount.ToString();
-            if (string.IsNullOrEmpty(result.Episodes) && item.TryGetProperty("volumes", out var volumes) && volumes.TryGetInt32(out int volCount) && volCount > 0)
-                result.Episodes = $"{volCount}卷";
+            if (string.IsNullOrEmpty(result.Episodes))
+            {
+                int volCount = SafeGetInt(item, "volumes");
+                if (volCount > 0)
+                    result.Episodes = $"{volCount}卷";
+            }
 
             // 封面
             if (item.TryGetProperty("images", out var images))
@@ -271,7 +276,8 @@ namespace AniTechou.Services.SearchProviders
             }
 
             // 评分
-            if (item.TryGetProperty("score", out var scoreProp) && scoreProp.TryGetDouble(out double score) && score > 0)
+            double score = SafeGetDouble(item, "score");
+            if (score > 0)
                 result.Tags.Add($"MAL评分:{score:F1}");
 
             // 类型/流派标签
@@ -296,6 +302,26 @@ namespace AniTechou.Services.SearchProviders
                 return string.IsNullOrWhiteSpace(val) ? "" : val;
             }
             return "";
+        }
+
+        // 安全获取整数（Null 值不会抛异常）
+        private static int SafeGetInt(JsonElement element, string property)
+        {
+            if (element.TryGetProperty(property, out var prop) &&
+                prop.ValueKind != JsonValueKind.Null &&
+                prop.TryGetInt32(out int val))
+                return val;
+            return 0;
+        }
+
+        // 安全获取浮点数（Null 值不会抛异常）
+        private static double SafeGetDouble(JsonElement element, string property)
+        {
+            if (element.TryGetProperty(property, out var prop) &&
+                prop.ValueKind != JsonValueKind.Null &&
+                prop.TryGetDouble(out double val))
+                return val;
+            return 0;
         }
     }
 }
