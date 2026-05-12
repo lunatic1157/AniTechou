@@ -13,6 +13,7 @@ namespace AniTechou.Services
         public bool AutoLogin { get; set; } = true;
         public string LastAccount { get; set; } = "";
         public string CustomSystemPrompt { get; set; } = "";
+        public bool EnableWebSearch { get; set; } = false; // 第3层：DeepSeek 联网搜索
         public string ThemeAccent { get; set; } = "Aurora";
         public string ThemeMode { get; set; } = "Light";
     }
@@ -66,8 +67,4 @@ namespace AniTechou.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ConfigManager] Save error: {ex.Message}");
-            }
-        }
-    }
-}
+                System.Diagnostics.Debu

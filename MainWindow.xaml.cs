@@ -1075,9 +1075,12 @@ namespace AniTechou
                         }
                         break;
                     case "bangumiid":
-                        // 这个字段主要用于辅助下载封面，不需要单独保存到数据库（除非您想扩充数据库字段）
-                        // 标记为成功，避免因为只传了 bangumiId 和 coverurl 而导致最终判定失败
-                        updatedFields.Add("BangumiID(辅助)");
+                    case "bangumi_id":
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                            success = workService.UpdateWorkBangumiId(work.Id, value);
+                            if (success) updatedFields.Add("Bangumi ID");
+                        }
                         break;
                 }
             }
@@ -1687,3 +1690,4 @@ namespace AniTechou
         }
     }
 }
+              

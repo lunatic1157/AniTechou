@@ -92,6 +92,11 @@
                         </Border>
                     </Grid>
 
+                    <CheckBox x:Name="WebSearchBox"
+                              Content="启用 DeepSeek 联网搜索（需使用 DeepSeek 平台）"
+                              Margin="0,14,0,0"
+                              Style="{StaticResource AppCheckBoxStyle}"/>
+
                     <WrapPanel Margin="0,18,0,0">
                         <Button Content="测试连接"
                                 Width="96"
@@ -181,11 +186,4 @@
 
             <Button Content="保存设置"
                     Width="120"
-                    Height="40"
-                    Style="{StaticResource AppPrimaryButtonStyle}"
-                    Click="Save_Click"
-                    HorizontalAlignment="Center"
-                    Margin="0,30,0,20"/>
-        </StackPanel>
-    </ScrollViewer>
-</UserControl>
+          

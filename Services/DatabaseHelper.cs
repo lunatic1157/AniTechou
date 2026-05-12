@@ -91,6 +91,10 @@ namespace AniTechou.Services
                             CoverPath TEXT,
                             Author TEXT,
                             OriginalWork TEXT,
+                            BangumiId TEXT,
+                            MALId TEXT,
+                            AniListId TEXT,
+                            VoiceActorInfo TEXT,
                             AddedTime DATETIME DEFAULT CURRENT_TIMESTAMP,
                             LastModified DATETIME DEFAULT CURRENT_TIMESTAMP
                         );
@@ -235,6 +239,9 @@ namespace AniTechou.Services
                     // 迁移 Works 表的 SourceType 列
                     MigrateWorksTable(conn);
 
+                    // 第2层改进：迁移外部 ID 字段
+                    MigrateWorksExternalIds(conn);
+
                     // 检查并创建 WorkRelations 表 (如果不存在)
                     MigrateWorkRelationsTable(conn);
 
@@ -244,6 +251,56 @@ namespace AniTechou.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Migration error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 第2层改进：为已有数据库添加外部 ID 字段
+        /// </summary>
+        private static void MigrateWorksExternalIds(SQLiteConnection conn)
+        {
+            try
+            {
+                var columnsToAdd = new Dictionary<string, bool>
+                {
+                    { "BangumiId", false },
+                    { "MALId", false },
+                    { "AniListId", false },
+                    { "VoiceActorInfo", false }
+                };
+
+                string checkSql = "PRAGMA table_info(Works)";
+                using (var cmd = new SQLiteCommand(checkSql, conn))
+                {
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string columnName = reader.GetString(1);
+                            if (columnsToAdd.ContainsKey(columnName))
+                                columnsToAdd[columnName] = true;
+                        }
+                    }
+                }
+
+                foreach (var kvp in columnsToAdd)
+                {
+                    if (!kvp.Value)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[DatabaseHelper] Adding {kvp.Key} column to Works table...");
+                        using (var cmdAdd = new SQLiteCommand(
+                            $"ALTER TABLE Works ADD COLUMN {kvp.Key} TEXT", conn))
+                        {
+                            cmdAdd.ExecuteNonQuery();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[DatabaseHelper] MigrateWorksExternalIds error: {ex.Message}");
             }
         }
 
@@ -370,50 +427,4 @@ WHERE Id NOT IN (
 
                     using (var reader = cmd.ExecuteReader())
                     {
-                        while (reader.Read())
-                        {
-                            string columnName = reader.GetString(1);
-                            if (columnName == "SourceType") hasSourceTypeColumn = true;
-                            if (columnName == "Author") hasAuthorColumn = true;
-                            if (columnName == "OriginalWork") hasOriginalWorkColumn = true;
-                        }
-                    }
-
-                    System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Works table has SourceType column: {hasSourceTypeColumn}");
-
-                    if (!hasSourceTypeColumn)
-                    {
-                        System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding SourceType column to Works table...");
-                        using (var cmdAdd = new SQLiteCommand("ALTER TABLE Works ADD COLUMN SourceType TEXT", conn))
-                        {
-                            cmdAdd.ExecuteNonQuery();
-                        }
-                        System.Diagnostics.Debug.WriteLine("[DatabaseHelper] SourceType column added successfully!");
-                    }
-
-                    if (!hasAuthorColumn)
-                    {
-                        System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding Author column to Works table...");
-                        using (var cmdAdd = new SQLiteCommand("ALTER TABLE Works ADD COLUMN Author TEXT", conn))
-                        {
-                            cmdAdd.ExecuteNonQuery();
-                        }
-                    }
-
-                    if (!hasOriginalWorkColumn)
-                    {
-                        System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding OriginalWork column to Works table...");
-                        using (var cmdAdd = new SQLiteCommand("ALTER TABLE Works ADD COLUMN OriginalWork TEXT", conn))
-                        {
-                            cmdAdd.ExecuteNonQuery();
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] MigrateWorksTable error: {ex.Message}");
-            }
-        }
-    }
-}
+                       

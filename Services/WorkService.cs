@@ -585,6 +585,25 @@ namespace AniTechou.Services
             }
         }
 
+        /// <summary>
+        /// 第2层改进：更新作品的 Bangumi ID
+        /// </summary>
+        public bool UpdateWorkBangumiId(int workId, string bangumiId)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = "UPDATE Works SET BangumiId = @BangumiId, LastModified = @Now WHERE Id = @WorkId";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@BangumiId", bangumiId ?? "");
+                    cmd.Parameters.AddWithValue("@Now", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.Parameters.AddWithValue("@WorkId", workId);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
         public bool UpdateWorkSynopsis(int workId, string synopsis)
         {
             using (var conn = DatabaseHelper.GetConnection(_currentAccount))
@@ -1094,7 +1113,8 @@ namespace AniTechou.Services
         /// </summary>
         public int AddWork(string title, string originalTitle, string type, string company,
                    string year, string season, string sourceType, string episodesVolumes, string progress,
-                   string status, int rating, string synopsis, string coverPath, string author = "", string originalWork = "")
+                   string status, int rating, string synopsis, string coverPath, string author = "", string originalWork = "",
+                   string bangumiId = "", string malId = "", string anilistId = "", string voiceActorInfo = "")
         {
             try
             {
@@ -1117,8 +1137,8 @@ namespace AniTechou.Services
 
                             // 插入作品
                             string insertWork = @"
-                        INSERT INTO Works (Title, OriginalTitle, Type, Company, Year, Season, SourceType, EpisodesVolumes, Synopsis, CoverPath, Author, OriginalWork, AddedTime, LastModified)
-                        VALUES (@Title, @OriginalTitle, @Type, @Company, @Year, @Season, @SourceType, @EpisodesVolumes, @Synopsis, @CoverPath, @Author, @OriginalWork, @AddedTime, @LastModified);
+                        INSERT INTO Works (Title, OriginalTitle, Type, Company, Year, Season, SourceType, EpisodesVolumes, Synopsis, CoverPath, Author, OriginalWork, BangumiId, MALId, AniListId, VoiceActorInfo, AddedTime, LastModified)
+                        VALUES (@Title, @OriginalTitle, @Type, @Company, @Year, @Season, @SourceType, @EpisodesVolumes, @Synopsis, @CoverPath, @Author, @OriginalWork, @BangumiId, @MALId, @AniListId, @VoiceActorInfo, @AddedTime, @LastModified);
                         SELECT last_insert_rowid();";
 
                             int workId;
@@ -1136,6 +1156,10 @@ namespace AniTechou.Services
                                 cmd.Parameters.AddWithValue("@EpisodesVolumes", episodesVolumes ?? "");
                                 cmd.Parameters.AddWithValue("@Synopsis", synopsis ?? "");
                                 cmd.Parameters.AddWithValue("@CoverPath", coverPath ?? "");
+                                cmd.Parameters.AddWithValue("@BangumiId", bangumiId ?? "");
+                                cmd.Parameters.AddWithValue("@MALId", malId ?? "");
+                                cmd.Parameters.AddWithValue("@AniListId", anilistId ?? "");
+                                cmd.Parameters.AddWithValue("@VoiceActorInfo", voiceActorInfo ?? "");
                                 cmd.Parameters.AddWithValue("@AddedTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                                 cmd.Parameters.AddWithValue("@LastModified", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                                 workId = Convert.ToInt32(cmd.ExecuteScalar());
@@ -1179,7 +1203,7 @@ namespace AniTechou.Services
             using (var conn = DatabaseHelper.GetConnection(_currentAccount))
             {
                 conn.Open();
-                string sql = @"SELECT Id, Title, OriginalTitle, Type, Company, Year, Season, SourceType, EpisodesVolumes, Synopsis, CoverPath, Author, OriginalWork
+                string sql = @"SELECT Id, Title, OriginalTitle, Type, Company, Year, Season, SourceType, EpisodesVolumes, Synopsis, CoverPath, Author, OriginalWork, BangumiId, MALId, AniListId, VoiceActorInfo
                                FROM Works WHERE Id = @Id";
                 using (var cmd = new SQLiteCommand(sql, conn))
                 {
@@ -1202,7 +1226,11 @@ namespace AniTechou.Services
                                 Synopsis = SafeGetString(reader, 9),
                                 CoverPath = SafeGetString(reader, 10),
                                 Author = SafeGetString(reader, 11),
-                                OriginalWork = SafeGetString(reader, 12)
+                                OriginalWork = SafeGetString(reader, 12),
+                                BangumiId = SafeGetString(reader, 13),
+                                MALId = SafeGetString(reader, 14),
+                                AniListId = SafeGetString(reader, 15),
+                                VoiceActorInfo = SafeGetString(reader, 16)
                             };
                         }
                     }
@@ -2712,47 +2740,4 @@ namespace AniTechou.Services
             if (string.IsNullOrWhiteSpace(fileName)) return "";
             string fallback = Path.Combine(GetCoversDirectory(), fileName);
             return File.Exists(fallback) ? fallback : "";
-        }
-
-        private static IEnumerable<string> ExtractNoteImagePaths(string content)
-        {
-            if (string.IsNullOrEmpty(content)) yield break;
-
-            foreach (Match match in Regex.Matches(content, "ani-image:(?<path>[^\"]+)", RegexOptions.IgnoreCase))
-            {
-                var p = (match.Groups["path"]?.Value ?? "").Trim();
-                if (!string.IsNullOrWhiteSpace(p)) yield return p;
-            }
-        }
-
-        private static string RewriteNoteContentPaths(string content, Dictionary<string, string> mapByOriginal, Dictionary<string, string> mapByFileName)
-        {
-            if (string.IsNullOrEmpty(content)) return content;
-            if ((mapByOriginal == null || mapByOriginal.Count == 0) && (mapByFileName == null || mapByFileName.Count == 0)) return content;
-
-            return Regex.Replace(
-                content,
-                "ani-image:(?<path>[^\"]+)",
-                m =>
-                {
-                    string p = (m.Groups["path"]?.Value ?? "").Trim();
-                    if (string.IsNullOrWhiteSpace(p)) return m.Value;
-
-                    if (mapByOriginal != null && mapByOriginal.TryGetValue(p, out var mapped))
-                    {
-                        return $"ani-image:{mapped}";
-                    }
-
-                    string fileName = Path.GetFileName(p);
-                    if (!string.IsNullOrWhiteSpace(fileName) && mapByFileName != null && mapByFileName.TryGetValue(fileName, out var mappedByName))
-                    {
-                        return $"ani-image:{mappedByName}";
-                    }
-
-                    return m.Value;
-                },
-                RegexOptions.IgnoreCase
-            );
-        }
-    }
-}
+       

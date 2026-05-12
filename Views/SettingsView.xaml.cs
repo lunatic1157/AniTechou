@@ -68,6 +68,7 @@ namespace AniTechou.Views
 
             ApiKeyBox.Password = config.ApiKey;
             AutoLoginBox.IsChecked = config.AutoLogin;
+            WebSearchBox.IsChecked = config.EnableWebSearch;
         }
 
         private void Platform_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -330,6 +331,7 @@ namespace AniTechou.Views
                 config.ApiUrl = ApiUrlBox.Text;
                 config.Model = ModelBox.Text;
                 config.AutoLogin = AutoLoginBox.IsChecked ?? true;
+                config.EnableWebSearch = WebSearchBox.IsChecked ?? false;
 
                 ConfigManager.Save(config);
 
@@ -355,8 +357,4 @@ namespace AniTechou.Views
             }
             catch (Exception ex)
             {
-                Windows.AppMessageDialog.Show(Application.Current.MainWindow, "错误", $"保存失败：{ex.Message}");
-            }
-        }
-    }
-}
+                Wi

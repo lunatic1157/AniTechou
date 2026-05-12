@@ -64,6 +64,7 @@ namespace AniTechou.Views
                         Season = result.season,
                         SourceType = result.sourceType,
                         CoverUrl = result.coverUrl,
+                        BangumiId = result.bangumiId ?? "",
                         Company = result.company,
                         Info = info.Trim(),
                         IsSelected = true
@@ -158,7 +159,13 @@ namespace AniTechou.Views
                         "wish",  // status
                         0,   // rating
                         "",  // synopsis
-                        ""   // coverPath
+                        "",  // coverPath
+                        "",  // author
+                        "",  // originalWork
+                        work.BangumiId ?? "",  // bangumiId
+                        "",  // malId
+                        "",  // anilistId
+                        ""   // voiceActorInfo
                     );
 
                     if (workId > 0)
@@ -200,19 +207,8 @@ namespace AniTechou.Views
         public string Season { get; set; } = "";
         public string SourceType { get; set; } = "";
         public string CoverUrl { get; set; } = "";
+        public string BangumiId { get; set; } = "";
         public string Company { get; set; } = "";
         public string Info { get; set; } = "";
 
-        public bool IsSelected
-        {
-            get => _isSelected;
-            set
-            {
-                _isSelected = value;
-                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsSelected)));
-            }
-        }
-
-        public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
-    }
-}
+  
