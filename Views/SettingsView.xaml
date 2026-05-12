@@ -61,39 +61,25 @@
                                      Style="{StaticResource AppPasswordBoxStyle}"/>
 
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="API 地址" Style="{StaticResource FieldLabelStyle}"/>
-                        <Border Grid.Row="2"
-                                Grid.Column="1"
-                                Height="40"
-                                Margin="0,0,0,12"
-                                Background="{DynamicResource Surface2Brush}"
-                                BorderBrush="{DynamicResource BorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="{DynamicResource InputCornerRadius}"
-                                Padding="12,10">
-                            <TextBlock x:Name="ApiUrlBox"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                       VerticalAlignment="Center"
-                                       TextTrimming="CharacterEllipsis"/>
-                        </Border>
+                        <TextBox x:Name="ApiUrlBox"
+                                 Grid.Row="2"
+                                 Grid.Column="1"
+                                 Height="40"
+                                 Margin="0,0,0,12"
+                                 Style="{StaticResource AppTextBoxStyle}"
+                                 TextChanged="ApiUrlOrModel_TextChanged"/>
 
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="模型" Style="{StaticResource FieldLabelStyle}"/>
-                        <Border Grid.Row="3"
-                                Grid.Column="1"
-                                Height="40"
-                                Background="{DynamicResource Surface2Brush}"
-                                BorderBrush="{DynamicResource BorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="{DynamicResource InputCornerRadius}"
-                                Padding="12,10">
-                            <TextBlock x:Name="ModelBox"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                       VerticalAlignment="Center"
-                                       TextTrimming="CharacterEllipsis"/>
-                        </Border>
+                        <TextBox x:Name="ModelBox"
+                                 Grid.Row="3"
+                                 Grid.Column="1"
+                                 Height="40"
+                                 Style="{StaticResource AppTextBoxStyle}"
+                                 TextChanged="ApiUrlOrModel_TextChanged"/>
                     </Grid>
 
                     <CheckBox x:Name="WebSearchBox"
-                              Content="启用 DeepSeek 联网搜索（需使用 DeepSeek 平台）"
+                              Content="启用 AI 联网搜索（DeepSeek、Kimi、OpenAI 原生支持）"
                               Margin="0,14,0,0"
                               Style="{StaticResource AppCheckBoxStyle}"/>
 

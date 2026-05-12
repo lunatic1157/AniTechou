@@ -13,7 +13,7 @@ namespace AniTechou.Services
         public bool AutoLogin { get; set; } = true;
         public string LastAccount { get; set; } = "";
         public string CustomSystemPrompt { get; set; } = "";
-        public bool EnableWebSearch { get; set; } = false; // 第3层：DeepSeek 联网搜索
+        public bool EnableWebSearch { get; set; } = false; // 启用 AI 联网搜索（平台自适应）
         public bool EnableBangumiSearch { get; set; } = true;
         public bool EnableMALSearch { get; set; } = false;
         public bool EnableAniListSearch { get; set; } = false;

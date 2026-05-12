@@ -177,12 +177,71 @@ namespace AniTechou.Services
             return await RetryHelper.RetryAsync(async () =>
             {
                 var content = new StringContent(
-                    JsonSerializer.Serialize(request),
+                    JsonSerializer.Serialize(request, request.GetType()),
                     Encoding.UTF8,
                     "application/json");
                 var response = await _httpClient.PostAsync($"{_apiUrl}/chat/completions", content);
                 return await response.Content.ReadAsStringAsync();
             }, "LLM API");
+        }
+
+        /// <summary>
+        /// 构建 LLM 请求体，根据平台自适应注入联网搜索参数
+        /// </summary>
+        private object BuildRequest(List<object> messages)
+        {
+            var baseRequest = new Dictionary<string, object>
+            {
+                ["model"] = _model,
+                ["messages"] = messages,
+                ["temperature"] = 0.3,
+                ["response_format"] = new { type = "json_object" }
+            };
+
+            if (!_enableWebSearch) return baseRequest;
+
+            // DeepSeek: enable_search 参数
+            if (_apiUrl.Contains("deepseek"))
+            {
+                baseRequest["enable_search"] = true;
+                System.Diagnostics.Debug.WriteLine("[AIService] 联网搜索: DeepSeek enable_search");
+                return baseRequest;
+            }
+
+            // Kimi (Moonshot): 使用 web_search 工具
+            if (_apiUrl.Contains("moonshot") || _apiUrl.Contains("kimi"))
+            {
+                baseRequest["tools"] = new[]
+                {
+                    new
+                    {
+                        type = "builtin_function",
+                        function = new { name = "web_search" }
+                    }
+                };
+                System.Diagnostics.Debug.WriteLine("[AIService] 联网搜索: Kimi web_search tool");
+                return baseRequest;
+            }
+
+            // OpenAI 兼容: web_search 工具 (gpt-4o-mini / gpt-4o 支持)
+            if (_apiUrl.Contains("openai"))
+            {
+                baseRequest["tools"] = new[]
+                {
+                    new
+                    {
+                        type = "web_search",
+                        web_search = new { }
+                    }
+                };
+                System.Diagnostics.Debug.WriteLine("[AIService] 联网搜索: OpenAI web_search tool");
+                return baseRequest;
+            }
+
+            // 未知平台：尝试 DeepSeek 兼容参数（多数国内 API 兼容此格式）
+            System.Diagnostics.Debug.WriteLine("[AIService] 联网搜索: 未知平台，尝试通用 enable_search");
+            baseRequest["enable_search"] = true;
+            return baseRequest;
         }
 
         public async Task<List<AIWorkSearchResult>> SearchWorks(string query)
@@ -406,30 +465,8 @@ namespace AniTechou.Services
                     messages.Add(new { role = msg.role, content = msg.content });
                 }
 
-                // === 第3层改进：DeepSeek 联网搜索 ===
-                object request;
-                if (_enableWebSearch && (_apiUrl.Contains("deepseek") || _apiUrl.Contains("api.deepseek")))
-                {
-                    request = new
-                    {
-                        model = _model,
-                        messages = messages,
-                        temperature = 0.3,
-                        response_format = new { type = "json_object" },
-                        enable_search = true  // DeepSeek 联网搜索参数
-                    };
-                    System.Diagnostics.Debug.WriteLine("[AIService] DeepSeek 联网搜索已启用");
-                }
-                else
-                {
-                    request = new
-                    {
-                        model = _model,
-                        messages = messages,
-                        temperature = 0.3,
-                        response_format = new { type = "json_object" }
-                    };
-                }
+                // === 第3层改进：平台自适应联网搜索 ===
+                var request = BuildRequest(messages);
 
                 var json = await PostToLLMAsync(request);
 

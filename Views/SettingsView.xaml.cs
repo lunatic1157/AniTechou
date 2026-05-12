@@ -20,6 +20,7 @@ namespace AniTechou.Views
             public string Name { get; set; }
             public string ApiUrl { get; set; }
             public string Model { get; set; }
+            public bool IsCustom { get; set; }
         }
 
         public SettingsView(string accountName)
@@ -44,9 +45,9 @@ namespace AniTechou.Views
             _platforms = new List<PlatformOption>
             {
                 new PlatformOption { Name = "DeepSeek", ApiUrl = "https://api.deepseek.com/v1", Model = "deepseek-chat" },
-                new PlatformOption { Name = "智谱AI", ApiUrl = "https://open.bigmodel.cn/api/paas/v4", Model = "glm-4-flash" },
-                new PlatformOption { Name = "阿里云百炼", ApiUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1", Model = "qwen-turbo" },
-                new PlatformOption { Name = "OpenAI", ApiUrl = "https://api.openai.com/v1", Model = "gpt-3.5-turbo" }
+                new PlatformOption { Name = "Kimi (月之暗面)", ApiUrl = "https://api.moonshot.cn/v1", Model = "moonshot-v1-8k" },
+                new PlatformOption { Name = "OpenAI", ApiUrl = "https://api.openai.com/v1", Model = "gpt-4o-mini" },
+                new PlatformOption { Name = "自定义", ApiUrl = "", Model = "", IsCustom = true }
             };
 
             PlatformBox.ItemsSource = _platforms;
@@ -59,11 +60,29 @@ namespace AniTechou.Views
 
             // 设置平台选中项
             string platform = config.Platform;
-            var selected = _platforms.FirstOrDefault(p => p.Name == platform) ?? _platforms.FirstOrDefault();
+            var selected = _platforms.FirstOrDefault(p => p.Name == platform);
+            if (selected == null && !string.IsNullOrEmpty(config.ApiUrl))
+            {
+                // 自定义平台
+                selected = _platforms.FirstOrDefault(p => p.IsCustom);
+                if (selected != null)
+                {
+                    selected.ApiUrl = config.ApiUrl;
+                    selected.Model = config.Model;
+                }
+            }
+            if (selected == null)
+                selected = _platforms.FirstOrDefault();
+
             if (selected != null)
             {
                 PlatformBox.SelectedItem = selected;
                 UpdateApiFields(selected);
+                // 覆盖：总是用已保存的值
+                if (!string.IsNullOrEmpty(config.ApiUrl))
+                    ApiUrlBox.Text = config.ApiUrl;
+                if (!string.IsNullOrEmpty(config.Model))
+                    ModelBox.Text = config.Model;
             }
 
             ApiKeyBox.Password = config.ApiKey;
@@ -84,8 +103,29 @@ namespace AniTechou.Views
 
         private void UpdateApiFields(PlatformOption item)
         {
-            ApiUrlBox.Text = item.ApiUrl ?? "";
-            ModelBox.Text = item.Model ?? "";
+            ApiUrlBox.Text = item.IsCustom ? "" : (item.ApiUrl ?? "");
+            ModelBox.Text = item.IsCustom ? "" : (item.Model ?? "");
+        }
+
+        // 当用户手动修改 API 地址或模型时，自动切换到自定义平台
+        private void ApiUrlOrModel_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (PlatformBox.SelectedItem is PlatformOption selected && selected.IsCustom)
+                return; // 已经是自定义，不用再切
+
+            // 检查当前内容是否与选中平台预设一致
+            if (PlatformBox.SelectedItem is PlatformOption current)
+            {
+                if (ApiUrlBox.Text != current.ApiUrl || ModelBox.Text != current.Model)
+                {
+                    // 内容变了，切换到自定义
+                    var custom = _platforms.FirstOrDefault(p => p.IsCustom);
+                    if (custom != null)
+                    {
+                        PlatformBox.SelectedItem = custom;
+                    }
+                }
+            }
         }
 
         private static string GetAppVersion()

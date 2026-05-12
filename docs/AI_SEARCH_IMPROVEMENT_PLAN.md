@@ -329,3 +329,8 @@ git push origin main
   - ✅ 任务 8：作品详情页外部链接（Bangumi/MAL/AniList 直达按钮）
   - ✅ 任务 9：封面下载缓存（本地缓存检查 + 数据库 BangumiId 复用）
   - ✅ 任务 3：拆分 WorkService.cs → 3 文件（partial class: ImportExport 814行 + Cover 330行 + 主文件 1704行）
+- 2026-05-13：**会话 4** — 平台系统翻新
+  - ✅ 平台精简：DeepSeek / Kimi / OpenAI / 自定义（去掉 智谱AI、阿里云百炼）
+  - ✅ API 地址和模型改为可编辑 TextBox，编辑即自动切换到自定义平台
+  - ✅ 联网搜索平台自适应：DeepSeek(`enable_search`) / Kimi(`web_search tool`) / OpenAI(`web_search tool`) / 未知平台兜底
+  - ✅ 修复 PostToLLMAsync 序列化隐患（runtime type 序列化）
