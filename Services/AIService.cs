@@ -19,7 +19,7 @@ namespace AniTechou.Services
         private readonly bool _enableWebSearch;
 
         // 用于保存对话上下文（多轮对话）
-        private static List<ChatMessage> _contextHistory = new List<ChatMessage>();
+        private List<ChatMessage> _contextHistory = new List<ChatMessage>();
         private const int MAX_HISTORY = 10;
 
         public class ChatMessage
@@ -36,7 +36,10 @@ namespace AniTechou.Services
             _model = model ?? config.Model;
             _enableWebSearch = config.EnableWebSearch;
 
-            _httpClient = new HttpClient();
+            _httpClient = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
             if (!string.IsNullOrEmpty(_apiKey))
             {
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
@@ -72,7 +75,7 @@ namespace AniTechou.Services
 
 字段规范：
 - **强制要求**：当 intent 为 WORK_SEARCH 时, works 数组中的每个对象必须完整包含以下15个字段：`title`, `originalTitle`, `type` (必须是 Anime/Manga/LightNovel/Game), `year`, `season`, `company`, `author`, `originalWork`, `sourceType`, `episodes`, `synopsis`, `coverUrl`, `bangumiId`, `tags`, `voiceActorInfo`。如果某个字段没有信息，请使用空字符串 """" 作为值。
-- **Bangumi ID 极为重要**：如果实时搜索数据中提供了 Bangumi ID，请务必将其填入 `bangumiId` 字段。同时 `coverUrl` 填入 ""bgm_id:{bangumiId}|{实时数据中的封面URL}"" 格式，以确保系统能精准获取封面。
+- **Bangumi ID 极为重要**：如果实时搜索数据中提供了 Bangumi ID，请务必将其填入 `bangumiId` 字段。同时 `coverUrl` 填入 ""bgm_id:{{bangumiId}}|{{实时数据中的封面URL}}"" 格式，以确保系统能精准获取封面。
 - **作者与制作公司**：对于 `Anime` 和 `Game`，重点填写 `company`（制作公司）；对于 `Manga` 和 `LightNovel`，重点填写 `author`（漫画家/插画师/执笔者）。
 - **原作 (originalWork)**：指的是**原作者**。如果一部作品是改编的（比如小说改漫画，或者小说改动画），请在这里填入**小说原作者**的名字。如果是原创作品，此处留空。
 - **原作类型 (sourceType)**：必须是 原创, 漫改, 小说改, 游戏改, 其他, 无 之一。如果是原创动画，填""原创""；如果是小说/漫画本身，填""无""。注意：**""游戏改""仅在作品类型为 Anime 且明确为""改编自游戏""时使用**；作品类型为 Game 时一般应为""无/原创/其他""，不要把 Game 自己标成""游戏改""。
@@ -163,6 +166,22 @@ namespace AniTechou.Services
             return false;
         }
 
+        /// <summary>
+        /// 带重试的 LLM API 调用（仅对网络瞬时错误重试，4xx/5xx 不重试）
+        /// </summary>
+        private async Task<string> PostToLLMAsync(object request)
+        {
+            return await RetryHelper.RetryAsync(async () =>
+            {
+                var content = new StringContent(
+                    JsonSerializer.Serialize(request),
+                    Encoding.UTF8,
+                    "application/json");
+                var response = await _httpClient.PostAsync($"{_apiUrl}/chat/completions", content);
+                return await response.Content.ReadAsStringAsync();
+            }, "LLM API");
+        }
+
         public async Task<List<AIWorkSearchResult>> SearchWorks(string query)
         {
             return await BatchSearchWorks(query);
@@ -218,14 +237,7 @@ namespace AniTechou.Services
                     temperature = 0.7
                 };
 
-                var content = new StringContent(
-                    JsonSerializer.Serialize(request),
-                    Encoding.UTF8,
-                    "application/json"
-                );
-
-                var response = await _httpClient.PostAsync($"{_apiUrl}/chat/completions", content);
-                var json = await response.Content.ReadAsStringAsync();
+                var json = await PostToLLMAsync(request);
 
                 using var doc = JsonDocument.Parse(json);
                 var resultText = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
@@ -323,9 +335,7 @@ namespace AniTechou.Services
                     temperature = 0.3
                 };
 
-                var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync($"{_apiUrl}/chat/completions", content);
-                var json = await response.Content.ReadAsStringAsync();
+                var json = await PostToLLMAsync(request);
 
                 using var doc = JsonDocument.Parse(json);
                 var resultText = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
@@ -407,4 +417,108 @@ namespace AniTechou.Services
                     };
                     System.Diagnostics.Debug.WriteLine("[AIService] DeepSeek 联网搜索已启用");
                 }
+                else
+                {
+                    request = new
+                    {
+                        model = _model,
+                        messages = messages,
+                        temperature = 0.3,
+                        response_format = new { type = "json_object" }
+                    };
+                }
+
+                var json = await PostToLLMAsync(request);
+
+                using var doc = JsonDocument.Parse(json);
+                var resultText = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
+
+                int start = resultText.IndexOf("{");
+                int end = resultText.LastIndexOf("}");
+                if (start >= 0 && end >= start)
+                {
+                    resultText = resultText.Substring(start, end - start + 1);
+                }
+
+                AIResponse aiResponse;
+                try
+                {
+                    aiResponse = JsonSerializer.Deserialize<AIResponse>(resultText);
+                }
+                catch
+                {
+                    aiResponse = new AIResponse { intent = "GENERAL_CHAT", answer = resultText };
+                }
+
+                if (aiResponse != null)
+                {
+                    _contextHistory.Add(new ChatMessage { role = "assistant", content = aiResponse.answer });
+                    if (_contextHistory.Count > MAX_HISTORY) _contextHistory.RemoveAt(0);
+                }
+
+                return aiResponse ?? new AIResponse { intent = "GENERAL_CHAT", answer = "抱歉，解析回复时出错了。" };
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"SmartChat异常: {ex.Message}");
+                return new AIResponse { intent = "GENERAL_CHAT", answer = "抱歉，出了点问题，请稍后再试。" };
+            }
+        }
+    }
+
+    public class AIWorkSearchResult
+    {
+        public string title { get; set; } = "";
+        public string originalTitle { get; set; } = "";
+        public string type { get; set; } = "Anime";
+        public string year { get; set; } = "";
+        public string company { get; set; } = "";
+        public string author { get; set; } = "";
+        public string originalWork { get; set; } = "";
+        public string episodes { get; set; } = "";
+        public string synopsis { get; set; } = "";
+        public List<string> tags { get; set; } = new List<string>();
+        public string coverUrl { get; set; } = "";
+        public string bangumiId { get; set; } = "";
+        public string sourceType { get; set; } = "";
+        public string season { get; set; } = "";
+        public string voiceActorInfo { get; set; } = "";
+    }
+
+    public class AIWorkSearchResponse
+    {
+        public List<AIWorkSearchResult> works { get; set; } = new List<AIWorkSearchResult>();
+    }
+
+    public class AIResponse
+    {
+        public string intent { get; set; } = "GENERAL_CHAT";
+        public string answer { get; set; } = "";
+        public List<AIWorkSearchResult> works { get; set; } = new List<AIWorkSearchResult>();
+        public AIUpdateInfo updateInfo { get; set; }
+        public AINoteInfo noteInfo { get; set; }
+    }
+
+    public class AINoteInfo
+    {
+        public string action { get; set; } = "";
+        public int noteId { get; set; } = 0;
+        public string title { get; set; } = "";
+        public string content { get; set; } = "";
+        public List<string> tags { get; set; } = new List<string>();
+        public List<string> relatedWorks { get; set; } = new List<string>();
+        public string searchTerm { get; set; } = "";
+    }
+
+    public class AIUpdateInfo
+    {
+        public string action { get; set; } = "";
+        public string title { get; set; } = "";
+        public string type { get; set; } = "";
+        public bool isBatchUpdate { get; set; } = false;
+        public Dictionary<string, string> updates { get; set; } = new Dictionary<string, string>();
+        public string targetTag { get; set; } = "";
+        public string newTag { get; set; } = "";
+    }
+}
    

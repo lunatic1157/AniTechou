@@ -67,4 +67,8 @@ namespace AniTechou.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debu
+                System.Diagnostics.Debug.WriteLine($"[ConfigManager] Save error: {ex.Message}");
+            }
+        }
+    }
+}

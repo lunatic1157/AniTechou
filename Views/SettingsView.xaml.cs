@@ -357,4 +357,8 @@ namespace AniTechou.Views
             }
             catch (Exception ex)
             {
-                Wi
+                Windows.AppMessageDialog.Show(Application.Current.MainWindow, "错误", $"保存失败：{ex.Message}");
+            }
+        }
+    }
+}

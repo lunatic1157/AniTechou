@@ -2730,6 +2730,47 @@ namespace AniTechou.Services
             return dir;
         }
 
+        private static IEnumerable<string> ExtractNoteImagePaths(string content)
+        {
+            if (string.IsNullOrEmpty(content)) yield break;
+
+            foreach (Match match in Regex.Matches(content, "ani-image:(?<path>[^\"]+)", RegexOptions.IgnoreCase))
+            {
+                var p = (match.Groups["path"]?.Value ?? "").Trim();
+                if (!string.IsNullOrWhiteSpace(p)) yield return p;
+            }
+        }
+
+        private static string RewriteNoteContentPaths(string content, Dictionary<string, string> mapByOriginal, Dictionary<string, string> mapByFileName)
+        {
+            if (string.IsNullOrEmpty(content)) return content;
+            if ((mapByOriginal == null || mapByOriginal.Count == 0) && (mapByFileName == null || mapByFileName.Count == 0)) return content;
+
+            return Regex.Replace(
+                content,
+                "ani-image:(?<path>[^\"]+)",
+                m =>
+                {
+                    string p = (m.Groups["path"]?.Value ?? "").Trim();
+                    if (string.IsNullOrWhiteSpace(p)) return m.Value;
+
+                    if (mapByOriginal != null && mapByOriginal.TryGetValue(p, out var mapped))
+                    {
+                        return $"ani-image:{mapped}";
+                    }
+
+                    string fileName = Path.GetFileName(p);
+                    if (!string.IsNullOrWhiteSpace(fileName) && mapByFileName != null && mapByFileName.TryGetValue(fileName, out var mappedByName))
+                    {
+                        return $"ani-image:{mappedByName}";
+                    }
+
+                    return m.Value;
+                },
+                RegexOptions.IgnoreCase
+            );
+        }
+
         private static string ResolveCoverFilePath(string coverPath)
         {
             string p = (coverPath ?? "").Trim();
@@ -2740,4 +2781,7 @@ namespace AniTechou.Services
             if (string.IsNullOrWhiteSpace(fileName)) return "";
             string fallback = Path.Combine(GetCoversDirectory(), fileName);
             return File.Exists(fallback) ? fallback : "";
+        }
+    }
+}
        

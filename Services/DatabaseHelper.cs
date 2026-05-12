@@ -427,4 +427,50 @@ WHERE Id NOT IN (
 
                     using (var reader = cmd.ExecuteReader())
                     {
-                       
+                        while (reader.Read())
+                        {
+                            string columnName = reader.GetString(1);
+                            if (columnName == "SourceType") hasSourceTypeColumn = true;
+                            if (columnName == "Author") hasAuthorColumn = true;
+                            if (columnName == "OriginalWork") hasOriginalWorkColumn = true;
+                        }
+                    }
+
+                    System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Works table has SourceType column: {hasSourceTypeColumn}");
+
+                    if (!hasSourceTypeColumn)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding SourceType column to Works table...");
+                        using (var cmdAdd = new SQLiteCommand("ALTER TABLE Works ADD COLUMN SourceType TEXT", conn))
+                        {
+                            cmdAdd.ExecuteNonQuery();
+                        }
+                        System.Diagnostics.Debug.WriteLine("[DatabaseHelper] SourceType column added successfully!");
+                    }
+
+                    if (!hasAuthorColumn)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding Author column to Works table...");
+                        using (var cmdAdd = new SQLiteCommand("ALTER TABLE Works ADD COLUMN Author TEXT", conn))
+                        {
+                            cmdAdd.ExecuteNonQuery();
+                        }
+                    }
+
+                    if (!hasOriginalWorkColumn)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding OriginalWork column to Works table...");
+                        using (var cmdAdd = new SQLiteCommand("ALTER TABLE Works ADD COLUMN OriginalWork TEXT", conn))
+                        {
+                            cmdAdd.ExecuteNonQuery();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] MigrateWorksTable error: {ex.Message}");
+            }
+        }
+    }
+}

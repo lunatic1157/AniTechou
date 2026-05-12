@@ -186,4 +186,11 @@
 
             <Button Content="保存设置"
                     Width="120"
-          
+                    Height="40"
+                    Style="{StaticResource AppPrimaryButtonStyle}"
+                    Click="Save_Click"
+                    HorizontalAlignment="Center"
+                    Margin="0,30,0,20"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

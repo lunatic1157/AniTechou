@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Web;
+using AniTechou.Services;
 
 namespace AniTechou.Services.SearchProviders
 {
@@ -50,14 +51,19 @@ namespace AniTechou.Services.SearchProviders
 
                 System.Diagnostics.Debug.WriteLine($"[BangumiSearch] 搜索: {url}");
 
-                var response = await _httpClient.GetAsync(url);
-                if (!response.IsSuccessStatusCode)
+                var json = await RetryHelper.RetryAsync(async () =>
                 {
-                    System.Diagnostics.Debug.WriteLine($"[BangumiSearch] HTTP {response.StatusCode}");
-                    return results;
-                }
+                    var response = await _httpClient.GetAsync(url);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[BangumiSearch] HTTP {response.StatusCode}");
+                        return null;
+                    }
+                    return await response.Content.ReadAsStringAsync();
+                }, "Bangumi搜索");
 
-                var json = await response.Content.ReadAsStringAsync();
+                if (json == null) return results;
+
                 using var doc = JsonDocument.Parse(json);
 
                 if (!doc.RootElement.TryGetProperty("list", out var list))
@@ -92,11 +98,15 @@ namespace AniTechou.Services.SearchProviders
                 string url = $"https://api.bgm.tv/v0/subjects/{externalId}";
                 System.Diagnostics.Debug.WriteLine($"[BangumiSearch] 获取详情: {url}");
 
-                var response = await _httpClient.GetAsync(url);
-                if (!response.IsSuccessStatusCode)
-                    return null;
+                var json = await RetryHelper.RetryAsync(async () =>
+                {
+                    var response = await _httpClient.GetAsync(url);
+                    if (!response.IsSuccessStatusCode) return null;
+                    return await response.Content.ReadAsStringAsync();
+                }, "Bangumi详情");
 
-                var json = await response.Content.ReadAsStringAsync();
+                if (json == null) return null;
+
                 using var doc = JsonDocument.Parse(json);
                 return ParseBangumiV0Subject(doc.RootElement);
             }

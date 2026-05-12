@@ -17,8 +17,9 @@ namespace AniTechou.Services.SearchProviders
         {
             _providers = new List<ISearchProvider>
             {
-                new BangumiSearchProvider()
-                // 后续可添加: new AniListSearchProvider(), new MALSearchProvider()
+                new BangumiSearchProvider(),
+                new MALSearchProvider(),
+                new AniListSearchProvider()
             };
         }
 
