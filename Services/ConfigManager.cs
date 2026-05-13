@@ -14,8 +14,6 @@ namespace AniTechou.Services
         public string LastAccount { get; set; } = "";
         public string CustomSystemPrompt { get; set; } = "";
         public string BangumiUsername { get; set; } = "";
-        public string BilibiliUid { get; set; } = "";
-        public string BilibiliCookie { get; set; } = "";
         public bool EnableWebSearch { get; set; } = false; // ⚠️ 会增加 10-60 秒延迟，默认关闭
         public bool EnableBangumiSearch { get; set; } = true;
         public bool EnableMALSearch { get; set; } = false;

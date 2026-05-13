@@ -92,8 +92,6 @@ namespace AniTechou.Views
             MALSearchBox.IsChecked = config.EnableMALSearch;
             AniListSearchBox.IsChecked = config.EnableAniListSearch;
             BangumiUserBox.Text = config.BangumiUsername ?? "";
-            BilibiliUidBox.Text = config.BilibiliUid ?? "";
-            BilibiliCookieBox.Text = config.BilibiliCookie ?? "";
         }
 
         private void Platform_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -382,8 +380,6 @@ namespace AniTechou.Views
                 config.EnableMALSearch = MALSearchBox.IsChecked ?? false;
                 config.EnableAniListSearch = AniListSearchBox.IsChecked ?? false;
                 config.BangumiUsername = BangumiUserBox.Text.Trim();
-                config.BilibiliUid = BilibiliUidBox.Text.Trim();
-                config.BilibiliCookie = BilibiliCookieBox.Text.Trim();
 
                 ConfigManager.Save(config);
 
@@ -439,31 +435,5 @@ namespace AniTechou.Views
             }
         }
 
-        private async void SyncBilibili_Click(object sender, RoutedEventArgs e)
-        {
-            string uid = BilibiliUidBox.Text.Trim();
-            if (string.IsNullOrEmpty(uid))
-            {
-                SyncStatusText.Text = "请输入 B站 UID";
-                return;
-            }
-            SyncStatusText.Text = "正在从 B站 同步...";
-            var service = new SyncService(_accountName);
-            string cookie = BilibiliCookieBox.Text.Trim();
-            var result = await service.SyncFromBilibiliAsync(uid, cookie);
-            if (result.Success)
-            {
-                string detailSummary = result.Details.Count > 0
-                    ? "\n" + string.Join("\n", result.Details.Take(10))
-                    : "";
-                if (result.Details.Count > 10)
-                    detailSummary += $"\n... 等 {result.Details.Count} 项变更";
-                SyncStatusText.Text = $"✅ B站同步完成\n更新 {result.UpdatedWorks} | 跳过 {result.SkippedWorks} | 未匹配 {result.Unmatched}{detailSummary}";
-            }
-            else
-            {
-                SyncStatusText.Text = $"❌ {result.ErrorMessage}";
-            }
-        }
     }
 }
