@@ -265,12 +265,23 @@ namespace AniTechou.Services
 
             try
             {
+                // 从 Cookie 提取 bili_jct 作为 CSRF token
+                string csrf = "";
+                if (!string.IsNullOrEmpty(cookie))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(cookie,
+                        @"bili_jct=([^;]+)");
+                    if (match.Success) csrf = match.Groups[1].Value;
+                }
+
                 var allItems = new List<BilibiliBangumiItem>();
                 int pn = 1;
 
                 while (true)
                 {
                     string url = $"https://api.bilibili.com/x/space/bangumi/follow/list?vmid={uid}&type=1&pn={pn}&ps=50";
+                    if (!string.IsNullOrEmpty(csrf))
+                        url += $"&csrf={csrf}";
                     System.Diagnostics.Debug.WriteLine($"[SyncService] B站 请求: {url}");
 
                     var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -279,12 +290,12 @@ namespace AniTechou.Services
                     if (!string.IsNullOrEmpty(cookie))
                     {
                         request.Headers.TryAddWithoutValidation("Cookie", cookie);
-                        System.Diagnostics.Debug.WriteLine($"[SyncService] B站 使用自定义Cookie(长度={cookie.Length})");
+                        System.Diagnostics.Debug.WriteLine($"[SyncService] B站 Cookie长度={cookie.Length} csrf={csrf?.Substring(0, Math.Min(6, csrf?.Length ?? 0))}...");
                     }
                     else
                     {
                         request.Headers.TryAddWithoutValidation("Cookie", "buvid3=anonymous;");
-                        System.Diagnostics.Debug.WriteLine("[SyncService] B站 无Cookie，使用匿名");
+                        System.Diagnostics.Debug.WriteLine("[SyncService] B站 无Cookie");
                     }
                     var response = await _http.SendAsync(request);
                     if (!response.IsSuccessStatusCode)
