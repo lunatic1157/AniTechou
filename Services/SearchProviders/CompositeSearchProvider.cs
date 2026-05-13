@@ -15,7 +15,7 @@ namespace AniTechou.Services.SearchProviders
 
         // 简单内存缓存：key → (results, expireTime)
         private static readonly Dictionary<string, (List<ExternalSearchResult> results, DateTime expireAt)> _cache = new();
-        private static readonly TimeSpan CacheTTL = TimeSpan.FromMinutes(3);
+        private static readonly TimeSpan CacheTTL = TimeSpan.FromMinutes(1);
 
         public CompositeSearchProvider(
             bool enableBangumi = true,

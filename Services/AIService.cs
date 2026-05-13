@@ -181,23 +181,30 @@ namespace AniTechou.Services
         {
             if (string.IsNullOrWhiteSpace(message)) return message;
 
-            // 去掉口语/问句部分，保留核心名词
+            // 去掉所有口语/问句/语气词，只留内容词
             string[] stopWords = {
-                "有什么", "有没有", "能不能", "可以", "帮我", "我想",
-                "好看的", "值得看", "推荐几部", "推荐一些", "介绍",
-                "哪些", "怎么", "为什么", "是什么", "意思是",
-                "告诉我", "想了解", "想知道", "请", "一下",
-                "吗", "呢", "啊", "吧", "了", "的", "哈"
+                "有什么", "有没有", "能不能", "可以", "帮我", "我想", "我想要",
+                "好看的", "值得看", "推荐几部", "推荐一些", "介绍", "给我",
+                "哪些", "怎么", "为什么", "是什么", "意思是", "请问",
+                "告诉我", "想了解", "想知道", "请", "一下", "一些",
+                "推荐", "搜索", "看看", "想要",
+                "吗", "呢", "啊", "吧", "了", "的", "哈", "哦",
+                "这", "那", "个", "部", "些", "和", "与", "或",
+                "年", "中", "里", "上", "下", "前", "后"
             };
 
             string result = message;
             foreach (var w in stopWords)
                 result = result.Replace(w, " ");
 
-            // 合并多余空格
+            // 去掉标点
+            result = result.Replace("《", " ").Replace("》", " ")
+                           .Replace("？", " ").Replace("！", " ")
+                           .Replace("，", " ").Replace("。", " ");
+
+            // 合并空格
             result = System.Text.RegularExpressions.Regex.Replace(result, @"\s+", " ").Trim();
 
-            // 如果清理后太短，用原句
             return result.Length >= 2 ? result : message;
         }
 
