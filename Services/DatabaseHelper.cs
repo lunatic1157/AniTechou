@@ -285,6 +285,9 @@ namespace AniTechou.Services
                     MigrateWorkRelationsTable(conn);
 
                     MigrateWorkTagsTable(conn);
+
+                    // 检查并迁移 UserList 表日期列
+                    MigrateUserListTable(conn);
                 }
             }
             catch (Exception ex)
@@ -450,6 +453,42 @@ WHERE Id NOT IN (
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] MigrateNotesTable error: {ex.Message}");
+            }
+        }
+
+        private static void MigrateUserListTable(SQLiteConnection conn)
+        {
+            try
+            {
+                string checkSql = "PRAGMA table_info(UserList)";
+                using (var cmd = new SQLiteCommand(checkSql, conn))
+                {
+                    bool hasStartedDate = false, hasFinishedDate = false;
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string name = reader.GetString(1);
+                            if (name == "StartedDate") hasStartedDate = true;
+                            if (name == "FinishedDate") hasFinishedDate = true;
+                        }
+                    }
+
+                    if (!hasStartedDate)
+                    {
+                        using var add = new SQLiteCommand("ALTER TABLE UserList ADD COLUMN StartedDate DATETIME", conn);
+                        add.ExecuteNonQuery();
+                    }
+                    if (!hasFinishedDate)
+                    {
+                        using var add = new SQLiteCommand("ALTER TABLE UserList ADD COLUMN FinishedDate DATETIME", conn);
+                        add.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] MigrateUserListTable: {ex.Message}");
             }
         }
 
