@@ -138,20 +138,35 @@ namespace AniTechou.Services
 
             foreach (var item in items)
             {
-                // 优先用 Bangumi ID 匹配
+                string searchName = item.NameCn ?? item.Name;
+                System.Diagnostics.Debug.WriteLine($"[SyncService] Bangumi 匹配: {searchName} (id={item.SubjectId})");
+
+                // 1) 按 BangumiId 精确匹配
                 var match = allWorks.FirstOrDefault(w =>
                     !string.IsNullOrEmpty(w.BangumiId) && w.BangumiId == item.SubjectId.ToString());
-                // 退而求其次按标题匹配
-                if (match == null)
+                // 2) 中文名精确
+                if (match == null && !string.IsNullOrEmpty(item.NameCn))
                     match = allWorks.FirstOrDefault(w =>
-                        !string.IsNullOrEmpty(w.Title) && w.Title == item.NameCn)
+                        !string.IsNullOrEmpty(w.Title) && w.Title == item.NameCn);
+                // 3) 日文名精确
+                if (match == null && !string.IsNullOrEmpty(item.Name))
+                    match = allWorks.FirstOrDefault(w =>
+                        !string.IsNullOrEmpty(w.Title) && w.Title == item.Name)
                         ?? allWorks.FirstOrDefault(w =>
-                        !string.IsNullOrEmpty(w.Title) && w.Title == item.Name);
+                        !string.IsNullOrEmpty(w.OriginalTitle) && w.OriginalTitle == item.Name);
+                // 4) 模糊：中文名包含关系
+                if (match == null && !string.IsNullOrEmpty(item.NameCn) && item.NameCn.Length >= 3)
+                    match = allWorks.FirstOrDefault(w =>
+                        !string.IsNullOrEmpty(w.Title) && (w.Title.Contains(item.NameCn) || item.NameCn.Contains(w.Title)));
+                // 5) 模糊：日文名包含关系
+                if (match == null && !string.IsNullOrEmpty(item.Name) && item.Name.Length >= 3)
+                    match = allWorks.FirstOrDefault(w =>
+                        !string.IsNullOrEmpty(w.Title) && (w.Title.Contains(item.Name) || item.Name.Contains(w.Title)));
 
                 if (match == null)
                 {
                     result.Unmatched++;
-                    result.Details.Add($"未匹配: {item.NameCn ?? item.Name}");
+                    result.Details.Add($"未匹配: {searchName}");
                     continue;
                 }
 
@@ -230,18 +245,34 @@ namespace AniTechou.Services
                     }
 
                     var json = await response.Content.ReadAsStringAsync();
+                    System.Diagnostics.Debug.WriteLine($"[SyncService] B站 响应前200字: {json?.Substring(0, Math.Min(200, json?.Length ?? 0))}");
                     using var doc = JsonDocument.Parse(json);
 
-                    if (doc.RootElement.TryGetProperty("code", out var code) && code.GetInt32() != 0)
+                    // code 可能是数字 0 或字符串 "0"
+                    int apiCode = 0;
+                    if (doc.RootElement.TryGetProperty("code", out var codeEl))
                     {
-                        string msg = "未知错误";
-                        if (doc.RootElement.TryGetProperty("message", out var msgEl)) msg = msgEl.GetString();
-                        result.ErrorMessage = $"B站 API 错误: {msg}";
+                        if (codeEl.ValueKind == JsonValueKind.Number) apiCode = codeEl.GetInt32();
+                        else if (codeEl.ValueKind == JsonValueKind.String && int.TryParse(codeEl.GetString(), out int c)) apiCode = c;
+                    }
+
+                    if (apiCode != 0)
+                    {
+                        string msg = SafeGetString(doc.RootElement, "message");
+                        result.ErrorMessage = $"B站 API 错误 (code={apiCode}): {msg}";
                         return result;
                     }
 
-                    if (!doc.RootElement.TryGetProperty("data", out var data)) break;
-                    if (!data.TryGetProperty("list", out var list)) break;
+                    if (!doc.RootElement.TryGetProperty("data", out var data))
+                    {
+                        System.Diagnostics.Debug.WriteLine("[SyncService] B站 响应无 data 字段");
+                        break;
+                    }
+                    if (!data.TryGetProperty("list", out var list))
+                    {
+                        System.Diagnostics.Debug.WriteLine("[SyncService] B站 data 无 list 字段");
+                        break;
+                    }
 
                     int count = 0;
                     foreach (var item in list.EnumerateArray())
@@ -286,13 +317,14 @@ namespace AniTechou.Services
 
             foreach (var item in items)
             {
-                // 按标题匹配（B站返回中文标题）
+                System.Diagnostics.Debug.WriteLine($"[SyncService] B站匹配: {item.Title}");
+
+                // 1) 精确标题
                 var match = allWorks.FirstOrDefault(w =>
                     !string.IsNullOrEmpty(w.Title) && w.Title == item.Title)
                     ?? allWorks.FirstOrDefault(w =>
                     !string.IsNullOrEmpty(w.OriginalTitle) && w.OriginalTitle == item.Title);
-
-                // 模糊匹配：B站标题通常包含季节信息如"咒术回战 第二季"
+                // 2) 短标题前缀（去掉" 第二季"之类的后缀）
                 if (match == null && item.Title.Length > 2)
                 {
                     string shortTitle = item.Title.Split(' ', '第', '（', '(').FirstOrDefault() ?? "";
@@ -300,6 +332,10 @@ namespace AniTechou.Services
                         match = allWorks.FirstOrDefault(w =>
                             !string.IsNullOrEmpty(w.Title) && w.Title.StartsWith(shortTitle, StringComparison.OrdinalIgnoreCase));
                 }
+                // 3) 包含关系
+                if (match == null && item.Title.Length >= 3)
+                    match = allWorks.FirstOrDefault(w =>
+                        !string.IsNullOrEmpty(w.Title) && (w.Title.Contains(item.Title) || item.Title.Contains(w.Title)));
 
                 if (match == null)
                 {
@@ -361,8 +397,9 @@ namespace AniTechou.Services
 
         private static int SafeGetInt(JsonElement el, string key)
         {
-            if (el.TryGetProperty(key, out var prop) && prop.ValueKind != JsonValueKind.Null && prop.TryGetInt32(out int v))
-                return v;
+            if (!el.TryGetProperty(key, out var prop) || prop.ValueKind == JsonValueKind.Null) return 0;
+            if (prop.TryGetInt32(out int v)) return v;
+            if (prop.ValueKind == JsonValueKind.String && int.TryParse(prop.GetString(), out int sv)) return sv;
             return 0;
         }
 
