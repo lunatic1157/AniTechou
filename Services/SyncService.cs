@@ -58,29 +58,52 @@ namespace AniTechou.Services
                     System.Diagnostics.Debug.WriteLine($"[SyncService] Bangumi 请求: {url}");
 
                     var response = await _http.GetAsync(url);
+                    var json = await response.Content.ReadAsStringAsync();
+
                     if (!response.IsSuccessStatusCode)
                     {
-                        result.ErrorMessage = $"Bangumi API 返回 {response.StatusCode}，请检查用户名";
+                        System.Diagnostics.Debug.WriteLine($"[SyncService] Bangumi 错误响应: {json?.Substring(0, Math.Min(500, json?.Length ?? 0))}");
+                        result.ErrorMessage = $"Bangumi 返回 {response.StatusCode}：用户名可能不对（应填 bgm.tv/user/ 后面的英文ID）";
                         return result;
                     }
 
-                    var json = await response.Content.ReadAsStringAsync();
                     using var doc = JsonDocument.Parse(json);
 
+                    // Bangumi v0 API: 收藏接口返回 { data: [...], total: N }
+                    if (doc.RootElement.TryGetProperty("total", out var totalEl) && totalEl.GetInt32() == 0)
+                    {
+                        result.ErrorMessage = "Bangumi 账户没有公开收藏，或用户名不存在";
+                        return result;
+                    }
+
                     if (!doc.RootElement.TryGetProperty("data", out var dataArray))
-                        break;
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SyncService] Bangumi 响应结构异常: {json?.Substring(0, Math.Min(300, json?.Length ?? 0))}");
+                        result.ErrorMessage = "Bangumi 返回数据格式异常，请确认用户名是否正确";
+                        return result;
+                    }
 
                     int count = 0;
                     foreach (var item in dataArray.EnumerateArray())
                     {
                         count++;
+                        // subject 可能是对象或数字
+                        int subjectId = 0;
+                        if (item.TryGetProperty("subject", out var subjectEl))
+                        {
+                            if (subjectEl.ValueKind == JsonValueKind.Number)
+                                subjectId = subjectEl.GetInt32();
+                            else if (subjectEl.ValueKind == JsonValueKind.Object)
+                                subjectId = SafeGetInt(subjectEl, "id");
+                        }
+
                         allItems.Add(new BangumiCollectionItem
                         {
-                            SubjectId = SafeGetInt(item, "subject_id"),
+                            SubjectId = subjectId,
                             Name = SafeGetString(item, "name"),
                             NameCn = SafeGetString(item, "name_cn"),
-                            Type = SafeGetInt(item, "subject_type") switch { 2 => "Anime", 3 => "Anime", _ => "Anime" },
-                            Status = SafeGetString(item, "type"), // wish/do/collect/on_hold/dropped
+                            Type = "Anime",
+                            Status = SafeGetString(item, "type"),
                             Rate = SafeGetInt(item, "rate"),
                             EpStatus = SafeGetInt(item, "ep_status"),
                             UpdatedAt = SafeGetString(item, "updated_at")
