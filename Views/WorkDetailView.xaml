@@ -130,11 +130,11 @@
 
                         <TextBlock Grid.Column="0" Text="开始：" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                         <DatePicker x:Name="StartedDatePicker" Grid.Column="1" Width="140" Margin="5,0"
-                                    SelectedDateFormat="Short" Style="{StaticResource AppDatePickerStyle}"/>
+                                    SelectedDateFormat="Short"/>
 
                         <TextBlock Grid.Column="2" Text="完成：" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                         <DatePicker x:Name="FinishedDatePicker" Grid.Column="3" Width="140" Margin="5,0"
-                                    SelectedDateFormat="Short" Style="{StaticResource AppDatePickerStyle}"/>
+                                    SelectedDateFormat="Short"/>
                     </Grid>
 
                     <Button Content="更新"
