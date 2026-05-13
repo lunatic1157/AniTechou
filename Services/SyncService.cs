@@ -277,9 +277,15 @@ namespace AniTechou.Services
                     request.Headers.Add("Referer", "https://space.bilibili.com/");
                     request.Headers.Add("Origin", "https://space.bilibili.com");
                     if (!string.IsNullOrEmpty(cookie))
+                    {
                         request.Headers.TryAddWithoutValidation("Cookie", cookie);
+                        System.Diagnostics.Debug.WriteLine($"[SyncService] B站 使用自定义Cookie(长度={cookie.Length})");
+                    }
                     else
+                    {
                         request.Headers.TryAddWithoutValidation("Cookie", "buvid3=anonymous;");
+                        System.Diagnostics.Debug.WriteLine("[SyncService] B站 无Cookie，使用匿名");
+                    }
                     var response = await _http.SendAsync(request);
                     if (!response.IsSuccessStatusCode)
                     {
