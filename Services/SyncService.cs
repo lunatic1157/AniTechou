@@ -180,7 +180,7 @@ namespace AniTechou.Services
                                     detail.Company, detail.Year, detail.Season ?? "",
                                     detail.SourceType ?? "", detail.Episodes ?? "",
                                     "", MapBangumiStatus(item.Status),
-                                    item.Rate > 0 ? item.Rate * 2 : 0,
+                                    item.Rate,
                                     detail.Synopsis ?? "", "", detail.Author ?? "",
                                     detail.OriginalWork ?? "", item.SubjectId.ToString());
 
@@ -213,7 +213,7 @@ namespace AniTechou.Services
                 if (userWork == null) continue;
 
                 string newStatus = MapBangumiStatus(item.Status);
-                int newRating = item.Rate > 0 ? item.Rate * 2 : userWork.Rating;
+                int newRating = item.Rate > 0 ? item.Rate : userWork.Rating; // Bangumi 1-10 直接映射
 
                 bool changed = userWork.Status != newStatus || userWork.Rating != newRating;
                 if (changed)
@@ -391,7 +391,7 @@ namespace AniTechou.Services
                 if (userWork == null) continue;
 
                 string newStatus = MapBilibiliStatus(item.FollowStatus);
-                int newRating = item.Rating > 0 ? item.Rating * 2 : userWork.Rating;
+                int newRating = item.Rating > 0 ? item.Rating : userWork.Rating; // B站评分也是 1-10
                 string newProgress = !string.IsNullOrEmpty(item.Progress) ? item.Progress : userWork.Progress;
 
                 bool changed = userWork.Status != newStatus
