@@ -308,7 +308,8 @@ namespace AniTechou.Services
             string searchContext = "";
             try
             {
-                var searchTask = _searchProvider.SearchAsync(query, null, 10);
+                string kw = ExtractSearchKeywords(query);
+                var searchTask = _searchProvider.SearchAsync(kw, null, 10, skipCache: _enableWebSearch);
                 if (await Task.WhenAny(searchTask, Task.Delay(5000)) == searchTask)
                 {
                     var externalResults = await searchTask;
@@ -397,7 +398,7 @@ namespace AniTechou.Services
             try
             {
                 string searchQuery = !string.IsNullOrEmpty(originalTitle) ? originalTitle : title;
-                var externalResults = await _searchProvider.SearchAsync(searchQuery, type, 3);
+                var externalResults = await _searchProvider.SearchAsync(searchQuery, type, 3, skipCache: _enableWebSearch);
                 if (externalResults.Count > 0)
                 {
                     // 如果找到精确匹配的 Bangumi ID，获取详细信息
@@ -510,7 +511,7 @@ namespace AniTechou.Services
                     // 提取关键词而非整句查询（"2025年有什么值得看的新番"→"2025 新番"）
                     string searchQuery = ExtractSearchKeywords(userMessage);
                     System.Diagnostics.Debug.WriteLine($"[AIService] 搜索关键词: {searchQuery}");
-                    var externalResults = await _searchProvider.SearchAsync(searchQuery, null, 8);
+                    var externalResults = await _searchProvider.SearchAsync(searchQuery, null, 8, skipCache: _enableWebSearch);
                     if (externalResults.Count > 0)
                     {
                         searchContext = CompositeSearchProvider.FormatForLLMPrompt(externalResults);

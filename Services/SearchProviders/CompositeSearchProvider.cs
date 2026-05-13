@@ -42,16 +42,19 @@ namespace AniTechou.Services.SearchProviders
         /// <param name="query">用户搜索词</param>
         /// <param name="typeHint">类型提示 (Anime/Manga/Game/LightNovel)</param>
         /// <param name="maxResults">最大结果数</param>
-        public async Task<List<ExternalSearchResult>> SearchAsync(string query, string typeHint = null, int maxResults = 8)
+        public async Task<List<ExternalSearchResult>> SearchAsync(string query, string typeHint = null, int maxResults = 8, bool skipCache = false)
         {
-            // 缓存命中 → 直接返回
+            // 缓存（可跳过）
             string cacheKey = $"{query}|{typeHint ?? "all"}|{maxResults}";
-            lock (_cache)
+            if (!skipCache)
             {
-                if (_cache.TryGetValue(cacheKey, out var entry) && DateTime.Now < entry.expireAt)
+                lock (_cache)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[CompositeSearch] 缓存命中: {query}");
-                    return entry.results;
+                    if (_cache.TryGetValue(cacheKey, out var entry) && DateTime.Now < entry.expireAt)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[CompositeSearch] 缓存命中: {query}");
+                        return entry.results;
+                    }
                 }
             }
 
