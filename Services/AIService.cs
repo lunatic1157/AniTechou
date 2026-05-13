@@ -170,8 +170,8 @@ namespace AniTechou.Services
         /// </summary>
         private object BuildRequest(List<object> messages)
         {
-            // 限制回复长度，减少延迟
-            const int maxTokens = 2000;
+            // 对话回复可能包含多个作品，需要更多 token
+            const int maxTokens = 4096;
 
             if (!_enableWebSearch)
             {
@@ -502,6 +502,7 @@ namespace AniTechou.Services
                 using var doc = JsonDocument.Parse(json);
                 var resultText = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
 
+                // 剥离可能的 Markdown 代码块
                 int start = resultText.IndexOf("{");
                 int end = resultText.LastIndexOf("}");
                 if (start >= 0 && end >= start)
@@ -516,7 +517,18 @@ namespace AniTechou.Services
                 }
                 catch
                 {
-                    aiResponse = new AIResponse { intent = "GENERAL_CHAT", answer = resultText };
+                    // JSON 解析失败 → 尝试提取 answer 字段
+                    var answerMatch = System.Text.RegularExpressions.Regex.Match(
+                        resultText, @"""answer"":\s*""([^""]*(?:\\.[^""]*)*)""");
+                    if (answerMatch.Success)
+                    {
+                        aiResponse = new AIResponse { intent = "GENERAL_CHAT", answer = answerMatch.Groups[1].Value };
+                    }
+                    else
+                    {
+                        // 实在不行就显示纯净文本（去掉 JSON 特殊字符）
+                        aiResponse = new AIResponse { intent = "GENERAL_CHAT", answer = resultText };
+                    }
                 }
 
                 if (aiResponse != null)

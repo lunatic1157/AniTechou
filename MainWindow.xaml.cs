@@ -1538,7 +1538,6 @@ namespace AniTechou
                     if (s is Button btn && btn.Tag is string q)
                     {
                         AIChatInputBox.Text = q;
-                        SendAIChat_Click(s, e);
                     }
                 };
                 SuggestionChips.Children.Add(chip);
