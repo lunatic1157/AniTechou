@@ -194,7 +194,7 @@ namespace AniTechou.Services
         /// <summary>
         /// 当前数据库 schema 版本号（递增即可）
         /// </summary>
-        private const int CURRENT_DB_VERSION = 1;
+        private const int CURRENT_DB_VERSION = 2;
 
         /// <summary>
         /// 初始化新账号的数据库（如果不存在则创建）
