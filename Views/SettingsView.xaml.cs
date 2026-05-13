@@ -93,6 +93,7 @@ namespace AniTechou.Views
             AniListSearchBox.IsChecked = config.EnableAniListSearch;
             BangumiUserBox.Text = config.BangumiUsername ?? "";
             BilibiliUidBox.Text = config.BilibiliUid ?? "";
+            BilibiliCookieBox.Text = config.BilibiliCookie ?? "";
         }
 
         private void Platform_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -382,6 +383,7 @@ namespace AniTechou.Views
                 config.EnableAniListSearch = AniListSearchBox.IsChecked ?? false;
                 config.BangumiUsername = BangumiUserBox.Text.Trim();
                 config.BilibiliUid = BilibiliUidBox.Text.Trim();
+                config.BilibiliCookie = BilibiliCookieBox.Text.Trim();
 
                 ConfigManager.Save(config);
 
@@ -447,7 +449,8 @@ namespace AniTechou.Views
             }
             SyncStatusText.Text = "正在从 B站 同步...";
             var service = new SyncService(_accountName);
-            var result = await service.SyncFromBilibiliAsync(uid);
+            string cookie = BilibiliCookieBox.Text.Trim();
+            var result = await service.SyncFromBilibiliAsync(uid, cookie);
             if (result.Success)
             {
                 string detailSummary = result.Details.Count > 0

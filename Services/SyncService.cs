@@ -119,7 +119,7 @@ namespace AniTechou.Services
 
                 System.Diagnostics.Debug.WriteLine($"[SyncService] Bangumi 获取 {allItems.Count} 条收藏");
 
-                result = ApplyBangumiResults(allItems);
+                result = await ApplyBangumiResultsAsync(allItems);
                 result.Success = true;
             }
             catch (Exception ex)
@@ -130,7 +130,7 @@ namespace AniTechou.Services
             return result;
         }
 
-        private SyncResult ApplyBangumiResults(List<BangumiCollectionItem> items)
+        private async Task<SyncResult> ApplyBangumiResultsAsync(List<BangumiCollectionItem> items)
         {
             var result = new SyncResult();
             var workService = new WorkService(_accountName);
@@ -165,6 +165,45 @@ namespace AniTechou.Services
 
                 if (match == null)
                 {
+                    // 没匹配到 → 自动从 Bangumi 导入作品详情，再设置状态
+                    if (item.SubjectId > 0)
+                    {
+                        try
+                        {
+                            var bgmProvider = new SearchProviders.BangumiSearchProvider();
+                            var detail = await bgmProvider.GetByIdAsync(item.SubjectId.ToString());
+                            if (detail != null)
+                            {
+                                string displayTitle = item.NameCn ?? detail.Title;
+                                int newId = workService.AddWork(
+                                    displayTitle, detail.OriginalTitle, detail.Type,
+                                    detail.Company, detail.Year, detail.Season ?? "",
+                                    detail.SourceType ?? "", detail.Episodes ?? "",
+                                    "", MapBangumiStatus(item.Status),
+                                    item.Rate > 0 ? item.Rate * 2 : 0,
+                                    detail.Synopsis ?? "", "", detail.Author ?? "",
+                                    detail.OriginalWork ?? "", item.SubjectId.ToString());
+
+                                if (newId > 0)
+                                {
+                                    // 下载封面
+                                    if (!string.IsNullOrEmpty(detail.CoverUrl))
+                                        _ = workService.DownloadAndSaveCoverAsync(
+                                            string.IsNullOrEmpty(detail.BangumiId) ? detail.CoverUrl
+                                            : $"bgm_id:{detail.BangumiId}|{detail.CoverUrl}", newId);
+
+                                    result.NewWorks++;
+                                    result.Details.Add($"新增: {displayTitle} → {MapStatusDisplay(MapBangumiStatus(item.Status))}");
+                                    continue;
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[SyncService] 自动导入失败 {searchName}: {ex.Message}");
+                        }
+                    }
+
                     result.Unmatched++;
                     result.Details.Add($"未匹配: {searchName}");
                     continue;
@@ -174,13 +213,12 @@ namespace AniTechou.Services
                 if (userWork == null) continue;
 
                 string newStatus = MapBangumiStatus(item.Status);
-                int newRating = item.Rate > 0 ? item.Rate * 2 : userWork.Rating; // Bangumi 1-10 → 2-10
+                int newRating = item.Rate > 0 ? item.Rate * 2 : userWork.Rating;
 
                 bool changed = userWork.Status != newStatus || userWork.Rating != newRating;
                 if (changed)
                 {
                     workService.UpdateUserWork(userWork.Id, newStatus, userWork.Progress, newRating);
-                    // 有 BangumiId 就更新到作品
                     if (string.IsNullOrEmpty(match.BangumiId) && item.SubjectId > 0)
                         workService.UpdateWorkBangumiId(match.Id, item.SubjectId.ToString());
                     result.UpdatedWorks++;
@@ -216,7 +254,7 @@ namespace AniTechou.Services
 
         // === Bilibili ===
 
-        public async Task<SyncResult> SyncFromBilibiliAsync(string uid)
+        public async Task<SyncResult> SyncFromBilibiliAsync(string uid, string cookie = "")
         {
             var result = new SyncResult();
             if (string.IsNullOrWhiteSpace(uid))
@@ -238,7 +276,10 @@ namespace AniTechou.Services
                     var request = new HttpRequestMessage(HttpMethod.Get, url);
                     request.Headers.Add("Referer", "https://space.bilibili.com/");
                     request.Headers.Add("Origin", "https://space.bilibili.com");
-                    request.Headers.TryAddWithoutValidation("Cookie", "buvid3=anonymous;");
+                    if (!string.IsNullOrEmpty(cookie))
+                        request.Headers.TryAddWithoutValidation("Cookie", cookie);
+                    else
+                        request.Headers.TryAddWithoutValidation("Cookie", "buvid3=anonymous;");
                     var response = await _http.SendAsync(request);
                     if (!response.IsSuccessStatusCode)
                     {
