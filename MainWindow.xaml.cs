@@ -204,49 +204,56 @@ namespace AniTechou
                 {
                     conn.Open();
                     
-                    // 1. 统计基本覆盖率
+                    // 统计覆盖率（6 个字段）
                     string statsSql = @"
-                        SELECT 
-                            count(*) as total, 
-                            SUM(CASE WHEN CoverPath IS NOT NULL AND CoverPath != '' THEN 1 ELSE 0 END) as with_cover,
-                            SUM(CASE WHEN Season IS NOT NULL AND Season != '' THEN 1 ELSE 0 END) as with_season,
-                            SUM(CASE WHEN Synopsis IS NOT NULL AND Synopsis != '' THEN 1 ELSE 0 END) as with_synopsis
+                        SELECT count(*) as total,
+                            SUM(CASE WHEN CoverPath IS NOT NULL AND CoverPath != '' THEN 1 ELSE 0 END) as w_cover,
+                            SUM(CASE WHEN Season IS NOT NULL AND Season != '' THEN 1 ELSE 0 END) as w_season,
+                            SUM(CASE WHEN Synopsis IS NOT NULL AND Synopsis != '' THEN 1 ELSE 0 END) as w_synopsis,
+                            SUM(CASE WHEN Author IS NOT NULL AND Author != '' THEN 1 ELSE 0 END) as w_author,
+                            SUM(CASE WHEN OriginalWork IS NOT NULL AND OriginalWork != '' THEN 1 ELSE 0 END) as w_orig,
+                            SUM(CASE WHEN Company IS NOT NULL AND Company != '' THEN 1 ELSE 0 END) as w_company
                         FROM Works;";
-                    
+
                     using (var cmd = new System.Data.SQLite.SQLiteCommand(statsSql, conn))
                     using (var reader = cmd.ExecuteReader())
                     {
                         if (reader.Read())
                         {
                             int total = Convert.ToInt32(reader["total"]);
-                            int withCover = Convert.ToInt32(reader["with_cover"]);
-                            int withSeason = Convert.ToInt32(reader["with_season"]);
-                            int withSynopsis = Convert.ToInt32(reader["with_synopsis"]);
-                            
-                            string report = $"📊 深度核查报告：\n" +
-                                           $"------------------\n" +
-                                           $"总作品数：{total}\n" +
-                                           $"🖼️ 封面覆盖：{withCover} ({ (total>0?withCover*100/total:0) }%)\n" +
-                                           $"📅 季度信息：{withSeason} ({ (total>0?withSeason*100/total:0) }%)\n" +
-                                           $"📝 简介补全：{withSynopsis} ({ (total>0?withSynopsis*100/total:0) }%)";
-                            
+                            int cover = Convert.ToInt32(reader["w_cover"]);
+                            int season = Convert.ToInt32(reader["w_season"]);
+                            int synopsis = Convert.ToInt32(reader["w_synopsis"]);
+                            int author = Convert.ToInt32(reader["w_author"]);
+                            int orig = Convert.ToInt32(reader["w_orig"]);
+                            int company = Convert.ToInt32(reader["w_company"]);
+                            int Pct(int n) => total > 0 ? n * 100 / total : 0;
+
+                            string report = $"📊 核查（共 {total} 部）\n" +
+                                $"🖼️封面 {cover}/{total} ({Pct(cover)}%)  📅季度 {season}/{total} ({Pct(season)}%)\n" +
+                                $"📝简介 {synopsis}/{total} ({Pct(synopsis)}%)  🏢公司 {company}/{total} ({Pct(company)}%)\n" +
+                                $"✍️作者 {author}/{total} ({Pct(author)}%)  📖原作 {orig}/{total} ({Pct(orig)}%)";
+
                             AddMessageToChat(report, false);
 
-                            if (withCover < total)
+                            if (cover < total)
                             {
                                 var fixBtn = new Button
                                 {
-                                    Content = $"🖼️ 一键补全 {total - withCover} 个缺失封面（直接查Bangumi，秒级）",
-                                    Height = 36,
-                                    FontSize = 12,
-                                    Padding = new Thickness(14, 0, 14, 0),
-                                    Margin = new Thickness(0, 8, 0, 0),
+                                    Content = $"🖼️ 补全 {total - cover} 个封面",
+                                    Height = 32,
+                                    FontSize = 11,
+                                    Padding = new Thickness(10, 0, 10, 0),
+                                    Margin = new Thickness(0, 8, 0, 4),
                                     Cursor = System.Windows.Input.Cursors.Hand
                                 };
                                 fixBtn.Style = (Style)FindResource("AppPrimaryButtonStyle");
                                 fixBtn.Click += async (s, e) => await BatchUpdateMissingCovers();
                                 ChatMessagesPanel.Children.Add(fixBtn);
                             }
+
+                            if (total > 0 && (synopsis < total || author < total || orig < total || company < total || season < total))
+                                AddMessageToChat("💡 试试对AI说「补全所有作品信息」来补简介/作者/原作/公司", false);
                         }
                     }
                 }

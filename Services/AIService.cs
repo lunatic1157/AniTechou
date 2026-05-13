@@ -65,8 +65,10 @@ namespace AniTechou.Services
 
 === 规则 ===
 1. 只返回 JSON，不要 Markdown 标记。
-2. 实时数据优先于训练知识。用户用简称（""马娘""）时，title 用正式全称（《赛马娘》）。
-3. works 条目含 15 个字段（无信息则 """"）：title, originalTitle, type, year, season, company, author, originalWork, sourceType, episodes, synopsis, coverUrl, bangumiId, tags, voiceActorInfo
+2. 🔴 上方实时数据中的标题/类型/封面/原作/声优都是真实数据，你必须原样采用。用户说的名字可能不准，你必须以实时数据为准。
+3. 🔴 coverUrl 必须用实时数据中的 bgm_id 格式。禁止自编 URL。
+4. 🔴 不知道的不编造，实时数据为空时在 answer 中说未找到。
+5. works 条目含 15 个字段（无信息则 """"）（无信息则 """"）：title, originalTitle, type, year, season, company, author, originalWork, sourceType, episodes, synopsis, coverUrl, bangumiId, tags, voiceActorInfo
    - author: 漫画/轻小说作者；originalWork: 改编作品的原著作者；coverUrl: 优先 ""bgm_id:{{id}}|{{url}}"" 格式
    - sourceType: 原创/漫改/小说改/游戏改/其他；season: 春/夏/秋/冬
    - voiceActorInfo: ""角色名(CV:声优名)""；tags: 3-8 个，优先导演/编剧/声优/风格
@@ -271,7 +273,7 @@ namespace AniTechou.Services
             string searchContext = "";
             try
             {
-                var searchTask = _searchProvider.SearchAsync(query, null, 5);
+                var searchTask = _searchProvider.SearchAsync(query, null, 10);
                 if (await Task.WhenAny(searchTask, Task.Delay(5000)) == searchTask)
                 {
                     var externalResults = await searchTask;
