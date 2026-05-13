@@ -104,10 +104,10 @@ namespace AniTechou.Services
                         double minR = 0, maxR = 10;
                         switch (rating)
                         {
-                            case "一般 (1-4)": minR = 1; maxR = 3.9; break;
-                            case "还行 (5-6)": minR = 5; maxR = 6.9; break;
-                            case "佳作 (7-8)": minR = 7; maxR = 8.9; break;
-                            case "神作 (9-10)": minR = 9; maxR = 10; break;
+                            case "一般 (1-4)": minR = 10; maxR = 39; break;
+                            case "还行 (5-6)": minR = 50; maxR = 69; break;
+                            case "佳作 (7-8)": minR = 70; maxR = 89; break;
+                            case "神作 (9-10)": minR = 90; maxR = 100; break;
                         }
                         sql += " AND ul.Rating >= @MinRating AND ul.Rating <= @MaxRating";
                         parameters.Add(new SQLiteParameter("@MinRating", minR));
@@ -529,7 +529,7 @@ namespace AniTechou.Services
                 string sql = "UPDATE UserList SET Rating = @Rating, LastUpdated = @Now WHERE WorkId = @WorkId";
                 using (var cmd = new SQLiteCommand(sql, conn))
                 {
-                    cmd.Parameters.Add("@Rating", System.Data.DbType.Double).Value = rating > 0 ? (object)rating : DBNull.Value;
+                    cmd.Parameters.Add("@Rating", System.Data.DbType.Double).Value = rating > 0 ? (object)(int)(rating*10) : DBNull.Value;
                     cmd.Parameters.AddWithValue("@Now", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                     cmd.Parameters.AddWithValue("@WorkId", workId);
                     return cmd.ExecuteNonQuery() > 0;
@@ -764,10 +764,10 @@ namespace AniTechou.Services
         /// <summary>
         /// 获取评分显示
         /// </summary>
-        private static string GetRatingDisplay(double rating)
+        private static string GetRatingDisplay(double rawRating)
         {
-            if (rating <= 0) return "-";
-            return rating.ToString("F1");
+            double r = rawRating / 10.0; if (r <= 0) return "-";
+            return r.ToString("F1");
         }
 
         /// <summary>
@@ -895,7 +895,7 @@ namespace AniTechou.Services
                                 cmd.Parameters.AddWithValue("@Status", status);
                                 cmd.Parameters.AddWithValue("@Progress", progress ?? "");
                                 // Rating 为 0 时存入 NULL（现有数据库约束是 1-10）
-                                cmd.Parameters.Add("@Rating", System.Data.DbType.Double).Value = rating > 0 ? (object)rating : DBNull.Value;
+                                cmd.Parameters.Add("@Rating", System.Data.DbType.Double).Value = rating > 0 ? (object)(int)(rating*10) : DBNull.Value;
                                 cmd.Parameters.AddWithValue("@StartedDate", string.IsNullOrEmpty(startedDate) ? DBNull.Value : startedDate);
                                 cmd.Parameters.AddWithValue("@FinishedDate", string.IsNullOrEmpty(finishedDate) ? DBNull.Value : finishedDate);
                                 cmd.Parameters.AddWithValue("@LastUpdated", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -979,7 +979,7 @@ namespace AniTechou.Services
                                 WorkId = SafeGetInt(reader, 1),
                                 Status = SafeGetString(reader, 2),
                                 Progress = SafeGetString(reader, 3),
-                                Rating = SafeGetDouble(reader, 4),
+                                Rating = SafeGetDouble(reader, 4) / 10.0,
                                 StartedDate = SafeGetString(reader, 5),
                                 FinishedDate = SafeGetString(reader, 6)
                             };
@@ -1013,7 +1013,7 @@ namespace AniTechou.Services
                         cmd.Parameters.AddWithValue("@Status", status);
                         cmd.Parameters.AddWithValue("@Progress", progress);
                         System.Diagnostics.Debug.WriteLine($"[Rating] UpdateUserWork 存储: rating={rating}");
-                        cmd.Parameters.Add("@Rating", System.Data.DbType.Double).Value = rating > 0 ? (object)rating : DBNull.Value;
+                        cmd.Parameters.Add("@Rating", System.Data.DbType.Double).Value = rating > 0 ? (object)(int)(rating*10) : DBNull.Value;
                         cmd.Parameters.AddWithValue("@StartedDate", string.IsNullOrEmpty(startedDate) ? DBNull.Value : startedDate);
                         cmd.Parameters.AddWithValue("@FinishedDate", string.IsNullOrEmpty(finishedDate) ? DBNull.Value : finishedDate);
                         cmd.Parameters.AddWithValue("@LastUpdated", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));

@@ -105,7 +105,7 @@ namespace AniTechou.Services
                             WorkId INTEGER NOT NULL,
                             Status TEXT CHECK(Status IN ('wish','doing','done')) DEFAULT 'wish',
                             Progress TEXT,
-                            Rating INTEGER CHECK(Rating BETWEEN 0 AND 10),
+                            Rating INTEGER,  -- ×10 存 (7.7→77)
                             StartedDate DATETIME,
                             FinishedDate DATETIME,
                             LastUpdated DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -194,7 +194,7 @@ namespace AniTechou.Services
         /// <summary>
         /// 当前数据库 schema 版本号（递增即可）
         /// </summary>
-        private const int CURRENT_DB_VERSION = 2;
+        private const int CURRENT_DB_VERSION = 3;
 
         /// <summary>
         /// 初始化新账号的数据库（如果不存在则创建）
@@ -483,6 +483,30 @@ WHERE Id NOT IN (
                     {
                         using var add = new SQLiteCommand("ALTER TABLE UserList ADD COLUMN FinishedDate DATETIME", conn);
                         add.ExecuteNonQuery();
+                    }
+                }
+
+                // 移除旧 Rating CHECK(BETWEEN 0 AND 10) 约束，允许 ×10 值(0-100)
+                string schemaSql = "SELECT sql FROM sqlite_master WHERE type='table' AND name='UserList'";
+                using (var scmd = new SQLiteCommand(schemaSql, conn))
+                {
+                    var schema = scmd.ExecuteScalar() as string;
+                    if (schema != null && (schema.Contains("BETWEEN 0 AND 10") || schema.Contains("Rating BETWEEN")))
+                    {
+                        using var tx = conn.BeginTransaction();
+                        new SQLiteCommand("CREATE TABLE UserList_tmp (" +
+                            "Id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                            "WorkId INTEGER NOT NULL," +
+                            "Status TEXT CHECK(Status IN ('wish','doing','done')) DEFAULT 'wish'," +
+                            "Progress TEXT," +
+                            "Rating INTEGER," +
+                            "StartedDate DATETIME," +
+                            "FinishedDate DATETIME," +
+                            "LastUpdated DATETIME DEFAULT CURRENT_TIMESTAMP)", conn).ExecuteNonQuery();
+                        new SQLiteCommand("INSERT INTO UserList_tmp SELECT * FROM UserList", conn).ExecuteNonQuery();
+                        new SQLiteCommand("DROP TABLE UserList", conn).ExecuteNonQuery();
+                        new SQLiteCommand("ALTER TABLE UserList_tmp RENAME TO UserList", conn).ExecuteNonQuery();
+                        tx.Commit();
                     }
                 }
             }
