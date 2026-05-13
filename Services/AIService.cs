@@ -55,75 +55,40 @@ namespace AniTechou.Services
 
         public static string GetDefaultSystemPrompt()
         {
-            return $@"你是 AniTechou 的 AI 助手，一个 ACGN 作品管理工具的智能核心。
-当前日期：{DateTime.Now:yyyy-MM-dd}
+            return $@"你是 AniTechou 的 AI 助手，帮助管理 ACGN 作品。当前日期：{DateTime.Now:yyyy-MM-dd}
 
-用户的个人作品列表（已收藏）：
+用户的收藏列表：
 {{USER_COLLECTION_CONTEXT}}
 
-实时搜索数据（来自 Bangumi/MAL/AniList API）：
+实时搜索数据（Bangumi/MAL/AniList）：
 {{SEARCH_CONTEXT}}
 
-=== 核心规则 ===
-1. **严格 JSON**：你的回复必须是可解析的 JSON，不能包含 Markdown 代码块标记。
-2. **数据优先**：如果上方有「实时搜索数据」，其中包含标题、类型、年份、原作、声优等真实信息，你必须优先使用。只在实时数据为空时才用训练知识。
-3. **别名匹配**：用户可能用简称（如""马娘""、""小圆""），请在 title 字段使用正式全称（如《赛马娘》《魔法少女小圆》），便于系统去重。
+=== 规则 ===
+1. 只返回 JSON，不要 Markdown 标记。
+2. 实时数据优先于训练知识。用户用简称（""马娘""）时，title 用正式全称（《赛马娘》）。
+3. works 条目含 15 个字段（无信息则 """"）：title, originalTitle, type, year, season, company, author, originalWork, sourceType, episodes, synopsis, coverUrl, bangumiId, tags, voiceActorInfo
+   - author: 漫画/轻小说作者；originalWork: 改编作品的原著作者；coverUrl: 优先 ""bgm_id:{{id}}|{{url}}"" 格式
+   - sourceType: 原创/漫改/小说改/游戏改/其他；season: 春/夏/秋/冬
+   - voiceActorInfo: ""角色名(CV:声优名)""；tags: 3-8 个，优先导演/编剧/声优/风格
 
-=== 意图识别 ===
-根据用户输入，选择以下意图之一：
+=== 意图 ===
+- WORK_SEARCH: 搜索/推荐作品 → 返回 works 数组
+- WORK_UPDATE:
+  · 定向: 用户指定作品名 → title 填该名，updates 只改用户提到的字段
+  · 全量: ""完善所有作品"" → isBatchUpdate=true
+  · 标签: ""A改成B"" → action:""TAG_UNIFY"", targetTag+newTag
+- WORK_DELETE: 删除作品
+- NOTE_CREATE/SEARCH/UPDATE: 笔记操作
+- GENERAL_CHAT: 闲聊
 
-**WORK_SEARCH** — 用户想搜索/推荐/了解作品
-- 关键词：推荐、搜索、找、有没有、什么动漫、介绍、看看等
-- 在 works 数组中返回作品，每个作品尽可能填满所有字段
+🔴 更新时只改用户提到的字段，不要覆盖其他信息！
 
-**WORK_UPDATE** — 用户想更新已有作品的信息
-- ⚠️ 关键区分：
-  a) **定向更新**：用户指定了作品名（如""更新咒术回战的原作信息""）→ title 填该作品名，updates 只包含用户提到的字段。**不要**在 updates 里加用户没要求的字段！
-  b) **全量更新**：用户说""完善我的所有作品""/""补全所有番剧信息"" → isBatchUpdate=true，updates 填入要补全的字段
-  c) **标签统一**：用户说""把标签A改成B"" → action:""TAG_UNIFY"", targetTag=旧标签, newTag=新标签
-  如果是全量更新某一系列，title 写出系列名（如""物语系列""）
-
-**WORK_DELETE** — 用户想删除作品
-
-**NOTE_CREATE / NOTE_SEARCH / NOTE_UPDATE** — 笔记相关操作
-
-**GENERAL_CHAT** — 闲聊等非作品操作
-
-=== 字段规范 ===
-每个 works 条目必须包含（无信息则空字符串）：
-`title`, `originalTitle`, `type`, `year`, `season`, `company`, `author`, `originalWork`,
-`sourceType`, `episodes`, `synopsis`, `coverUrl`, `bangumiId`, `tags`, `voiceActorInfo`
-
-- **author**：漫画/轻小说填漫画家/作者；动画如有原作信息也填
-- **originalWork**：改编作品的原作名称（如""《电锯人》原作：藤本树""则填""藤本树""），原创动画留空
-- **sourceType**：原创/漫改/小说改/游戏改/其他/无
-- **season**：春/夏/秋/冬
-- **coverUrl**：优先用实时数据中的 Bangumi ID，格式 ""bgm_id:{{id}}|{{url}}""
-- **voiceActorInfo**：格式 ""角色名(CV:声优名)""，仅在用户问声优时填写
-- **tags**：3-8 个标签，优先提取导演/编剧/声优/制作公司/题材风格
-
-=== updateInfo 规范（仅 WORK_UPDATE 时需要）===
-- `title`：要更新的作品名（定向更新必填，全量更新可选）
-- `isBatchUpdate`：true=更新所有作品，false=只更新 title 指定的作品
-- `updates`：键值对，只包含用户要求修改的字段。可选键名：
-  synopsis, company, author, originalWork, sourceType, season, episodes, coverUrl, bangumiId
-- `action`：""TAG_UNIFY"" 用于标签统一操作
-- 🔴 **重要**：如果用户没有明确要求更新某个字段，不要在 updates 里加它！不要把用户不关心的信息覆盖进去。
-
-=== 返回 JSON 示例 ===
-{{
-  ""intent"": ""WORK_SEARCH"",
-  ""answer"": ""根据 Bangumi 数据，为你找到以下作品："",
-  ""works"": [{{
-    ""title"": ""葬送的芙莉莲"", ""originalTitle"": ""葬送のフリーレン"", ""type"": ""Anime"",
-    ""year"": ""2023"", ""season"": ""秋"", ""company"": ""MADHOUSE"", ""author"": """",
-    ""originalWork"": ""山田钟人"", ""sourceType"": ""漫改"", ""episodes"": ""28"",
-    ""synopsis"": ""勇者一行击败魔王后的故事..."", ""coverUrl"": ""bgm_id:364291|https://..."",
-    ""bangumiId"": ""364291"", ""tags"": [""治愈"", ""奇幻"", ""导演:斋藤圭一郎""],
-    ""voiceActorInfo"": ""芙莉莲(CV:种崎敦美)、菲伦(CV:市之濑加那)""
-  }}],
-  ""updateInfo"": null
-}}";
+示例：{{ ""intent"":""WORK_SEARCH"", ""answer"":""找到以下作品"", ""works"":[{{
+  ""title"":""葬送的芙莉莲"", ""originalTitle"":""葬送のフリーレン"", ""type"":""Anime"",
+  ""year"":""2023"", ""season"":""秋"", ""company"":""MADHOUSE"", ""author"":"""", ""originalWork"":""山田钟人"",
+  ""sourceType"":""漫改"", ""episodes"":""28"", ""synopsis"":"""", ""coverUrl"":""bgm_id:364291|"",
+  ""bangumiId"":""364291"", ""tags"":[""治愈"",""奇幻""], ""voiceActorInfo"":""""
+  }}], ""updateInfo"":null }}";
         }
 
         /// <summary>
@@ -205,6 +170,9 @@ namespace AniTechou.Services
         /// </summary>
         private object BuildRequest(List<object> messages)
         {
+            // 限制回复长度，减少延迟
+            const int maxTokens = 2000;
+
             if (!_enableWebSearch)
             {
                 return new
@@ -212,7 +180,8 @@ namespace AniTechou.Services
                     model = _model,
                     messages = messages,
                     temperature = 0.3,
-                    response_format = new { type = "json_object" }
+                    response_format = new { type = "json_object" },
+                    max_tokens = maxTokens
                 };
             }
 
@@ -226,6 +195,7 @@ namespace AniTechou.Services
                     messages = messages,
                     temperature = 0.3,
                     response_format = new { type = "json_object" },
+                    max_tokens = maxTokens,
                     enable_search = true
                 };
             }
@@ -240,6 +210,7 @@ namespace AniTechou.Services
                     messages = messages,
                     temperature = 0.3,
                     response_format = new { type = "json_object" },
+                    max_tokens = maxTokens,
                     tools = new[]
                     {
                         new
@@ -261,6 +232,7 @@ namespace AniTechou.Services
                     messages = messages,
                     temperature = 0.3,
                     response_format = new { type = "json_object" },
+                    max_tokens = maxTokens,
                     tools = new[]
                     {
                         new
@@ -280,6 +252,7 @@ namespace AniTechou.Services
                 messages = messages,
                 temperature = 0.3,
                 response_format = new { type = "json_object" },
+                max_tokens = maxTokens,
                 enable_search = true
             };
         }
@@ -294,12 +267,20 @@ namespace AniTechou.Services
         /// </summary>
         public async Task<List<AIWorkSearchResult>> BatchSearchWorks(string query)
         {
-            // === 第1层改进：预搜索真实 ACGN 数据库 ===
+            // === 第1层改进：预搜索真实 ACGN 数据库（5 秒超时，慢则跳过） ===
             string searchContext = "";
             try
             {
-                var externalResults = await _searchProvider.SearchAsync(query, null, 8);
-                searchContext = CompositeSearchProvider.FormatForLLMPrompt(externalResults);
+                var searchTask = _searchProvider.SearchAsync(query, null, 5);
+                if (await Task.WhenAny(searchTask, Task.Delay(5000)) == searchTask)
+                {
+                    var externalResults = await searchTask;
+                    searchContext = CompositeSearchProvider.FormatForLLMPrompt(externalResults);
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("[AIService] 外部搜索超时(5s)，降级为纯 LLM");
+                }
             }
             catch (Exception ex)
             {
@@ -340,7 +321,8 @@ namespace AniTechou.Services
                         new { role = "system", content = "你是一个ACGN专家，必须返回JSON格式的数据。如果提供了实时搜索数据，必须优先使用其中的真实作品信息。" },
                         new { role = "user", content = prompt }
                     },
-                    temperature = 0.7
+                    temperature = 0.7,
+                    max_tokens = 2000
                 };
 
                 var json = await PostToLLMAsync(request);
@@ -438,7 +420,8 @@ namespace AniTechou.Services
                         new { role = "system", content = "你是一个ACGN专家，必须返回纯JSON格式。优先使用实时数据中的真实信息。" },
                         new { role = "user", content = prompt }
                     },
-                    temperature = 0.3
+                    temperature = 0.3,
+                    max_tokens = 2000
                 };
 
                 var json = await PostToLLMAsync(request);
