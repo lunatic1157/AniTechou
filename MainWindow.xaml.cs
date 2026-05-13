@@ -266,20 +266,20 @@ namespace AniTechou
 
         private async Task BatchUpdateMissingCovers()
         {
-            AddMessageToChat("🔄 正在扫描缺失封面的作品...", false);
+            AddMessageToChat("🔄 正在扫描缺失封面/BangumiId的作品...", false);
             try
             {
                 var workService = new WorkService(_currentAccountName);
                 var allWorks = workService.GetAllWorksForSearch();
-                var missing = allWorks.Where(w => string.IsNullOrEmpty(w.CoverPath)).ToList();
+                var missing = allWorks.Where(w => string.IsNullOrEmpty(w.CoverPath) || string.IsNullOrEmpty(w.BangumiId)).ToList();
 
                 if (missing.Count == 0)
                 {
-                    AddMessageToChat("✅ 所有作品都有封面，无需补全！", false);
+                    AddMessageToChat("✅ 所有作品都有封面和 Bangumi 链接！", false);
                     return;
                 }
 
-                AddMessageToChat($"📋 找到 {missing.Count} 个缺失封面，开始逐个搜索...", false);
+                AddMessageToChat($"📋 找到 {missing.Count} 个需补全（封面/BangumiId），开始搜索...", false);
 
                 var searchProvider = new Services.SearchProviders.BangumiSearchProvider();
                 int updated = 0;
@@ -289,7 +289,6 @@ namespace AniTechou
                     {
                         var results = await searchProvider.SearchAsync(w.Title, w.Type);
                         var match = results.FirstOrDefault();
-                        // 精确匹配失败时尝试短关键词
                         if (match == null && w.Title.Length > 4)
                         {
                             string shortQuery = w.Title.Split(' ', '：', ':', '（', '(')[0];
@@ -299,16 +298,22 @@ namespace AniTechou
                                 match = results.FirstOrDefault();
                             }
                         }
-                        if (match != null && !string.IsNullOrEmpty(match.CoverUrl))
+                        if (match != null)
                         {
-                            string coverInfo = !string.IsNullOrEmpty(match.BangumiId)
-                                ? $"bgm_id:{match.BangumiId}|{match.CoverUrl}"
-                                : match.CoverUrl;
-                            var localPath = await workService.DownloadAndSaveCoverAsync(coverInfo, w.Id);
-                            if (!string.IsNullOrEmpty(localPath))
+                            // 存 BangumiId
+                            if (!string.IsNullOrEmpty(match.BangumiId) && string.IsNullOrEmpty(w.BangumiId))
                             {
+                                workService.UpdateWorkBangumiId(w.Id, match.BangumiId);
                                 updated++;
-                                System.Diagnostics.Debug.WriteLine($"[BatchCover] {w.Title} 封面更新成功");
+                            }
+                            // 下载封面
+                            if (!string.IsNullOrEmpty(match.CoverUrl) && string.IsNullOrEmpty(w.CoverPath))
+                            {
+                                string coverInfo = !string.IsNullOrEmpty(match.BangumiId)
+                                    ? $"bgm_id:{match.BangumiId}|{match.CoverUrl}"
+                                    : match.CoverUrl;
+                                var localPath = await workService.DownloadAndSaveCoverAsync(coverInfo, w.Id);
+                                if (!string.IsNullOrEmpty(localPath)) updated++;
                             }
                         }
                         // Bangumi API 限速：每次请求间隔 1s

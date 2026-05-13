@@ -200,6 +200,28 @@ namespace AniTechou.Views
                                 System.Diagnostics.Debug.WriteLine($"[AIBatchAdd] 封面下载失败: {ex.Message}");
                             }
                         }
+                        // 自动从 Bangumi 获取热门标签
+                        if (!string.IsNullOrEmpty(work.BangumiId))
+                        {
+                            try
+                            {
+                                var bgmProvider = new Services.SearchProviders.BangumiSearchProvider();
+                                var detail = await bgmProvider.GetByIdAsync(work.BangumiId);
+                                if (detail != null && detail.Tags.Count > 0)
+                                {
+                                    var topTags = detail.Tags.Take(6);
+                                    foreach (var tag in NormalizeTags(topTags.ToList()))
+                                    {
+                                        if (!string.IsNullOrWhiteSpace(tag))
+                                            workService.AddWorkTag(workId, tag, "Bangumi");
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[AIBatchAdd] 自动标签失败: {ex.Message}");
+                            }
+                        }
                     }
                 }
 
