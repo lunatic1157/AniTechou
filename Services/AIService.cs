@@ -36,8 +36,8 @@ namespace AniTechou.Services
             _model = model ?? config.Model;
             _enableWebSearch = config.EnableWebSearch;
 
-            // 联网搜索需要更长时间（LLM 需先搜索网络再生成回复）
-            double timeoutSec = config.EnableWebSearch ? 60 : 30;
+            // 联网搜索需要更长时间但不多重试，免得用户等半天
+            double timeoutSec = config.EnableWebSearch ? 90 : 30;
             _httpClient = new HttpClient
             {
                 Timeout = TimeSpan.FromSeconds(timeoutSec)
@@ -149,9 +149,9 @@ namespace AniTechou.Services
         }
 
         /// <summary>
-        /// 带重试的 LLM API 调用（仅对网络瞬时错误重试，4xx/5xx 不重试）
+        /// 带重试的 LLM API 调用
         /// </summary>
-        private async Task<string> PostToLLMAsync(object request)
+        private async Task<string> PostToLLMAsync(object request, int maxRetries = 2)
         {
             return await RetryHelper.RetryAsync(async () =>
             {
@@ -161,7 +161,7 @@ namespace AniTechou.Services
                     "application/json");
                 var response = await _httpClient.PostAsync($"{_apiUrl}/chat/completions", content);
                 return await response.Content.ReadAsStringAsync();
-            }, "LLM API");
+            }, "LLM API", maxRetries);
         }
 
         /// <summary>
@@ -495,7 +495,9 @@ namespace AniTechou.Services
                 // === 第3层改进：平台自适应联网搜索 ===
                 var request = BuildRequest(messages);
 
-                var json = await PostToLLMAsync(request);
+                // 联网搜索不重试：每次调用成本高，重试只会让用户等更久
+                int retries = _enableWebSearch ? 0 : 2;
+                var json = await PostToLLMAsync(request, retries);
 
                 using var doc = JsonDocument.Parse(json);
                 var resultText = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
@@ -528,7 +530,11 @@ namespace AniTechou.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"SmartChat异常: {ex.Message}");
-                return new AIResponse { intent = "GENERAL_CHAT", answer = "抱歉，出了点问题，请稍后再试。" };
+                bool isTimeout = ex is TaskCanceledException || ex.InnerException is TaskCanceledException;
+                string hint = isTimeout && _enableWebSearch
+                    ? "\n\n💡 联网搜索超时了，试试在设置里关掉「AI 联网搜索」，速度会快很多。"
+                    : "";
+                return new AIResponse { intent = "GENERAL_CHAT", answer = $"抱歉，出了点问题，请稍后再试。{hint}" };
             }
         }
     }

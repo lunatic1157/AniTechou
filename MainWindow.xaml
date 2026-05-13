@@ -273,6 +273,8 @@
                         Background="{DynamicResource Surface2Brush}"
                         Padding="10">
                     <StackPanel>
+                        <!-- 快捷提问 -->
+                        <WrapPanel x:Name="SuggestionChips" Margin="0,0,0,8"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>

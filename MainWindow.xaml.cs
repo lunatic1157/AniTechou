@@ -1502,6 +1502,47 @@ namespace AniTechou
             ContentPlaceholder.Visibility = Visibility.Collapsed;
             MainContentArea.Visibility = Visibility.Visible;
             SetSidebarSelectionByTag("all");
+            SetupSuggestionChips();
+        }
+
+        private void SetupSuggestionChips()
+        {
+            if (SuggestionChips == null) return;
+            SuggestionChips.Children.Clear();
+
+            var suggestions = new[]
+            {
+                ("🔍 推荐", "推荐几部好看的治愈番"),
+                ("📋 补全", "帮我补全作品的原作信息"),
+                ("🏷️ 标签", "给我库里的京阿尼作品加上制作公司标签"),
+                ("🆕 2025", "2025年有什么值得看的新番"),
+                ("🎬 热梗", "帮我找一部主角会时间回溯的动画"),
+                ("📝 声优", "花泽香菜配过哪些知名角色"),
+            };
+
+            foreach (var (label, question) in suggestions)
+            {
+                var chip = new Button
+                {
+                    Content = label,
+                    Height = 28,
+                    FontSize = 12,
+                    Margin = new Thickness(0, 0, 6, 4),
+                    Padding = new Thickness(10, 0, 10, 0),
+                    Cursor = System.Windows.Input.Cursors.Hand,
+                    Tag = question
+                };
+                chip.Style = (Style)FindResource("AppGhostButtonStyle");
+                chip.Click += (s, e) =>
+                {
+                    if (s is Button btn && btn.Tag is string q)
+                    {
+                        AIChatInputBox.Text = q;
+                        SendAIChat_Click(s, e);
+                    }
+                };
+                SuggestionChips.Children.Add(chip);
+            }
         }
 
         // 显示添加作品选择界面
