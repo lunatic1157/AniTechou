@@ -195,7 +195,9 @@ namespace AniTechou.Services
                     string url = $"https://api.bilibili.com/x/space/bangumi/follow/list?vmid={uid}&type=1&pn={pn}&ps=50";
                     System.Diagnostics.Debug.WriteLine($"[SyncService] B站 请求: {url}");
 
-                    var response = await _http.GetAsync(url);
+                    var request = new HttpRequestMessage(HttpMethod.Get, url);
+                    request.Headers.Add("Referer", "https://space.bilibili.com/");
+                    var response = await _http.SendAsync(request);
                     if (!response.IsSuccessStatusCode)
                     {
                         result.ErrorMessage = $"B站 API 返回 {response.StatusCode}，UID 可能设有隐私";
