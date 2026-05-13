@@ -140,7 +140,7 @@ namespace AniTechou.Views
                 
                 // 设置评分 (1-10 数字)
                 double ratingVal = userWork.Rating;
-                RatingBox.Text = ratingVal > 0 ? (ratingVal % 1 == 0 ? ((int)ratingVal).ToString() : ratingVal.ToString("F1")) : "";
+                RatingBox.Text = ratingVal > 0 ? ratingVal.ToString("F1") : "";
 
                 // 设置开始/完成日期
                 if (DateTime.TryParse(userWork.StartedDate, out var started))

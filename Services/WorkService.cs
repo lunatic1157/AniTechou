@@ -767,7 +767,6 @@ namespace AniTechou.Services
         private static string GetRatingDisplay(double rating)
         {
             if (rating <= 0) return "-";
-            if (rating == (int)rating) return ((int)rating).ToString();
             return rating.ToString("F1");
         }
 
