@@ -44,8 +44,9 @@
             <Setter Property="Margin" Value="0,0,0,8"/>
             <Setter Property="HorizontalAlignment" Value="Right"/>
             <Setter Property="MaxWidth" Value="280"/>
+            <Setter Property="TextElement.Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
-        
+
         <Style x:Key="AIMessageStyle" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Surface3Brush}"/>
             <Setter Property="CornerRadius" Value="12"/>
@@ -53,6 +54,7 @@
             <Setter Property="Margin" Value="0,0,0,8"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="MaxWidth" Value="280"/>
+            <Setter Property="TextElement.Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
     </Window.Resources>
 
