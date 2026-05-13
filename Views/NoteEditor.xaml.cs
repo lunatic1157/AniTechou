@@ -442,11 +442,12 @@ namespace AniTechou.Views
 
         private string GetRichTextContent()
         {
-            // MD 模式：先把 Markdown 转成 FlowDocument 再存为 XAML
+            // MD 模式：把 Markdown 转成 FlowDocument 再存 XAML
             if (_isMarkdownMode && !string.IsNullOrEmpty(MarkdownEditor.Text))
             {
                 ConvertMarkdownToRich(MarkdownEditor.Text);
-                // 不切换回 RichEditor（用户还在 MD 模式），只更新内部 Document
+                // 更新原件为 MD 转换后的内容
+                _originalXaml = XamlWriter.Save(RichEditor.Document);
             }
             if (IsDocumentEffectivelyEmpty()) return "";
             try
@@ -603,31 +604,45 @@ namespace AniTechou.Views
 
         // === Markdown 模式 ===
         private bool _isMarkdownMode = false;
-        private string _markdownCache = "";
-        private bool _convertingContent = false; // 防止 TextChanged 循环
+        private string _originalXaml = ""; // 进入 MD 前的原始 XAML，切回来时恢复
+        private bool _convertingContent = false;
 
         private void MarkdownToggle_Checked(object sender, RoutedEventArgs e)
         {
+            // 保存当前富文本原件
+            _originalXaml = XamlWriter.Save(RichEditor.Document);
             _isMarkdownMode = true;
-            // 富文本 → Markdown
-            _markdownCache = ConvertRichToMarkdown();
-            MarkdownEditor.Text = _markdownCache;
+            // 生成 MD 文本
+            string mdText = ConvertRichToMarkdown();
+            MarkdownEditor.Text = mdText;
             RichEditor.Visibility = Visibility.Collapsed;
             MarkdownEditor.Visibility = Visibility.Visible;
-            // 隐藏富文本工具栏按钮
-            DisableRichToolbar(true);
         }
 
         private void MarkdownToggle_Unchecked(object sender, RoutedEventArgs e)
         {
             _isMarkdownMode = false;
-            // Markdown → 富文本
-            string mdText = MarkdownEditor.Text ?? "";
-            if (!string.IsNullOrEmpty(mdText))
-                ConvertMarkdownToRich(mdText);
             MarkdownEditor.Visibility = Visibility.Collapsed;
             RichEditor.Visibility = Visibility.Visible;
-            DisableRichToolbar(false);
+            // 恢复原件——即使 MD 里改了东西也不丢，用户必须保存才能写入
+            if (!string.IsNullOrEmpty(_originalXaml))
+            {
+                try
+                {
+                    var restored = (FlowDocument)XamlReader.Parse(_originalXaml);
+                    RichEditor.Document = restored;
+                }
+                catch
+                {
+                    // XAML 恢复失败则用 MD 内容重建
+                    if (!string.IsNullOrEmpty(MarkdownEditor.Text))
+                        ConvertMarkdownToRich(MarkdownEditor.Text);
+                }
+            }
+            else if (!string.IsNullOrEmpty(MarkdownEditor.Text))
+            {
+                ConvertMarkdownToRich(MarkdownEditor.Text);
+            }
         }
 
         private void MarkdownEditor_TextChanged(object sender, TextChangedEventArgs e)
@@ -638,7 +653,6 @@ namespace AniTechou.Views
 
         private void DisableRichToolbar(bool disabled)
         {
-            // MD 模式下禁用富文本工具栏，只保留 MarkdownToggle
             MarkdownToggle.IsEnabled = true;
         }
 
