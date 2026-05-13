@@ -170,6 +170,50 @@
                 </StackPanel>
             </Border>
 
+            <Border Style="{StaticResource AppSectionCardStyle}" Padding="24" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="🔄 同步追番数据" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="从 Bangumi / B站 同步收藏状态到本地"
+                               FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,12"/>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Bangumi 用户名" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13"/>
+                        <TextBox x:Name="BangumiUserBox" Grid.Column="1" Height="36" Margin="8,0"
+                                 Style="{StaticResource AppTextBoxStyle}"
+                                 ToolTip="例如: yourname（不是邮箱，是个人页 URL 里的用户名）"/>
+                        <Button Grid.Column="2" Content="同步" Width="64" Height="36"
+                                Style="{StaticResource AppPrimaryButtonStyle}"
+                                Click="SyncBangumi_Click"/>
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="B站 UID" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13"/>
+                        <TextBox x:Name="BilibiliUidBox" Grid.Column="1" Height="36" Margin="8,0"
+                                 Style="{StaticResource AppTextBoxStyle}"
+                                 ToolTip="在 B站个人空间 URL 里可以找到，是一串数字"/>
+                        <Button Grid.Column="2" Content="同步" Width="64" Height="36"
+                                Style="{StaticResource AppPrimaryButtonStyle}"
+                                Click="SyncBilibili_Click"/>
+                    </Grid>
+
+                    <TextBlock x:Name="SyncStatusText" FontSize="11"
+                               Foreground="{DynamicResource TextMutedBrush}" Margin="0,10,0,0"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
             <Border Style="{StaticResource AppSectionCardStyle}" Padding="24">
                 <StackPanel>
                     <TextBlock Text="ℹ️ 关于" Style="{StaticResource SectionTitleStyle}"/>

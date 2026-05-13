@@ -309,9 +309,9 @@ namespace AniTechou.Services
             using (var conn = DatabaseHelper.GetConnection(_currentAccount))
             {
                 conn.Open();
-                string sql = @"SELECT w.Id, w.Title, w.OriginalTitle, w.Year, w.Company, w.CoverPath, ul.Progress, ul.Rating, w.Author, w.Type 
-                               FROM Works w 
-                               INNER JOIN UserList ul ON w.Id = ul.WorkId 
+                string sql = @"SELECT w.Id, w.Title, w.OriginalTitle, w.Year, w.Company, w.CoverPath, ul.Progress, ul.Rating, w.Author, w.Type, w.BangumiId
+                               FROM Works w
+                               INNER JOIN UserList ul ON w.Id = ul.WorkId
                                ORDER BY w.Title";
                 using (var cmd = new SQLiteCommand(sql, conn))
                 {
@@ -331,6 +331,7 @@ namespace AniTechou.Services
                                 Type = SafeGetString(reader, 9),
                                 Info = $"{SafeGetString(reader, 3)} · {displayMaker}",
                                 CoverPath = SafeGetString(reader, 5),
+                                BangumiId = SafeGetString(reader, 10),
                                 ProgressValue = ParseProgressToValue(SafeGetString(reader, 6)),
                                 ProgressText = SafeGetString(reader, 6) ?? "未开始",
                                 RatingDisplay = GetRatingDisplay(SafeGetInt(reader, 7))
@@ -478,6 +479,7 @@ namespace AniTechou.Services
                                 Type = SafeGetString(reader, 9),
                                 Info = $"{SafeGetString(reader, 3)} · {displayMaker}",
                                 CoverPath = SafeGetString(reader, 5),
+                                BangumiId = "",
                                 ProgressValue = ParseProgressToValue(SafeGetString(reader, 6)),
                                 ProgressText = SafeGetString(reader, 6) ?? "未开始",
                                 RatingDisplay = GetRatingDisplay(SafeGetInt(reader, 7))
@@ -818,6 +820,7 @@ namespace AniTechou.Services
             public string Type { get; set; } = "";
             public string Info { get; set; } = "";
             public string CoverPath { get; set; } = "";
+            public string BangumiId { get; set; } = "";
             public double ProgressValue { get; set; }
             public string ProgressText { get; set; } = "";
             public string RatingDisplay { get; set; } = "";

@@ -91,6 +91,8 @@ namespace AniTechou.Views
             BangumiSearchBox.IsChecked = config.EnableBangumiSearch;
             MALSearchBox.IsChecked = config.EnableMALSearch;
             AniListSearchBox.IsChecked = config.EnableAniListSearch;
+            BangumiUserBox.Text = config.BangumiUsername ?? "";
+            BilibiliUidBox.Text = config.BilibiliUid ?? "";
         }
 
         private void Platform_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -378,6 +380,8 @@ namespace AniTechou.Views
                 config.EnableBangumiSearch = BangumiSearchBox.IsChecked ?? true;
                 config.EnableMALSearch = MALSearchBox.IsChecked ?? false;
                 config.EnableAniListSearch = AniListSearchBox.IsChecked ?? false;
+                config.BangumiUsername = BangumiUserBox.Text.Trim();
+                config.BilibiliUid = BilibiliUidBox.Text.Trim();
 
                 ConfigManager.Save(config);
 
@@ -404,6 +408,58 @@ namespace AniTechou.Views
             catch (Exception ex)
             {
                 Windows.AppMessageDialog.Show(Application.Current.MainWindow, "错误", $"保存失败：{ex.Message}");
+            }
+        }
+
+        private async void SyncBangumi_Click(object sender, RoutedEventArgs e)
+        {
+            string username = BangumiUserBox.Text.Trim();
+            if (string.IsNullOrEmpty(username))
+            {
+                SyncStatusText.Text = "请输入 Bangumi 用户名";
+                return;
+            }
+            SyncStatusText.Text = "正在从 Bangumi 同步...";
+            var service = new SyncService(_accountName);
+            var result = await service.SyncFromBangumiAsync(username);
+            if (result.Success)
+            {
+                string detailSummary = result.Details.Count > 0
+                    ? "\n" + string.Join("\n", result.Details.Take(10))
+                    : "";
+                if (result.Details.Count > 10)
+                    detailSummary += $"\n... 等 {result.Details.Count} 项变更";
+                SyncStatusText.Text = $"✅ Bangumi 同步完成\n更新 {result.UpdatedWorks} | 跳过 {result.SkippedWorks} | 未匹配 {result.Unmatched}{detailSummary}";
+            }
+            else
+            {
+                SyncStatusText.Text = $"❌ {result.ErrorMessage}";
+            }
+        }
+
+        private async void SyncBilibili_Click(object sender, RoutedEventArgs e)
+        {
+            string uid = BilibiliUidBox.Text.Trim();
+            if (string.IsNullOrEmpty(uid))
+            {
+                SyncStatusText.Text = "请输入 B站 UID";
+                return;
+            }
+            SyncStatusText.Text = "正在从 B站 同步...";
+            var service = new SyncService(_accountName);
+            var result = await service.SyncFromBilibiliAsync(uid);
+            if (result.Success)
+            {
+                string detailSummary = result.Details.Count > 0
+                    ? "\n" + string.Join("\n", result.Details.Take(10))
+                    : "";
+                if (result.Details.Count > 10)
+                    detailSummary += $"\n... 等 {result.Details.Count} 项变更";
+                SyncStatusText.Text = $"✅ B站同步完成\n更新 {result.UpdatedWorks} | 跳过 {result.SkippedWorks} | 未匹配 {result.Unmatched}{detailSummary}";
+            }
+            else
+            {
+                SyncStatusText.Text = $"❌ {result.ErrorMessage}";
             }
         }
     }
