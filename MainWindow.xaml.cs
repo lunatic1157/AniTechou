@@ -289,6 +289,16 @@ namespace AniTechou
                     {
                         var results = await searchProvider.SearchAsync(w.Title, w.Type);
                         var match = results.FirstOrDefault();
+                        // 精确匹配失败时尝试短关键词
+                        if (match == null && w.Title.Length > 4)
+                        {
+                            string shortQuery = w.Title.Split(' ', '：', ':', '（', '(')[0];
+                            if (shortQuery.Length < w.Title.Length)
+                            {
+                                results = await searchProvider.SearchAsync(shortQuery, w.Type);
+                                match = results.FirstOrDefault();
+                            }
+                        }
                         if (match != null && !string.IsNullOrEmpty(match.CoverUrl))
                         {
                             string coverInfo = !string.IsNullOrEmpty(match.BangumiId)

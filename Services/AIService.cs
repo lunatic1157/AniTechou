@@ -166,6 +166,14 @@ namespace AniTechou.Services
             }, "LLM API", maxRetries);
         }
 
+        // API 可能返回 HTML 错误页而非 JSON
+        private static bool IsValidJsonResponse(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return false;
+            string trimmed = json.TrimStart();
+            return trimmed.StartsWith("{");
+        }
+
         /// <summary>
         /// 构建 LLM 请求体，根据平台自适应注入联网搜索参数
         /// 每个分支返回独立匿名类型，确保 JSON 序列化时属性不丢失
@@ -328,6 +336,9 @@ namespace AniTechou.Services
                 };
 
                 var json = await PostToLLMAsync(request);
+
+                if (!IsValidJsonResponse(json))
+                    return new List<AIWorkSearchResult>();
 
                 using var doc = JsonDocument.Parse(json);
                 var resultText = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
@@ -502,6 +513,12 @@ namespace AniTechou.Services
                 // 联网搜索不重试：每次调用成本高，重试只会让用户等更久
                 int retries = _enableWebSearch ? 0 : 2;
                 var json = await PostToLLMAsync(request, retries);
+
+                if (!IsValidJsonResponse(json))
+                {
+                    System.Diagnostics.Debug.WriteLine($"[AIService] API 返回非 JSON: {json?.Substring(0, Math.Min(200, json?.Length ?? 0))}");
+                    return new AIResponse { intent = "GENERAL_CHAT", answer = "服务暂时不可用，请稍后重试。" };
+                }
 
                 using var doc = JsonDocument.Parse(json);
                 var resultText = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
