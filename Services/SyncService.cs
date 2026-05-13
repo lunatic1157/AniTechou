@@ -237,6 +237,8 @@ namespace AniTechou.Services
 
                     var request = new HttpRequestMessage(HttpMethod.Get, url);
                     request.Headers.Add("Referer", "https://space.bilibili.com/");
+                    request.Headers.Add("Origin", "https://space.bilibili.com");
+                    request.Headers.TryAddWithoutValidation("Cookie", "buvid3=anonymous;");
                     var response = await _http.SendAsync(request);
                     if (!response.IsSuccessStatusCode)
                     {
