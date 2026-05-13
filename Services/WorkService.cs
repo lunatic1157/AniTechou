@@ -521,7 +521,7 @@ namespace AniTechou.Services
             }
         }
 
-        public bool UpdateWorkRating(int workId, int rating)
+        public bool UpdateWorkRating(int workId, double rating)
         {
             using (var conn = DatabaseHelper.GetConnection(_currentAccount))
             {
@@ -979,7 +979,7 @@ namespace AniTechou.Services
                                 WorkId = SafeGetInt(reader, 1),
                                 Status = SafeGetString(reader, 2),
                                 Progress = SafeGetString(reader, 3),
-                                Rating = SafeGetInt(reader, 4),
+                                Rating = SafeGetDouble(reader, 4),
                                 StartedDate = SafeGetString(reader, 5),
                                 FinishedDate = SafeGetString(reader, 6)
                             };

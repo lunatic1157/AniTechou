@@ -213,7 +213,7 @@ namespace AniTechou.Services
                 if (userWork == null) continue;
 
                 string newStatus = MapBangumiStatus(item.Status);
-                int newRating = item.Rate > 0 ? item.Rate : userWork.Rating; // Bangumi 1-10 直接映射
+                double newRating = item.Rate > 0 ? item.Rate : userWork.Rating;
 
                 bool changed = userWork.Status != newStatus || userWork.Rating != newRating;
                 if (changed)
