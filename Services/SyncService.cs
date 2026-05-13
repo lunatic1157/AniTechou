@@ -87,22 +87,24 @@ namespace AniTechou.Services
                     foreach (var item in dataArray.EnumerateArray())
                     {
                         count++;
-                        // subject 可能是对象或数字
+                        // Bangumi v0 API: subject 是子对象 { id, name, name_cn, type, ... }
                         int subjectId = 0;
-                        if (item.TryGetProperty("subject", out var subjectEl))
+                        string name = "", nameCn = "", subjectType = "Anime";
+                        if (item.TryGetProperty("subject", out var subjectEl) && subjectEl.ValueKind == JsonValueKind.Object)
                         {
-                            if (subjectEl.ValueKind == JsonValueKind.Number)
-                                subjectId = subjectEl.GetInt32();
-                            else if (subjectEl.ValueKind == JsonValueKind.Object)
-                                subjectId = SafeGetInt(subjectEl, "id");
+                            subjectId = SafeGetInt(subjectEl, "id");
+                            name = SafeGetString(subjectEl, "name");
+                            nameCn = SafeGetString(subjectEl, "name_cn");
+                            int subType = SafeGetInt(subjectEl, "type");
+                            subjectType = subType switch { 2 => "Anime", 3 => "Anime", _ => "Anime" };
                         }
 
                         allItems.Add(new BangumiCollectionItem
                         {
                             SubjectId = subjectId,
-                            Name = SafeGetString(item, "name"),
-                            NameCn = SafeGetString(item, "name_cn"),
-                            Type = "Anime",
+                            Name = name,
+                            NameCn = nameCn,
+                            Type = subjectType,
                             Status = SafeGetString(item, "type"),
                             Rate = SafeGetInt(item, "rate"),
                             EpStatus = SafeGetInt(item, "ep_status"),
