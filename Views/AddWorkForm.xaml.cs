@@ -34,16 +34,7 @@ namespace AniTechou.Views
             StatusBox.ItemsSource = new List<string> { "想看", "在看", "看过" };
             StatusBox.SelectedIndex = 0;
 
-            RatingBox.ItemsSource = new List<string>
-            {
-                "未评分",
-                "★☆☆☆☆ (1-2分)",
-                "★★☆☆☆ (3-4分)",
-                "★★★☆☆ (5-6分)",
-                "★★★★☆ (7-8分)",
-                "★★★★★ (9-10分)"
-            };
-            RatingBox.SelectedIndex = 0;
+            // 评分已是数字文本框
         }
 
         private void TypeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -102,17 +93,9 @@ namespace AniTechou.Views
                     _ => "wish"
                 };
 
-                // 评分转换
-                string ratingText = RatingBox.SelectedItem as string ?? "未评分";
-                int rating = ratingText switch
-                {
-                    "★☆☆☆☆ (1-2分)" => 2,
-                    "★★☆☆☆ (3-4分)" => 4,
-                    "★★★☆☆ (5-6分)" => 6,
-                    "★★★★☆ (7-8分)" => 8,
-                    "★★★★★ (9-10分)" => 10,
-                    _ => 0
-                };
+                // 评分 (1-10)
+                double.TryParse(RatingBox.Text.Trim(), out double rating);
+                if (rating < 0 || rating > 10) rating = 0;
 
                 // 年份季度
                 string year = YearBox.Text.Trim();

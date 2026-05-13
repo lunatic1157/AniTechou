@@ -30,16 +30,7 @@ namespace AniTechou.Views
 
             StatusBox.ItemsSource = new List<string> { "想看", "在看", "看过" };
             StatusBox.SelectedIndex = 0;
-            RatingBox.ItemsSource = new List<string>
-            {
-                "未评分",
-                "★☆☆☆☆ (1-2分)",
-                "★★☆☆☆ (3-4分)",
-                "★★★☆☆ (5-6分)",
-                "★★★★☆ (7-8分)",
-                "★★★★★ (9-10分)"
-            };
-            RatingBox.SelectedIndex = 0;
+            // 评分已是数字文本框
 
             LoadData();
         }
@@ -147,17 +138,9 @@ namespace AniTechou.Views
                 // 设置进度
                 ProgressBox.Text = NormalizeProgressInput(userWork.Progress ?? "");
                 
-                // 设置评分
-                int ratingIndex = userWork.Rating switch
-                {
-                    2 => 1,
-                    4 => 2,
-                    6 => 3,
-                    8 => 4,
-                    10 => 5,
-                    _ => 0
-                };
-                RatingBox.SelectedIndex = ratingIndex;
+                // 设置评分 (1-10 数字)
+                double ratingVal = userWork.Rating;
+                RatingBox.Text = ratingVal > 0 ? (ratingVal % 1 == 0 ? ((int)ratingVal).ToString() : ratingVal.ToString("F1")) : "";
 
                 // 设置开始/完成日期
                 if (DateTime.TryParse(userWork.StartedDate, out var started))
@@ -557,17 +540,10 @@ namespace AniTechou.Views
                     _ => "wish"
                 };
                 
-                // 获取评分
-                string ratingText = RatingBox.SelectedItem as string ?? "未评分";
-                int rating = ratingText switch
-                {
-                    "★☆☆☆☆ (1-2分)" => 2,
-                    "★★☆☆☆ (3-4分)" => 4,
-                    "★★★☆☆ (5-6分)" => 6,
-                    "★★★★☆ (7-8分)" => 8,
-                    "★★★★★ (9-10分)" => 10,
-                    _ => 0
-                };
+                // 获取评分 (1-10)
+                double.TryParse(RatingBox.Text.Trim(), out double rating);
+                if (rating < 0) rating = 0;
+                if (rating > 10) rating = 10;
                 
                 // 进度
                 string progress = NormalizeProgressInput(ProgressBox.Text);

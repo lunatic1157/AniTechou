@@ -116,8 +116,8 @@
                     <ColumnDefinition Width="92"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="评分" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
-                <ComboBox x:Name="RatingBox" Grid.Column="1" Height="40" Width="180" HorizontalAlignment="Left" Style="{StaticResource AppComboBoxStyle}"/>
+                <TextBlock Grid.Column="0" Text="评分 (1-10)" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                <TextBox x:Name="RatingBox" Grid.Column="1" Height="40" Width="80" HorizontalAlignment="Left" Style="{StaticResource AppTextBoxStyle}" Text=""/>
             </Grid>
 
             <Grid Margin="0,10">

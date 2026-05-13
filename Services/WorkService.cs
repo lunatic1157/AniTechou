@@ -101,19 +101,17 @@ namespace AniTechou.Services
                     // 评分筛选
                     if (rating != "全部评分" && !string.IsNullOrEmpty(rating))
                     {
-                        int minRating = rating switch
+                        double minR = 0, maxR = 10;
+                        switch (rating)
                         {
-                            "★ 1-2分" => 1,
-                            "★★ 3-4分" => 3,
-                            "★★★ 5-6分" => 5,
-                            "★★★★ 7-8分" => 7,
-                            "★★★★★ 9-10分" => 9,
-                            _ => 0
-                        };
-                        int maxRating = minRating + 1;
+                            case "一般 (1-4)": minR = 1; maxR = 3.9; break;
+                            case "还行 (5-6)": minR = 5; maxR = 6.9; break;
+                            case "佳作 (7-8)": minR = 7; maxR = 8.9; break;
+                            case "神作 (9-10)": minR = 9; maxR = 10; break;
+                        }
                         sql += " AND ul.Rating >= @MinRating AND ul.Rating <= @MaxRating";
-                        parameters.Add(new SQLiteParameter("@MinRating", minRating));
-                        parameters.Add(new SQLiteParameter("@MaxRating", maxRating));
+                        parameters.Add(new SQLiteParameter("@MinRating", minR));
+                        parameters.Add(new SQLiteParameter("@MaxRating", maxR));
                     }
 
                     // 标签筛选
@@ -153,7 +151,7 @@ namespace AniTechou.Services
                                     CoverPath = SafeGetString(reader, 5),
                                     ProgressValue = ParseProgressToValue(SafeGetString(reader, 6)),
                                     ProgressText = SafeGetString(reader, 6) ?? "未开始",
-                                    RatingDisplay = GetRatingDisplay(SafeGetInt(reader, 7))
+                                    RatingDisplay = GetRatingDisplay(SafeGetDouble(reader, 7))
                                 });
                             }
                         }
@@ -334,7 +332,7 @@ namespace AniTechou.Services
                                 BangumiId = SafeGetString(reader, 10),
                                 ProgressValue = ParseProgressToValue(SafeGetString(reader, 6)),
                                 ProgressText = SafeGetString(reader, 6) ?? "未开始",
-                                RatingDisplay = GetRatingDisplay(SafeGetInt(reader, 7))
+                                RatingDisplay = GetRatingDisplay(SafeGetDouble(reader, 7))
                             });
                         }
                     }
@@ -375,7 +373,7 @@ namespace AniTechou.Services
                                     CoverPath = SafeGetString(reader, 5),
                                     ProgressValue = ParseProgressToValue(SafeGetString(reader, 6)),
                                     ProgressText = SafeGetString(reader, 6) ?? "未开始",
-                                    RatingDisplay = GetRatingDisplay(SafeGetInt(reader, 7))
+                                    RatingDisplay = GetRatingDisplay(SafeGetDouble(reader, 7))
                                 });
                             }
                         }
@@ -482,7 +480,7 @@ namespace AniTechou.Services
                                 BangumiId = "",
                                 ProgressValue = ParseProgressToValue(SafeGetString(reader, 6)),
                                 ProgressText = SafeGetString(reader, 6) ?? "未开始",
-                                RatingDisplay = GetRatingDisplay(SafeGetInt(reader, 7))
+                                RatingDisplay = GetRatingDisplay(SafeGetDouble(reader, 7))
                             });
                         }
                     }
@@ -766,16 +764,11 @@ namespace AniTechou.Services
         /// <summary>
         /// 获取评分显示
         /// </summary>
-        private string GetRatingDisplay(int rating)
+        private static string GetRatingDisplay(double rating)
         {
-            if (rating <= 0) return "未评分";
-
-            int fullStars = rating / 2;
-            string stars = new string('★', fullStars);
-            if (rating % 2 == 1)
-                stars += "½";
-            stars += new string('☆', 5 - fullStars);
-            return stars;
+            if (rating <= 0) return "-";
+            if (rating == (int)rating) return ((int)rating).ToString();
+            return rating.ToString("F1");
         }
 
         /// <summary>
@@ -792,6 +785,14 @@ namespace AniTechou.Services
         /// <summary>
         /// 安全获取整数
         /// </summary>
+        private double SafeGetDouble(SQLiteDataReader reader, int index)
+        {
+            var value = reader.GetValue(index);
+            if (value == null || Convert.IsDBNull(value)) return 0;
+            if (double.TryParse(value.ToString(), out double r)) return r;
+            return 0;
+        }
+
         private int SafeGetInt(SQLiteDataReader reader, int index)
         {
             var value = reader.GetValue(index);
@@ -831,7 +832,7 @@ namespace AniTechou.Services
         /// </summary>
         public int AddWork(string title, string originalTitle, string type, string company,
                    string year, string season, string sourceType, string episodesVolumes, string progress,
-                   string status, int rating, string synopsis, string coverPath, string author = "", string originalWork = "",
+                   string status, double rating, string synopsis, string coverPath, string author = "", string originalWork = "",
                    string bangumiId = "", string malId = "", string anilistId = "", string voiceActorInfo = "",
                    string startedDate = "", string finishedDate = "")
         {
@@ -990,7 +991,7 @@ namespace AniTechou.Services
             return null;
         }
 
-        public void UpdateUserWork(int userListId, string status, string progress, int rating,
+        public void UpdateUserWork(int userListId, string status, string progress, double rating,
             string startedDate = null, string finishedDate = null)
         {
             try

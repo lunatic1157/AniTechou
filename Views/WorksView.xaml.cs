@@ -69,7 +69,7 @@ namespace AniTechou.Views
             SourceTypeFilter.ItemsSource = new List<string> { "全部原作", "原创", "漫改", "小说改", "游戏改", "其他" };
             SourceTypeFilter.SelectedIndex = 0;
 
-            RatingFilter.ItemsSource = new List<string> { "全部评分", "★ 1-2分", "★★ 3-4分", "★★★ 5-6分", "★★★★ 7-8分", "★★★★★ 9-10分" };
+            RatingFilter.ItemsSource = new List<string> { "全部评分", "一般 (1-4)", "还行 (5-6)", "佳作 (7-8)", "神作 (9-10)" };
             RatingFilter.SelectedIndex = 0;
         }
 
