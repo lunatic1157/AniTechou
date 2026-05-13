@@ -529,7 +529,7 @@ namespace AniTechou.Services
                 string sql = "UPDATE UserList SET Rating = @Rating, LastUpdated = @Now WHERE WorkId = @WorkId";
                 using (var cmd = new SQLiteCommand(sql, conn))
                 {
-                    cmd.Parameters.AddWithValue("@Rating", rating > 0 ? rating : DBNull.Value);
+                    cmd.Parameters.Add("@Rating", System.Data.DbType.Double).Value = rating > 0 ? (object)rating : DBNull.Value;
                     cmd.Parameters.AddWithValue("@Now", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                     cmd.Parameters.AddWithValue("@WorkId", workId);
                     return cmd.ExecuteNonQuery() > 0;
@@ -895,7 +895,7 @@ namespace AniTechou.Services
                                 cmd.Parameters.AddWithValue("@Status", status);
                                 cmd.Parameters.AddWithValue("@Progress", progress ?? "");
                                 // Rating 为 0 时存入 NULL（现有数据库约束是 1-10）
-                                cmd.Parameters.AddWithValue("@Rating", rating > 0 ? rating : DBNull.Value);
+                                cmd.Parameters.Add("@Rating", System.Data.DbType.Double).Value = rating > 0 ? (object)rating : DBNull.Value;
                                 cmd.Parameters.AddWithValue("@StartedDate", string.IsNullOrEmpty(startedDate) ? DBNull.Value : startedDate);
                                 cmd.Parameters.AddWithValue("@FinishedDate", string.IsNullOrEmpty(finishedDate) ? DBNull.Value : finishedDate);
                                 cmd.Parameters.AddWithValue("@LastUpdated", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -1012,7 +1012,7 @@ namespace AniTechou.Services
                     {
                         cmd.Parameters.AddWithValue("@Status", status);
                         cmd.Parameters.AddWithValue("@Progress", progress);
-                        cmd.Parameters.AddWithValue("@Rating", rating);
+                        cmd.Parameters.Add("@Rating", System.Data.DbType.Double).Value = rating > 0 ? (object)rating : DBNull.Value;
                         cmd.Parameters.AddWithValue("@StartedDate", string.IsNullOrEmpty(startedDate) ? DBNull.Value : startedDate);
                         cmd.Parameters.AddWithValue("@FinishedDate", string.IsNullOrEmpty(finishedDate) ? DBNull.Value : finishedDate);
                         cmd.Parameters.AddWithValue("@LastUpdated", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
