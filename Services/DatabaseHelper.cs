@@ -194,7 +194,7 @@ namespace AniTechou.Services
         /// <summary>
         /// 当前数据库 schema 版本号（递增即可）
         /// </summary>
-        private const int CURRENT_DB_VERSION = 3;
+        private const int CURRENT_DB_VERSION = 4;
 
         /// <summary>
         /// 初始化新账号的数据库（如果不存在则创建）
@@ -288,6 +288,9 @@ namespace AniTechou.Services
 
                     // 检查并迁移 UserList 表日期列
                     MigrateUserListTable(conn);
+
+                    // v4: 旧 Rating 值 ×10
+                    FixLegacyRatingValues(conn);
                 }
             }
             catch (Exception ex)
@@ -503,7 +506,9 @@ WHERE Id NOT IN (
                             "StartedDate DATETIME," +
                             "FinishedDate DATETIME," +
                             "LastUpdated DATETIME DEFAULT CURRENT_TIMESTAMP)", conn).ExecuteNonQuery();
-                        new SQLiteCommand("INSERT INTO UserList_tmp SELECT Id, WorkId, Status, Progress, Rating * 10, StartedDate, FinishedDate, LastUpdated FROM UserList", conn).ExecuteNonQuery();
+                        new SQLiteCommand("INSERT INTO UserList_tmp SELECT Id, WorkId, Status, Progress, Rating * 10, StartedDate, FinishedDate, LastUpdated FROM UserList WHERE Rating > 0", conn).ExecuteNonQuery();
+                        // 0 分的不动
+                        new SQLiteCommand("INSERT INTO UserList_tmp SELECT Id, WorkId, Status, Progress, Rating, StartedDate, FinishedDate, LastUpdated FROM UserList WHERE Rating IS NULL OR Rating = 0", conn).ExecuteNonQuery();
                         new SQLiteCommand("DROP TABLE UserList", conn).ExecuteNonQuery();
                         new SQLiteCommand("ALTER TABLE UserList_tmp RENAME TO UserList", conn).ExecuteNonQuery();
                         tx.Commit();
@@ -513,6 +518,27 @@ WHERE Id NOT IN (
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] MigrateUserListTable: {ex.Message}");
+            }
+        }
+
+        // v4: 旧评分值（1-10）→ ×10（10-100）
+        private static void FixLegacyRatingValues(SQLiteConnection conn)
+        {
+            try
+            {
+                // 检查是否有未 ×10 的旧值（Rating > 0 AND Rating <= 10）
+                using var check = new SQLiteCommand("SELECT COUNT(1) FROM UserList WHERE Rating > 0 AND Rating <= 10", conn);
+                var count = Convert.ToInt32(check.ExecuteScalar());
+                if (count > 0)
+                {
+                    using var update = new SQLiteCommand("UPDATE UserList SET Rating = Rating * 10 WHERE Rating > 0 AND Rating <= 10", conn);
+                    int rows = update.ExecuteNonQuery();
+                    System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] FixLegacyRating: 修正 {rows} 条旧评分");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] FixLegacyRating: {ex.Message}");
             }
         }
 
