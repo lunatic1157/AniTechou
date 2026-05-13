@@ -503,7 +503,7 @@ WHERE Id NOT IN (
                             "StartedDate DATETIME," +
                             "FinishedDate DATETIME," +
                             "LastUpdated DATETIME DEFAULT CURRENT_TIMESTAMP)", conn).ExecuteNonQuery();
-                        new SQLiteCommand("INSERT INTO UserList_tmp SELECT * FROM UserList", conn).ExecuteNonQuery();
+                        new SQLiteCommand("INSERT INTO UserList_tmp SELECT Id, WorkId, Status, Progress, Rating * 10, StartedDate, FinishedDate, LastUpdated FROM UserList", conn).ExecuteNonQuery();
                         new SQLiteCommand("DROP TABLE UserList", conn).ExecuteNonQuery();
                         new SQLiteCommand("ALTER TABLE UserList_tmp RENAME TO UserList", conn).ExecuteNonQuery();
                         tx.Commit();
