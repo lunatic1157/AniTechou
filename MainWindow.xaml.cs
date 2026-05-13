@@ -234,7 +234,18 @@ namespace AniTechou
 
                             if (withCover < total)
                             {
-                                AddMessageToChat("💡 提示：检测到部分作品缺失封面，你可以对我说“完善所有作品封面”来尝试自动补全。", false);
+                                var fixBtn = new Button
+                                {
+                                    Content = $"🖼️ 一键补全 {total - withCover} 个缺失封面（直接查Bangumi，秒级）",
+                                    Height = 36,
+                                    FontSize = 12,
+                                    Padding = new Thickness(14, 0, 14, 0),
+                                    Margin = new Thickness(0, 8, 0, 0),
+                                    Cursor = System.Windows.Input.Cursors.Hand
+                                };
+                                fixBtn.Style = (Style)FindResource("AppPrimaryButtonStyle");
+                                fixBtn.Click += async (s, e) => await BatchUpdateMissingCovers();
+                                ChatMessagesPanel.Children.Add(fixBtn);
                             }
                         }
                     }
@@ -243,6 +254,60 @@ namespace AniTechou
             catch (Exception ex)
             {
                 AddMessageToChat($"❌ 核查失败：{ex.Message}", false);
+            }
+        }
+
+        private async Task BatchUpdateMissingCovers()
+        {
+            AddMessageToChat("🔄 正在扫描缺失封面的作品...", false);
+            try
+            {
+                var workService = new WorkService(_currentAccountName);
+                var allWorks = workService.GetAllWorksForSearch();
+                var missing = allWorks.Where(w => string.IsNullOrEmpty(w.CoverPath)).ToList();
+
+                if (missing.Count == 0)
+                {
+                    AddMessageToChat("✅ 所有作品都有封面，无需补全！", false);
+                    return;
+                }
+
+                AddMessageToChat($"📋 找到 {missing.Count} 个缺失封面，开始逐个搜索...", false);
+
+                var searchProvider = new Services.SearchProviders.BangumiSearchProvider();
+                int updated = 0;
+                foreach (var w in missing)
+                {
+                    try
+                    {
+                        var results = await searchProvider.SearchAsync(w.Title, w.Type);
+                        var match = results.FirstOrDefault();
+                        if (match != null && !string.IsNullOrEmpty(match.CoverUrl))
+                        {
+                            string coverInfo = !string.IsNullOrEmpty(match.BangumiId)
+                                ? $"bgm_id:{match.BangumiId}|{match.CoverUrl}"
+                                : match.CoverUrl;
+                            var localPath = await workService.DownloadAndSaveCoverAsync(coverInfo, w.Id);
+                            if (!string.IsNullOrEmpty(localPath))
+                            {
+                                updated++;
+                                System.Diagnostics.Debug.WriteLine($"[BatchCover] {w.Title} 封面更新成功");
+                            }
+                        }
+                        // Bangumi API 限速：每次请求间隔 1s
+                        await Task.Delay(1000);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[BatchCover] {w.Title} 失败: {ex.Message}");
+                    }
+                }
+
+                AddMessageToChat($"✅ 完成！成功更新 {updated}/{missing.Count} 个封面。", false);
+            }
+            catch (Exception ex)
+            {
+                AddMessageToChat($"❌ 批量更新失败：{ex.Message}", false);
             }
         }
 
@@ -496,8 +561,6 @@ namespace AniTechou
                 {
                     Text = "🤖 正在思考...",
                     FontSize = 12,
-                    Foreground = new System.Windows.Media.SolidColorBrush(
-                        System.Windows.Media.Color.FromRgb(127, 110, 90))
                 }
             };
             ChatMessagesPanel.Children.Add(loadingBorder);
@@ -550,7 +613,6 @@ namespace AniTechou
                 batchControlPanel.Children.Add(new TextBlock
                 {
                     Text = $"⏳ 启动全量补完计划，共计 {allWorks.Count} 部作品...",
-                    Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(127, 110, 90)),
                     Margin = new Thickness(0, 0, 0, 10)
                 });
                 
@@ -1113,7 +1175,6 @@ namespace AniTechou
                 Text = $"🎯 为你推荐以下作品：",
                 FontSize = 13,
                 FontWeight = System.Windows.FontWeights.Bold,
-                Foreground = ThemeManager.GetBrush("TextPrimaryBrush"),
                 Margin = new Thickness(0, 0, 0, 10)
             });
 
@@ -1144,7 +1205,6 @@ namespace AniTechou
                 {
                     Text = $" [{GetTypeDisplay(work.type)}]",
                     FontSize = 11,
-                    Foreground = ThemeManager.GetBrush("TextSecondaryBrush"),
                     Margin = new Thickness(5, 2, 0, 0),
                     VerticalAlignment = VerticalAlignment.Center
                 });
@@ -1158,7 +1218,6 @@ namespace AniTechou
                         Text = $"🎙️ {work.voiceActorInfo}",
                         FontSize = 11,
                         FontWeight = System.Windows.FontWeights.SemiBold,
-                        Foreground = ThemeManager.GetBrush("AccentStrongBrush"),
                         Margin = new Thickness(0, 4, 0, 2)
                     });
                 }
@@ -1174,7 +1233,6 @@ namespace AniTechou
                     {
                         Text = info,
                         FontSize = 11,
-                        Foreground = ThemeManager.GetBrush("TextSecondaryBrush"),
                         Margin = new Thickness(0, 2, 0, 0)
                     });
                 }
@@ -1186,7 +1244,6 @@ namespace AniTechou
                     {
                         Text = work.synopsis.Length > 80 ? work.synopsis.Substring(0, 80) + "..." : work.synopsis,
                         FontSize = 11,
-                        Foreground = ThemeManager.GetBrush("TextSecondaryBrush"),
                         TextWrapping = TextWrapping.Wrap,
                         Margin = new Thickness(0, 6, 0, 0)
                     });
@@ -1238,7 +1295,6 @@ namespace AniTechou
             {
                 Text = "✨ 如果喜欢这些，还可以试试问：'更多治愈系作品'",
                 FontSize = 10,
-                Foreground = ThemeManager.GetBrush("TextMutedBrush"),
                 Margin = new Thickness(0, 6, 0, 0)
             });
 

@@ -36,8 +36,8 @@ namespace AniTechou.Services
             _model = model ?? config.Model;
             _enableWebSearch = config.EnableWebSearch;
 
-            // 联网搜索需要更长时间但不多重试，免得用户等半天
-            double timeoutSec = config.EnableWebSearch ? 90 : 30;
+            // DeepSeek API 响应慢（尤其是高峰时段），给足时间
+            double timeoutSec = config.EnableWebSearch ? 120 : 60;
             _httpClient = new HttpClient
             {
                 Timeout = TimeSpan.FromSeconds(timeoutSec)
