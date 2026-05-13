@@ -132,8 +132,12 @@ namespace AniTechou.Services.SearchProviders
                 };
 
                 if (!string.IsNullOrEmpty(r.Company)) info.Add($"   制作公司: {r.Company}");
+                if (!string.IsNullOrEmpty(r.Author)) info.Add($"   作者: {r.Author}");
+                if (!string.IsNullOrEmpty(r.OriginalWork)) info.Add($"   原作: {r.OriginalWork}");
+                if (!string.IsNullOrEmpty(r.SourceType)) info.Add($"   原作类型: {r.SourceType}");
                 if (!string.IsNullOrEmpty(r.Episodes) && r.Episodes != "0") info.Add($"   集数: {r.Episodes}");
                 if (!string.IsNullOrEmpty(r.Synopsis)) info.Add($"   简介: {r.Synopsis}");
+                if (!string.IsNullOrEmpty(r.VoiceActorInfo)) info.Add($"   声优: {r.VoiceActorInfo}");
 
                 string coverHint = !string.IsNullOrEmpty(r.BangumiId)
                     ? $"bgm_id:{r.BangumiId}|{r.CoverUrl}"

@@ -189,61 +189,87 @@ namespace AniTechou.Services
 
         /// <summary>
         /// 构建 LLM 请求体，根据平台自适应注入联网搜索参数
+        /// 每个分支返回独立匿名类型，确保 JSON 序列化时属性不丢失
         /// </summary>
         private object BuildRequest(List<object> messages)
         {
-            var baseRequest = new Dictionary<string, object>
+            if (!_enableWebSearch)
             {
-                ["model"] = _model,
-                ["messages"] = messages,
-                ["temperature"] = 0.3,
-                ["response_format"] = new { type = "json_object" }
-            };
-
-            if (!_enableWebSearch) return baseRequest;
+                return new
+                {
+                    model = _model,
+                    messages = messages,
+                    temperature = 0.3,
+                    response_format = new { type = "json_object" }
+                };
+            }
 
             // DeepSeek: enable_search 参数
             if (_apiUrl.Contains("deepseek"))
             {
-                baseRequest["enable_search"] = true;
                 System.Diagnostics.Debug.WriteLine("[AIService] 联网搜索: DeepSeek enable_search");
-                return baseRequest;
+                return new
+                {
+                    model = _model,
+                    messages = messages,
+                    temperature = 0.3,
+                    response_format = new { type = "json_object" },
+                    enable_search = true
+                };
             }
 
             // Kimi (Moonshot): 使用 web_search 工具
             if (_apiUrl.Contains("moonshot") || _apiUrl.Contains("kimi"))
             {
-                baseRequest["tools"] = new[]
+                System.Diagnostics.Debug.WriteLine("[AIService] 联网搜索: Kimi web_search tool");
+                return new
                 {
-                    new
+                    model = _model,
+                    messages = messages,
+                    temperature = 0.3,
+                    response_format = new { type = "json_object" },
+                    tools = new[]
                     {
-                        type = "builtin_function",
-                        function = new { name = "web_search" }
+                        new
+                        {
+                            type = "builtin_function",
+                            function = new { name = "web_search" }
+                        }
                     }
                 };
-                System.Diagnostics.Debug.WriteLine("[AIService] 联网搜索: Kimi web_search tool");
-                return baseRequest;
             }
 
-            // OpenAI 兼容: web_search 工具 (gpt-4o-mini / gpt-4o 支持)
+            // OpenAI 兼容: web_search 工具
             if (_apiUrl.Contains("openai"))
             {
-                baseRequest["tools"] = new[]
+                System.Diagnostics.Debug.WriteLine("[AIService] 联网搜索: OpenAI web_search tool");
+                return new
                 {
-                    new
+                    model = _model,
+                    messages = messages,
+                    temperature = 0.3,
+                    response_format = new { type = "json_object" },
+                    tools = new[]
                     {
-                        type = "web_search",
-                        web_search = new { }
+                        new
+                        {
+                            type = "web_search",
+                            web_search = new { }
+                        }
                     }
                 };
-                System.Diagnostics.Debug.WriteLine("[AIService] 联网搜索: OpenAI web_search tool");
-                return baseRequest;
             }
 
-            // 未知平台：尝试 DeepSeek 兼容参数（多数国内 API 兼容此格式）
+            // 未知平台：尝试 DeepSeek 兼容参数（多数国内 API 兼容）
             System.Diagnostics.Debug.WriteLine("[AIService] 联网搜索: 未知平台，尝试通用 enable_search");
-            baseRequest["enable_search"] = true;
-            return baseRequest;
+            return new
+            {
+                model = _model,
+                messages = messages,
+                temperature = 0.3,
+                response_format = new { type = "json_object" },
+                enable_search = true
+            };
         }
 
         public async Task<List<AIWorkSearchResult>> SearchWorks(string query)
@@ -270,16 +296,20 @@ namespace AniTechou.Services
 
             var prompt = $@"请根据用户的需求，返回符合条件的作品列表。要求：
 1. 返回JSON数组格式
-2. 每个作品包含：
+2. 每个作品包含以下字段（有信息就填，没有则空字符串）：
    - title(标题)
    - originalTitle(原名可选)
    - type(类型:Anime/Manga/LightNovel/Game)
    - year(年份可选，仅数字，如2023)
-   - company(制作公司可选)
+   - company(制作公司，动画填公司、漫画/轻小说填出版社)
+   - author(作者，漫画/轻小说必填，动画可选)
+   - originalWork(原作名，改编作品必填原著作名称)
    - coverUrl(封面图片URL，优先使用下方真实数据)
    - bangumiId(Bangumi ID，优先使用下方真实数据)
    - sourceType(原作类型，必须是以下之一：原创, 漫改, 小说改, 游戏改, 其他)
    - season(季度，必须是以下之一：春, 夏, 秋, 冬)
+   - voiceActorInfo(主要声优，格式: ""角色A(CV:声优A)、角色B(CV:声优B)"")
+   - tags(标签数组，每个3-8字，优先提取导演/声优/制作人员)
 3. 如果用户指定了制作公司（如""京阿尼""），只返回该公司的作品
 4. 如果用户指定了年份范围，只返回该年份的作品
 5. 返回5-10个最相关的作品

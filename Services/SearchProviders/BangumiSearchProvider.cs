@@ -222,26 +222,61 @@ namespace AniTechou.Services.SearchProviders
                     result.Year = dateStr[..4];
             }
 
-            // 制作人员信息 (v0 API infobox)
+            // 制作人员信息 (v0 API infobox) — 含声优、原作、制作人员
             if (root.TryGetProperty("infobox", out var infobox))
             {
                 foreach (var item in infobox.EnumerateArray())
                 {
                     string key = SafeGetString(item, "key");
-                    string value = ExtractInfoboxValue(item);
+                    string value = ExtractInfoboxValue(item); // 单值（如公司名/导演名）
+                    string allValues = ExtractInfoboxValues(item); // 多值（如声优列表）
 
-                    if (string.IsNullOrEmpty(value)) continue;
+                    if (string.IsNullOrEmpty(value) && string.IsNullOrEmpty(allValues)) continue;
 
-                    if (key.Contains("动画制作") || key.Contains("制作公司") || key.Contains("製作"))
-                        result.Company = value;
-                    else if (key.Contains("原作") || key.Contains("原案"))
-                        result.OriginalWork = value;
-                    else if (key.Contains("导演") || key.Contains("监督") || key.Contains("監督"))
-                        result.Tags.Add($"导演:{value}");
-                    else if (key.Contains("脚本") || key.Contains("系列构成") || key.Contains("シリーズ構成"))
-                        result.Tags.Add($"脚本:{value}");
-                    else if (key.Contains("音乐") || key.Contains("音楽"))
-                        result.Tags.Add($"音乐:{value}");
+                    // 原作 / 原作者
+                    if (key.Contains("原作") || key.Contains("原著") || key.Contains("原案"))
+                    {
+                        if (string.IsNullOrEmpty(result.OriginalWork))
+                            result.OriginalWork = value;
+                    }
+                    // 制作公司
+                    else if (key.Contains("动画制作") || key.Contains("制作公司") || key.Contains("製作"))
+                    {
+                        if (string.IsNullOrEmpty(result.Company))
+                            result.Company = value;
+                    }
+                    // 导演
+                    else if (key.Contains("导演") || key.Contains("监督") || key.Contains("監督") || key.Contains("ディレクター"))
+                        AddTagIfNew(result, $"导演:{value}");
+                    // 脚本 / 系列构成
+                    else if (key.Contains("脚本") || key.Contains("系列构成") || key.Contains("シリーズ構成") || key.Contains("编剧"))
+                        AddTagIfNew(result, $"脚本:{value}");
+                    // 音乐
+                    else if (key.Contains("音乐") || key.Contains("音楽") || key.Contains("作曲"))
+                        AddTagIfNew(result, $"音乐:{value}");
+                    // 角色设计
+                    else if (key.Contains("角色设计") || key.Contains("人物设定") || key.Contains("キャラクターデザイン") || key.Contains("人设"))
+                        AddTagIfNew(result, $"角色设计:{value}");
+                    // 美术
+                    else if (key.Contains("美术监督") || key.Contains("美術監督") || key.Contains("美术"))
+                        AddTagIfNew(result, $"美术:{value}");
+                    // 摄影
+                    else if (key.Contains("摄影监督") || key.Contains("撮影監督"))
+                        AddTagIfNew(result, $"摄影:{value}");
+                    // 声优 / 配音演员（可能是多值列表）
+                    else if (key.Contains("声优") || key.Contains("配音") || key.Contains("キャスト") || key.Contains("CV"))
+                    {
+                        // 优先用多值解析，单值兜底
+                        string seiyuuList = !string.IsNullOrEmpty(allValues) ? allValues : value;
+                        foreach (var name in SplitSeiyuuNames(seiyuuList))
+                            AddTagIfNew(result, $"CV:{name}");
+                    }
+                    // 小说/漫画作者（区别于动画原作）
+                    else if (key.Contains("作者") || key.Contains("著者") || key.Contains("イラスト") || key.Contains("插图"))
+                    {
+                        if (string.IsNullOrEmpty(result.Author))
+                            result.Author = value;
+                    }
                 }
             }
 
@@ -270,7 +305,7 @@ namespace AniTechou.Services.SearchProviders
         };
 
         /// <summary>
-        /// 从 Bangumi v0 infobox 的 value 数组中提取文本值
+        /// 从 Bangumi v0 infobox 的 value 数组中提取第一个文本值
         /// infobox 格式: {"key": "...", "value": [{"v": "文本"}]}
         /// </summary>
         private static string ExtractInfoboxValue(JsonElement item)
@@ -282,6 +317,71 @@ namespace AniTechou.Services.SearchProviders
                 return SafeGetString(valueArray[0], "v");
             }
             return "";
+        }
+
+        /// <summary>
+        /// 从 Bangumi v0 infobox 的 value 数组中提取所有值，用分号连接
+        /// 适用于声优列表等多值字段
+        /// </summary>
+        private static string ExtractInfoboxValues(JsonElement item)
+        {
+            if (!item.TryGetProperty("value", out var valueArray))
+                return "";
+            if (valueArray.ValueKind != JsonValueKind.Array || valueArray.GetArrayLength() == 0)
+                return "";
+
+            var values = new List<string>();
+            foreach (var v in valueArray.EnumerateArray())
+            {
+                string text = SafeGetString(v, "v");
+                if (!string.IsNullOrWhiteSpace(text))
+                    values.Add(text);
+            }
+            return string.Join("、", values);
+        }
+
+        /// <summary>
+        /// 拆分声优名字（Bangumi 格式: "角色A (声优A)、角色B (声优B)" 或 "声优A、声优B"）
+        /// 优先提取括号里的声优名，没有括号则整体作为声优名
+        /// </summary>
+        private static List<string> SplitSeiyuuNames(string raw)
+        {
+            var result = new List<string>();
+            if (string.IsNullOrWhiteSpace(raw)) return result;
+
+            // 按顿号、逗号、分号拆分
+            var parts = raw.Split(new[] { '、', '，', ',', '；', ';' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var part in parts)
+            {
+                string trimmed = part.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed)) continue;
+
+                // 提取括号里的声优名 "角色名 (声优名)" → "声优名"
+                int open = trimmed.LastIndexOf('(');
+                int close = trimmed.LastIndexOf(')');
+                if (open > -1 && close > open)
+                {
+                    string name = trimmed.Substring(open + 1, close - open - 1).Trim();
+                    if (!string.IsNullOrWhiteSpace(name) && !result.Contains(name))
+                        result.Add(name);
+                }
+                else
+                {
+                    // 没有括号则直接用
+                    if (!result.Contains(trimmed))
+                        result.Add(trimmed);
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 添加标签（去重，上限 15 个）
+        /// </summary>
+        private static void AddTagIfNew(ExternalSearchResult result, string tag)
+        {
+            if (!result.Tags.Contains(tag) && result.Tags.Count < 15)
+                result.Tags.Add(tag);
         }
 
         private static string SafeGetString(JsonElement element, string property)
