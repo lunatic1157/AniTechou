@@ -7,5 +7,7 @@ namespace AniTechou.Models
         public string Status { get; set; }
         public string Progress { get; set; }
         public int Rating { get; set; }
+        public string StartedDate { get; set; }
+        public string FinishedDate { get; set; }
     }
 }

@@ -158,6 +158,17 @@ namespace AniTechou.Views
                     _ => 0
                 };
                 RatingBox.SelectedIndex = ratingIndex;
+
+                // 设置开始/完成日期
+                if (DateTime.TryParse(userWork.StartedDate, out var started))
+                    StartedDatePicker.SelectedDate = started;
+                else
+                    StartedDatePicker.SelectedDate = null;
+
+                if (DateTime.TryParse(userWork.FinishedDate, out var finished))
+                    FinishedDatePicker.SelectedDate = finished;
+                else
+                    FinishedDatePicker.SelectedDate = null;
             }
 
             // 加载标签
@@ -561,9 +572,15 @@ namespace AniTechou.Views
                 // 进度
                 string progress = NormalizeProgressInput(ProgressBox.Text);
                 ProgressBox.Text = progress;
-                
+
+                // 开始/完成日期
+                string startedDate = StartedDatePicker.SelectedDate.HasValue
+                    ? StartedDatePicker.SelectedDate.Value.ToString("yyyy-MM-dd") : null;
+                string finishedDate = FinishedDatePicker.SelectedDate.HasValue
+                    ? FinishedDatePicker.SelectedDate.Value.ToString("yyyy-MM-dd") : null;
+
                 // 更新数据库
-                _workService.UpdateUserWork(_userListId, statusEn, progress, rating);
+                _workService.UpdateUserWork(_userListId, statusEn, progress, rating, startedDate, finishedDate);
                 
                 Windows.AppMessageDialog.Show(Application.Current.MainWindow, "成功", "更新成功！");
                 

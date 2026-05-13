@@ -192,6 +192,11 @@ namespace AniTechou.Services
         }
 
         /// <summary>
+        /// 当前数据库 schema 版本号（递增即可）
+        /// </summary>
+        private const int CURRENT_DB_VERSION = 1;
+
+        /// <summary>
         /// 初始化新账号的数据库（如果不存在则创建）
         /// </summary>
         /// <param name="accountName">账号名</param>
@@ -206,17 +211,51 @@ namespace AniTechou.Services
                 {
                     System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Creating new database for: {accountName}");
                     CreateNewDatabase(dbPath);
+                    // 新库直接设最新版本号，跳过迁移
+                    SetUserVersion(accountName, CURRENT_DB_VERSION);
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Database exists, running migration for: {accountName}");
-                    // 迁移：为已有数据库添加缺失的列
+                    // 版本号快速通道：已是最新则跳过全部检查
+                    int existingVersion = GetUserVersion(accountName);
+                    if (existingVersion >= CURRENT_DB_VERSION)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] DB version {existingVersion} is current, skipping migration");
+                        return;
+                    }
+
+                    System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] DB version {existingVersion} < {CURRENT_DB_VERSION}, running migration");
                     MigrateDatabase(accountName);
+                    SetUserVersion(accountName, CURRENT_DB_VERSION);
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] InitializeForAccount error: {ex.Message}");
+            }
+        }
+
+        private static int GetUserVersion(string accountName)
+        {
+            using (var conn = GetConnection(accountName))
+            {
+                conn.Open();
+                using (var cmd = new SQLiteCommand("PRAGMA user_version", conn))
+                {
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+                }
+            }
+        }
+
+        private static void SetUserVersion(string accountName, int version)
+        {
+            using (var conn = GetConnection(accountName))
+            {
+                conn.Open();
+                using (var cmd = new SQLiteCommand($"PRAGMA user_version = {version}", conn))
+                {
+                    cmd.ExecuteNonQuery();
+                }
             }
         }
 

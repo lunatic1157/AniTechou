@@ -36,6 +36,7 @@ namespace AniTechou.Views
                 // 统计看板
                 AnimeCount.Text = stats.AnimeCount.ToString();
                 MangaCount.Text = stats.MangaCount.ToString();
+                LightNovelCount.Text = stats.LightNovelCount.ToString();
                 GameCount.Text = stats.GameCount.ToString();
                 TotalWorksText.Text = stats.TotalWorks.ToString();
                 TotalNotesText.Text = stats.TotalNotes.ToString();

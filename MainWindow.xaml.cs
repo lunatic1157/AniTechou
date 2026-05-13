@@ -1490,23 +1490,6 @@ namespace AniTechou
             }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
-        private string GetAIReply(string userMessage)
-        {
-            // 模拟回复，后续替换为真实的AI API调用
-            if (userMessage.Contains("推荐") || userMessage.Contains("治愈"))
-            {
-                return "推荐几部治愈系作品：\n• 葬送的芙莉莲\n• 夏目友人帐\n• 摇曳露营△\n• 妖精森林的小不点";
-            }
-            else if (userMessage.Contains("芙莉莲"))
-            {
-                return "《葬送的芙莉莲》是由MADHOUSE制作的动画，讲述了勇者一行击败魔王后，精灵魔法使芙莉莲重新踏上旅途的故事。这是一部非常治愈的作品，共28集。";
-            }
-            else
-            {
-                return $"收到你的问题：\"{userMessage}\"\n\n我正在学习中，后续会接入AI服务为你提供更准确的回答。你可以尝试问一些关于动漫推荐的问题。";
-            }
-        }
-
         // 添加成员变量
         private string _currentAccountName;
 

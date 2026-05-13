@@ -87,23 +87,31 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Background="{DynamicResource Surface2Brush}" CornerRadius="{DynamicResource CardCornerRadius}" Padding="18" Margin="0,0,10,0">
+                        <Border Grid.Column="0" Background="{DynamicResource Surface2Brush}" CornerRadius="{DynamicResource CardCornerRadius}" Padding="16" Margin="0,0,6,0">
                             <StackPanel HorizontalAlignment="Center">
                                 <TextBlock x:Name="AnimeCount" Text="0" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
                                 <TextBlock Text="动画" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Column="1" Background="{DynamicResource Surface2Brush}" CornerRadius="{DynamicResource CardCornerRadius}" Padding="18" Margin="5,0,5,0">
+                        <Border Grid.Column="1" Background="{DynamicResource Surface2Brush}" CornerRadius="{DynamicResource CardCornerRadius}" Padding="16" Margin="3,0,3,0">
                             <StackPanel HorizontalAlignment="Center">
                                 <TextBlock x:Name="MangaCount" Text="0" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
                                 <TextBlock Text="漫画" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Column="2" Background="{DynamicResource Surface2Brush}" CornerRadius="{DynamicResource CardCornerRadius}" Padding="18" Margin="10,0,0,0">
+                        <Border Grid.Column="2" Background="{DynamicResource Surface2Brush}" CornerRadius="{DynamicResource CardCornerRadius}" Padding="16" Margin="3,0,3,0">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock x:Name="LightNovelCount" Text="0" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="轻小说" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="3" Background="{DynamicResource Surface2Brush}" CornerRadius="{DynamicResource CardCornerRadius}" Padding="16" Margin="6,0,0,0">
                             <StackPanel HorizontalAlignment="Center">
                                 <TextBlock x:Name="GameCount" Text="0" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
                                 <TextBlock Text="游戏" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>

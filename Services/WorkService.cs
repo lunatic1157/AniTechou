@@ -829,7 +829,8 @@ namespace AniTechou.Services
         public int AddWork(string title, string originalTitle, string type, string company,
                    string year, string season, string sourceType, string episodesVolumes, string progress,
                    string status, int rating, string synopsis, string coverPath, string author = "", string originalWork = "",
-                   string bangumiId = "", string malId = "", string anilistId = "", string voiceActorInfo = "")
+                   string bangumiId = "", string malId = "", string anilistId = "", string voiceActorInfo = "",
+                   string startedDate = "", string finishedDate = "")
         {
             try
             {
@@ -882,8 +883,8 @@ namespace AniTechou.Services
 
                             // 插入用户列表
                             string insertList = @"
-                        INSERT INTO UserList (WorkId, Status, Progress, Rating, LastUpdated)
-                        VALUES (@WorkId, @Status, @Progress, @Rating, @LastUpdated)";
+                        INSERT INTO UserList (WorkId, Status, Progress, Rating, StartedDate, FinishedDate, LastUpdated)
+                        VALUES (@WorkId, @Status, @Progress, @Rating, @StartedDate, @FinishedDate, @LastUpdated)";
 
                             using (var cmd = new SQLiteCommand(insertList, conn))
                             {
@@ -892,6 +893,8 @@ namespace AniTechou.Services
                                 cmd.Parameters.AddWithValue("@Progress", progress ?? "");
                                 // Rating 为 0 时存入 NULL（现有数据库约束是 1-10）
                                 cmd.Parameters.AddWithValue("@Rating", rating > 0 ? rating : DBNull.Value);
+                                cmd.Parameters.AddWithValue("@StartedDate", string.IsNullOrEmpty(startedDate) ? DBNull.Value : startedDate);
+                                cmd.Parameters.AddWithValue("@FinishedDate", string.IsNullOrEmpty(finishedDate) ? DBNull.Value : finishedDate);
                                 cmd.Parameters.AddWithValue("@LastUpdated", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                                 cmd.ExecuteNonQuery();
                             }
@@ -959,7 +962,7 @@ namespace AniTechou.Services
             using (var conn = DatabaseHelper.GetConnection(_currentAccount))
             {
                 conn.Open();
-                string sql = "SELECT Id, WorkId, Status, Progress, Rating FROM UserList WHERE WorkId = @WorkId";
+                string sql = "SELECT Id, WorkId, Status, Progress, Rating, COALESCE(StartedDate,''), COALESCE(FinishedDate,'') FROM UserList WHERE WorkId = @WorkId";
                 using (var cmd = new SQLiteCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@WorkId", workId);
@@ -973,7 +976,9 @@ namespace AniTechou.Services
                                 WorkId = SafeGetInt(reader, 1),
                                 Status = SafeGetString(reader, 2),
                                 Progress = SafeGetString(reader, 3),
-                                Rating = SafeGetInt(reader, 4)
+                                Rating = SafeGetInt(reader, 4),
+                                StartedDate = SafeGetString(reader, 5),
+                                FinishedDate = SafeGetString(reader, 6)
                             };
                         }
                     }
@@ -982,7 +987,8 @@ namespace AniTechou.Services
             return null;
         }
 
-        public void UpdateUserWork(int userListId, string status, string progress, int rating)
+        public void UpdateUserWork(int userListId, string status, string progress, int rating,
+            string startedDate = null, string finishedDate = null)
         {
             try
             {
@@ -990,10 +996,12 @@ namespace AniTechou.Services
                 {
                     conn.Open();
                     string sql = @"
-                UPDATE UserList 
-                SET Status = @Status, 
-                    Progress = @Progress, 
-                    Rating = @Rating, 
+                UPDATE UserList
+                SET Status = @Status,
+                    Progress = @Progress,
+                    Rating = @Rating,
+                    StartedDate = @StartedDate,
+                    FinishedDate = @FinishedDate,
                     LastUpdated = @LastUpdated
                 WHERE Id = @Id";
 
@@ -1002,6 +1010,8 @@ namespace AniTechou.Services
                         cmd.Parameters.AddWithValue("@Status", status);
                         cmd.Parameters.AddWithValue("@Progress", progress);
                         cmd.Parameters.AddWithValue("@Rating", rating);
+                        cmd.Parameters.AddWithValue("@StartedDate", string.IsNullOrEmpty(startedDate) ? DBNull.Value : startedDate);
+                        cmd.Parameters.AddWithValue("@FinishedDate", string.IsNullOrEmpty(finishedDate) ? DBNull.Value : finishedDate);
                         cmd.Parameters.AddWithValue("@LastUpdated", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                         cmd.Parameters.AddWithValue("@Id", userListId);
                         int rows = cmd.ExecuteNonQuery();
@@ -1181,25 +1191,7 @@ namespace AniTechou.Services
                         int noteId = SafeGetInt(reader, 0);
                         int workCount = SafeGetInt(reader, 5);
 
-                        // 获取关联作品标题和ID
-                        var workTitles = new List<string>();
-                        var workIds = new List<int>();
-                        if (workCount > 0)
-                        {
-                            using (var cmdWorks = new SQLiteCommand("SELECT w.Id, w.Title FROM Works w INNER JOIN NoteWorks nw ON w.Id = nw.WorkId WHERE nw.NoteId = @NoteId", conn))
-                            {
-                                cmdWorks.Parameters.AddWithValue("@NoteId", noteId);
-                                using (var readerWorks = cmdWorks.ExecuteReader())
-                                {
-                                    while (readerWorks.Read())
-                                    {
-                                        workIds.Add(SafeGetInt(readerWorks, 0));
-                                        workTitles.Add(SafeGetString(readerWorks, 1));
-                                    }
-                                }
-                            }
-                        }
-
+                        // 暂存基础数据，统一批量查询关联作品
                         notes.Add(new NoteListItem
                         {
                             Id = noteId,
@@ -1209,10 +1201,50 @@ namespace AniTechou.Services
                             CreatedTime = DateTime.Parse(SafeGetString(reader, 3)),
                             Tags = SafeGetString(reader, 4) ?? "",
                             WorkCount = workCount,
-                            WorkTitles = workTitles,
-                            WorkIds = workIds,
+                            WorkTitles = new List<string>(),
+                            WorkIds = new List<int>(),
                             DisplayTitle = string.IsNullOrEmpty(title) ? "无标题" : title
                         });
+                    }
+                }
+
+                // 一次查询批量获取所有笔记的关联作品标题（避免 N+1）
+                if (notes.Count > 0)
+                {
+                    var noteIds = notes.Select(n => n.Id).ToList();
+                    var idList = string.Join(",", noteIds);
+                    string workBatchSql = $@"
+                        SELECT nw.NoteId, w.Id, w.Title
+                        FROM NoteWorks nw
+                        INNER JOIN Works w ON nw.WorkId = w.Id
+                        WHERE nw.NoteId IN ({idList})";
+
+                    using (var cmdBatch = new SQLiteCommand(workBatchSql, conn))
+                    using (var readerBatch = cmdBatch.ExecuteReader())
+                    {
+                        // 构建 noteId → (ids, titles) 字典
+                        var workMap = new Dictionary<int, (List<int> ids, List<string> titles)>();
+                        while (readerBatch.Read())
+                        {
+                            int nid = SafeGetInt(readerBatch, 0);
+                            int wid = SafeGetInt(readerBatch, 1);
+                            string wtitle = SafeGetString(readerBatch, 2);
+
+                            if (!workMap.ContainsKey(nid))
+                                workMap[nid] = (new List<int>(), new List<string>());
+                            workMap[nid].ids.Add(wid);
+                            workMap[nid].titles.Add(wtitle);
+                        }
+
+                        // 回填到 note 对象
+                        foreach (var note in notes)
+                        {
+                            if (workMap.TryGetValue(note.Id, out var works))
+                            {
+                                note.WorkIds = works.ids;
+                                note.WorkTitles = works.titles;
+                            }
+                        }
                     }
                 }
             }
@@ -1493,6 +1525,7 @@ namespace AniTechou.Services
         {
             public int AnimeCount { get; set; }
             public int MangaCount { get; set; }
+            public int LightNovelCount { get; set; }
             public int GameCount { get; set; }
             public int TotalWorks { get; set; }
             public int TotalNotes { get; set; }
@@ -1533,7 +1566,7 @@ namespace AniTechou.Services
                                 stats.MangaCount = count;
                                 break;
                             case "LightNovel":
-                                // 可以添加轻小说统计
+                                stats.LightNovelCount = count;
                                 break;
                             case "Game":
                                 stats.GameCount = count;
@@ -1542,7 +1575,7 @@ namespace AniTechou.Services
                     }
                 }
 
-                stats.TotalWorks = stats.AnimeCount + stats.MangaCount + stats.GameCount;
+                stats.TotalWorks = stats.AnimeCount + stats.MangaCount + stats.LightNovelCount + stats.GameCount;
 
                 // 统计笔记数量
                 string noteCountSql = "SELECT COUNT(*) FROM Notes";
@@ -1603,25 +1636,49 @@ namespace AniTechou.Services
             using (var conn = DatabaseHelper.GetConnection(_currentAccount))
             {
                 conn.Open();
-                string sql = "SELECT Username, Nickname, CreatedTime FROM Accounts WHERE Username = @Username";
+
+                // 确保 AccountInfo 表存在
+                using (var createCmd = new SQLiteCommand(
+                    "CREATE TABLE IF NOT EXISTS AccountInfo (Id INTEGER PRIMARY KEY, Nickname TEXT, CreatedTime TEXT)", conn))
+                {
+                    createCmd.ExecuteNonQuery();
+                }
+
+                string sql = "SELECT Nickname, COALESCE(CreatedTime, '') FROM AccountInfo WHERE Id = 1";
                 using (var cmd = new SQLiteCommand(sql, conn))
                 {
-                    cmd.Parameters.AddWithValue("@Username", _currentAccount);
                     using (var reader = cmd.ExecuteReader())
                     {
                         if (reader.Read())
                         {
+                            string createdStr = SafeGetString(reader, 1);
                             return new AccountInfo
                             {
-                                Username = SafeGetString(reader, 0),
-                                Nickname = SafeGetString(reader, 1),
-                                CreatedTime = DateTime.Parse(SafeGetString(reader, 2))
+                                Username = _currentAccount,
+                                Nickname = SafeGetString(reader, 0),
+                                CreatedTime = DateTime.TryParse(createdStr, out var dt) ? dt : DateTime.Now
                             };
                         }
                     }
                 }
+
+                // 首次使用，插入默认行
+                string now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                using (var insertCmd = new SQLiteCommand(
+                    "INSERT INTO AccountInfo (Id, Nickname, CreatedTime) VALUES (1, @Nick, @Time)", conn))
+                {
+                    insertCmd.Parameters.AddWithValue("@Nick", _currentAccount);
+                    insertCmd.Parameters.AddWithValue("@Time", now);
+                    insertCmd.ExecuteNonQuery();
+                }
+
+                return new AccountInfo
+                {
+                    Username = _currentAccount,
+                    Nickname = _currentAccount,
+                    CreatedTime = DateTime.Now
+                };
             }
-            return null;
         }
 
         /// <summary>
@@ -1640,7 +1697,8 @@ namespace AniTechou.Services
                         CREATE TABLE IF NOT EXISTS AccountInfo (
                             Id INTEGER PRIMARY KEY,
                             Nickname TEXT,
-                            AvatarPath TEXT
+                            AvatarPath TEXT,
+                            CreatedTime TEXT
                         )";
                     using (var cmd = new SQLiteCommand(createTable, conn))
                     {

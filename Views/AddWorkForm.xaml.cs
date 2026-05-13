@@ -133,6 +133,12 @@ namespace AniTechou.Views
 
                 var workService = new WorkService(_accountName);
 
+                // 开始/完成日期
+                string startedDate = StartedDatePicker.SelectedDate.HasValue
+                    ? StartedDatePicker.SelectedDate.Value.ToString("yyyy-MM-dd") : "";
+                string finishedDate = FinishedDatePicker.SelectedDate.HasValue
+                    ? FinishedDatePicker.SelectedDate.Value.ToString("yyyy-MM-dd") : "";
+
                 int workId = workService.AddWork(
                     title,
                     OriginalTitleBox.Text.Trim(),
@@ -148,7 +154,9 @@ namespace AniTechou.Views
                     SynopsisBox.Text.Trim(),
                     _selectedCoverPath,
                     author,
-                    originalWork
+                    originalWork,
+                    startedDate: startedDate,
+                    finishedDate: finishedDate
                 );
 
                 if (workId > 0)

@@ -119,9 +119,29 @@
                 <TextBlock Grid.Column="0" Text="评分" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                 <ComboBox x:Name="RatingBox" Grid.Column="1" Height="40" Width="180" HorizontalAlignment="Left" Style="{StaticResource AppComboBoxStyle}"/>
             </Grid>
-            
+
+            <Grid Margin="0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="92"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="开始日期" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                <DatePicker x:Name="StartedDatePicker" Grid.Column="1" Height="40" Width="180" HorizontalAlignment="Left"
+                            Style="{StaticResource AppDatePickerStyle}" SelectedDateFormat="Short"/>
+            </Grid>
+
+            <Grid Margin="0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="92"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="完成日期" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                <DatePicker x:Name="FinishedDatePicker" Grid.Column="1" Height="40" Width="180" HorizontalAlignment="Left"
+                            Style="{StaticResource AppDatePickerStyle}" SelectedDateFormat="Short"/>
+            </Grid>
+
             <Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,18,0,14"/>
-            
+
             <TextBlock Text="封面" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10"/>
             
             <Border Background="{DynamicResource Surface2Brush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource CardCornerRadius}" Padding="14">

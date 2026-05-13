@@ -119,8 +119,25 @@
                         <TextBlock Grid.Column="0" Text="评分：" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                         <ComboBox x:Name="RatingBox" Grid.Column="1" Width="140" Margin="5,0" Style="{StaticResource AppComboBoxStyle}"/>
                     </Grid>
-                    
-                    <Button Content="更新" 
+
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="开始：" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                        <DatePicker x:Name="StartedDatePicker" Grid.Column="1" Width="140" Margin="5,0"
+                                    SelectedDateFormat="Short" Style="{StaticResource AppDatePickerStyle}"/>
+
+                        <TextBlock Grid.Column="2" Text="完成：" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        <DatePicker x:Name="FinishedDatePicker" Grid.Column="3" Width="140" Margin="5,0"
+                                    SelectedDateFormat="Short" Style="{StaticResource AppDatePickerStyle}"/>
+                    </Grid>
+
+                    <Button Content="更新"
                             Width="72" Height="34"
                             Style="{StaticResource AppPrimaryButtonStyle}"
                             HorizontalAlignment="Right"
