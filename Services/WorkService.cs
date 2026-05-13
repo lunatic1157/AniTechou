@@ -1012,6 +1012,7 @@ namespace AniTechou.Services
                     {
                         cmd.Parameters.AddWithValue("@Status", status);
                         cmd.Parameters.AddWithValue("@Progress", progress);
+                        System.Diagnostics.Debug.WriteLine($"[Rating] UpdateUserWork 存储: rating={rating}");
                         cmd.Parameters.Add("@Rating", System.Data.DbType.Double).Value = rating > 0 ? (object)rating : DBNull.Value;
                         cmd.Parameters.AddWithValue("@StartedDate", string.IsNullOrEmpty(startedDate) ? DBNull.Value : startedDate);
                         cmd.Parameters.AddWithValue("@FinishedDate", string.IsNullOrEmpty(finishedDate) ? DBNull.Value : finishedDate);

@@ -140,6 +140,7 @@ namespace AniTechou.Views
                 
                 // 设置评分 (1-10 数字)
                 double ratingVal = userWork.Rating;
+                System.Diagnostics.Debug.WriteLine($"[Rating] 加载: userWork.Rating={userWork.Rating} → 显示为 '{ratingVal:F1}'");
                 RatingBox.Text = ratingVal > 0 ? ratingVal.ToString("F1") : "";
 
                 // 设置开始/完成日期
@@ -542,6 +543,7 @@ namespace AniTechou.Views
                 
                 // 获取评分 (1-10)
                 double.TryParse(RatingBox.Text.Trim(), out double rating);
+                System.Diagnostics.Debug.WriteLine($"[Rating] 输入框: '{RatingBox.Text}' → 解析: {rating}");
                 if (rating < 0) rating = 0;
                 if (rating > 10) rating = 10;
                 
