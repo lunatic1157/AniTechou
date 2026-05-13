@@ -175,6 +175,33 @@ namespace AniTechou.Services
         }
 
         /// <summary>
+        /// 从自然语言消息中提取搜索关键词（去掉口语词）
+        /// </summary>
+        private static string ExtractSearchKeywords(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return message;
+
+            // 去掉口语/问句部分，保留核心名词
+            string[] stopWords = {
+                "有什么", "有没有", "能不能", "可以", "帮我", "我想",
+                "好看的", "值得看", "推荐几部", "推荐一些", "介绍",
+                "哪些", "怎么", "为什么", "是什么", "意思是",
+                "告诉我", "想了解", "想知道", "请", "一下",
+                "吗", "呢", "啊", "吧", "了", "的", "哈"
+            };
+
+            string result = message;
+            foreach (var w in stopWords)
+                result = result.Replace(w, " ");
+
+            // 合并多余空格
+            result = System.Text.RegularExpressions.Regex.Replace(result, @"\s+", " ").Trim();
+
+            // 如果清理后太短，用原句
+            return result.Length >= 2 ? result : message;
+        }
+
+        /// <summary>
         /// 构建 LLM 请求体，根据平台自适应注入联网搜索参数
         /// 每个分支返回独立匿名类型，确保 JSON 序列化时属性不丢失
         /// </summary>
@@ -480,7 +507,10 @@ namespace AniTechou.Services
             {
                 try
                 {
-                    var externalResults = await _searchProvider.SearchAsync(userMessage, null, 8);
+                    // 提取关键词而非整句查询（"2025年有什么值得看的新番"→"2025 新番"）
+                    string searchQuery = ExtractSearchKeywords(userMessage);
+                    System.Diagnostics.Debug.WriteLine($"[AIService] 搜索关键词: {searchQuery}");
+                    var externalResults = await _searchProvider.SearchAsync(searchQuery, null, 8);
                     if (externalResults.Count > 0)
                     {
                         searchContext = CompositeSearchProvider.FormatForLLMPrompt(externalResults);
