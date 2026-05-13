@@ -450,6 +450,8 @@ namespace AniTechou.Services
         /// </summary>
         public async Task<AIResponse> SmartChat(string userMessage, string userCollectionContext = "")
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
             // 1. 更新上下文
             _contextHistory.Add(new ChatMessage { role = "user", content = userMessage });
             if (_contextHistory.Count > MAX_HISTORY) _contextHistory.RemoveAt(0);
@@ -537,14 +539,18 @@ namespace AniTechou.Services
                     if (_contextHistory.Count > MAX_HISTORY) _contextHistory.RemoveAt(0);
                 }
 
+                sw.Stop();
+                if (aiResponse != null && !string.IsNullOrEmpty(aiResponse.answer))
+                    aiResponse.answer += $"\n\n⏱️ 耗时 {sw.Elapsed.TotalSeconds:F1} 秒";
                 return aiResponse ?? new AIResponse { intent = "GENERAL_CHAT", answer = "抱歉，解析回复时出错了。" };
             }
             catch (Exception ex)
             {
+                sw.Stop();
                 System.Diagnostics.Debug.WriteLine($"SmartChat异常: {ex.Message}");
                 bool isTimeout = ex is TaskCanceledException || ex.InnerException is TaskCanceledException;
                 string hint = isTimeout && _enableWebSearch
-                    ? "\n\n💡 联网搜索超时了，试试在设置里关掉「AI 联网搜索」，速度会快很多。"
+                    ? $"\n\n💡 联网搜索超时（{sw.Elapsed.TotalSeconds:F0}秒），试试在设置里关掉「AI 联网搜索」。"
                     : "";
                 return new AIResponse { intent = "GENERAL_CHAT", answer = $"抱歉，出了点问题，请稍后再试。{hint}" };
             }

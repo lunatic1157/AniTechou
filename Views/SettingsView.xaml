@@ -82,6 +82,9 @@
                               Content="启用 AI 联网搜索（DeepSeek、Kimi、OpenAI 原生支持）"
                               Margin="0,14,0,0"
                               Style="{StaticResource AppCheckBoxStyle}"/>
+                    <TextBlock Text="⚠️ 联网搜索会增加 10-60 秒延迟，仅在搜最新作品时建议开启"
+                               FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                               Margin="20,2,0,0" IsHitTestVisible="False"/>
 
                     <TextBlock Text="🔍 搜索数据源" Margin="0,18,0,6"
                                Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"/>

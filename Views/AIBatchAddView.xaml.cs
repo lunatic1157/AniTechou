@@ -67,6 +67,11 @@ namespace AniTechou.Views
                         BangumiId = result.bangumiId ?? "",
                         Company = result.company,
                         Info = info.Trim(),
+                        Tags = result.tags ?? new List<string>(),
+                        Author = result.author ?? "",
+                        OriginalWork = result.originalWork ?? "",
+                        Synopsis = result.synopsis ?? "",
+                        VoiceActorInfo = result.voiceActorInfo ?? "",
                         IsSelected = true
                     });
                 }
@@ -120,7 +125,7 @@ namespace AniTechou.Views
             SelectedCountText.Text = $"已选择 {count} 项";
         }
 
-        private void AddSelected_Click(object sender, RoutedEventArgs e)
+        private async void AddSelected_Click(object sender, RoutedEventArgs e)
         {
             var selectedWorks = _works.Where(w => w.IsSelected).ToList();
             if (selectedWorks.Count == 0)
@@ -158,28 +163,42 @@ namespace AniTechou.Views
                         "",  // progress
                         "wish",  // status
                         0,   // rating
-                        "",  // synopsis
+                        work.Synopsis ?? "",  // synopsis
                         "",  // coverPath
-                        "",  // author
-                        "",  // originalWork
+                        work.Author ?? "",  // author
+                        work.OriginalWork ?? "",  // originalWork
                         work.BangumiId ?? "",  // bangumiId
                         "",  // malId
                         "",  // anilistId
-                        ""   // voiceActorInfo
+                        work.VoiceActorInfo ?? ""   // voiceActorInfo
                     );
 
                     if (workId > 0)
                     {
                         addedCount++;
-                        // 异步下载封面
+                        // 添加标签
+                        if (work.Tags != null && work.Tags.Count > 0)
+                        {
+                            foreach (var tag in NormalizeTags(work.Tags))
+                            {
+                                if (!string.IsNullOrWhiteSpace(tag))
+                                    workService.AddWorkTag(workId, tag, "AI导入");
+                            }
+                        }
+                        // 同步下载封面
                         if (!string.IsNullOrEmpty(work.CoverUrl))
                         {
-                            var currentWork = work;
-                            var id = workId;
-                            _ = Task.Run(async () =>
+                            try
                             {
-                                await workService.DownloadAndSaveCoverAsync(currentWork.CoverUrl, id);
-                            });
+                                string coverInfo = work.CoverUrl;
+                                if (!string.IsNullOrEmpty(work.BangumiId) && !coverInfo.StartsWith("bgm_id:"))
+                                    coverInfo = $"bgm_id:{work.BangumiId}|{coverInfo}";
+                                await workService.DownloadAndSaveCoverAsync(coverInfo, workId);
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[AIBatchAdd] 封面下载失败: {ex.Message}");
+                            }
                         }
                     }
                 }
@@ -193,6 +212,26 @@ namespace AniTechou.Views
             {
                 MessageBox.Show($"添加失败：{ex.Message}");
             }
+        }
+
+        private static List<string> NormalizeTags(List<string> tags)
+        {
+            var result = new List<string>();
+            foreach (var tag in tags)
+            {
+                if (string.IsNullOrWhiteSpace(tag)) continue;
+                string t = tag.Trim();
+                if (t.StartsWith("监督:") || t.StartsWith("監督:"))
+                    t = "导演" + t.Substring(t.IndexOf(':'));
+                else if (t.StartsWith("声优:") || t.StartsWith("配音:") || t.StartsWith("CV:") || t.StartsWith("cv:"))
+                    t = "CV" + t.Substring(t.IndexOf(':'));
+                else if (t.StartsWith("制作:") || t.StartsWith("动画制作:") || t.StartsWith("製作:"))
+                    t = "制作" + t.Substring(t.IndexOf(':'));
+                if (t.Length > 30) t = t.Substring(0, 30);
+                if (!result.Contains(t, StringComparer.OrdinalIgnoreCase))
+                    result.Add(t);
+            }
+            return result;
         }
     }
 
@@ -210,6 +249,11 @@ namespace AniTechou.Views
         public string BangumiId { get; set; } = "";
         public string Company { get; set; } = "";
         public string Info { get; set; } = "";
+        public List<string> Tags { get; set; } = new List<string>();
+        public string Author { get; set; } = "";
+        public string OriginalWork { get; set; } = "";
+        public string Synopsis { get; set; } = "";
+        public string VoiceActorInfo { get; set; } = "";
 
   
         public bool IsSelected

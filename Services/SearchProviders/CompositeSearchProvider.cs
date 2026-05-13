@@ -13,6 +13,10 @@ namespace AniTechou.Services.SearchProviders
     {
         private readonly List<ISearchProvider> _providers;
 
+        // 简单内存缓存：key → (results, expireTime)
+        private static readonly Dictionary<string, (List<ExternalSearchResult> results, DateTime expireAt)> _cache = new();
+        private static readonly TimeSpan CacheTTL = TimeSpan.FromMinutes(10);
+
         public CompositeSearchProvider(
             bool enableBangumi = true,
             bool enableMAL = false,
@@ -40,43 +44,67 @@ namespace AniTechou.Services.SearchProviders
         /// <param name="maxResults">最大结果数</param>
         public async Task<List<ExternalSearchResult>> SearchAsync(string query, string typeHint = null, int maxResults = 8)
         {
+            // 缓存命中 → 直接返回
+            string cacheKey = $"{query}|{typeHint ?? "all"}|{maxResults}";
+            lock (_cache)
+            {
+                if (_cache.TryGetValue(cacheKey, out var entry) && DateTime.Now < entry.expireAt)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[CompositeSearch] 缓存命中: {query}");
+                    return entry.results;
+                }
+            }
+
+            List<ExternalSearchResult> allResults;
+
             if (_providers.Count == 1)
             {
-                // 单源直接调用，无需并发开销
                 try
                 {
-                    return (await _providers[0].SearchAsync(query, typeHint)).Take(maxResults).ToList();
+                    allResults = (await _providers[0].SearchAsync(query, typeHint)).Take(maxResults).ToList();
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine(
-                        $"[CompositeSearch] {_providers[0].ProviderName} 搜索失败: {ex.Message}");
-                    return new List<ExternalSearchResult>();
+                    System.Diagnostics.Debug.WriteLine($"[CompositeSearch] {_providers[0].ProviderName} 搜索失败: {ex.Message}");
+                    allResults = new List<ExternalSearchResult>();
                 }
             }
-
-            // 多源并发搜索
-            var tasks = _providers.Select(p => SearchProviderSafe(p, query, typeHint)).ToArray();
-            var resultsArrays = await Task.WhenAll(tasks);
-
-            // 合并去重（保持优先级顺序）
-            var allResults = new List<ExternalSearchResult>();
-            var seenTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            for (int i = 0; i < resultsArrays.Length; i++)
+            else
             {
-                foreach (var result in resultsArrays[i])
+                // 多源并发搜索
+                var tasks = _providers.Select(p => SearchProviderSafe(p, query, typeHint)).ToArray();
+                var resultsArrays = await Task.WhenAll(tasks);
+
+                // 合并去重（保持优先级顺序）
+                allResults = new List<ExternalSearchResult>();
+                var seenTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                for (int i = 0; i < resultsArrays.Length; i++)
                 {
-                    string key = (result.Title + result.OriginalTitle).ToLowerInvariant();
-                    if (!seenTitles.Contains(key))
+                    foreach (var result in resultsArrays[i])
                     {
-                        seenTitles.Add(key);
-                        allResults.Add(result);
+                        string key = (result.Title + result.OriginalTitle).ToLowerInvariant();
+                        if (!seenTitles.Contains(key))
+                        {
+                            seenTitles.Add(key);
+                            allResults.Add(result);
+                        }
                     }
                 }
+
+                allResults = allResults.Take(maxResults).ToList();
             }
 
-            return allResults.Take(maxResults).ToList();
+            // 写入缓存
+            if (allResults.Count > 0)
+            {
+                lock (_cache)
+                {
+                    _cache[cacheKey] = (allResults, DateTime.Now.Add(CacheTTL));
+                }
+            }
+
+            return allResults;
         }
 
         private static async Task<List<ExternalSearchResult>> SearchProviderSafe(
