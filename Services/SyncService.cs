@@ -347,9 +347,16 @@ namespace AniTechou.Services
 
         private static string SafeGetString(JsonElement el, string key)
         {
-            if (el.TryGetProperty(key, out var prop))
-                return prop.ValueKind == JsonValueKind.Null ? "" : (prop.GetString() ?? "");
-            return "";
+            if (!el.TryGetProperty(key, out var prop)) return "";
+            return prop.ValueKind switch
+            {
+                JsonValueKind.Null or JsonValueKind.Undefined => "",
+                JsonValueKind.String => prop.GetString() ?? "",
+                JsonValueKind.Number => prop.GetRawText(),
+                JsonValueKind.True => "true",
+                JsonValueKind.False => "false",
+                _ => ""
+            };
         }
 
         private static int SafeGetInt(JsonElement el, string key)
