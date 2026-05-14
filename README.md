@@ -56,7 +56,9 @@ AniTechou 是一款「AI + 笔记驱动」的 ACGN 作品管理工具。
 
 
 ### 设置与 AI 配置
-<img width="1545" height="1473" alt="image" src="https://github.com/user-attachments/assets/989186a6-0b2f-4342-965d-0738e95f6927" />
+<img width="1492" height="702" alt="image" src="https://github.com/user-attachments/assets/f6d80432-cfdb-43f0-951a-f4a99839a3df" />
+<img width="1507" height="528" alt="image" src="https://github.com/user-attachments/assets/9beeddef-ad38-45f4-bcc7-a603d8ef2e2a" />
+
 
 ## 下载与安装
 - 当前提供 Windows x64 安装版
