@@ -150,7 +150,7 @@ namespace AniTechou.Utilities
         }
 
         /// <summary>
-        /// Convert Markdown text to WPF FlowDocument.
+        /// Convert Markdown text to WPF FlowDocument via Markdig HTML.
         /// </summary>
         public static FlowDocument MarkdownToFlowDocument(string markdown)
         {
@@ -159,224 +159,68 @@ namespace AniTechou.Utilities
 
             try
             {
-                var doc = new FlowDocument
-                {
-                    FontFamily = new System.Windows.Media.FontFamily("Microsoft YaHei"),
-                    FontSize = 14,
-                    PagePadding = new Thickness(0)
-                };
+                // 1. Markdig: Markdown → HTML (full spec support)
+                var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+                string html = Markdig.Markdown.ToHtml(markdown, pipeline);
 
-                var lines = markdown.Replace("\r\n", "\n").Split('\n');
-                Paragraph currentPara = null;
-
-                foreach (var line in lines)
-                {
-                    string trimmed = line.TrimEnd();
-
-                    if (string.IsNullOrWhiteSpace(trimmed))
-                    {
-                        currentPara = null;
-                        continue;
-                    }
-
-                    // Headings
-                    if (trimmed.StartsWith("### "))
-                    {
-                        var para = new Paragraph(ParseInlineMarkdown(trimmed.Substring(4))) { FontSize = 18, FontWeight = FontWeights.Bold };
-                        doc.Blocks.Add(para);
-                        currentPara = null;
-                    }
-                    else if (trimmed.StartsWith("## "))
-                    {
-                        var para = new Paragraph(ParseInlineMarkdown(trimmed.Substring(3))) { FontSize = 22, FontWeight = FontWeights.Bold };
-                        doc.Blocks.Add(para);
-                        currentPara = null;
-                    }
-                    else if (trimmed.StartsWith("# "))
-                    {
-                        var para = new Paragraph(ParseInlineMarkdown(trimmed.Substring(2))) { FontSize = 26, FontWeight = FontWeights.Bold };
-                        doc.Blocks.Add(para);
-                        currentPara = null;
-                    }
-                    // Unordered list
-                    else if (trimmed.StartsWith("- ") || trimmed.StartsWith("* "))
-                    {
-                        string text = trimmed.Substring(2);
-                        var listItem = new ListItem(new Paragraph(ParseInlineMarkdown(text)));
-                        if (doc.Blocks.LastBlock is List lastList && lastList.MarkerStyle == TextMarkerStyle.Disc)
-                            lastList.ListItems.Add(listItem);
-                        else
-                        {
-                            var list = new List { MarkerStyle = TextMarkerStyle.Disc };
-                            list.ListItems.Add(listItem);
-                            doc.Blocks.Add(list);
-                        }
-                        currentPara = null;
-                    }
-                    // Ordered list
-                    else if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^\d+\.\s"))
-                    {
-                        string text = System.Text.RegularExpressions.Regex.Replace(trimmed, @"^\d+\.\s", "");
-                        var listItem = new ListItem(new Paragraph(ParseInlineMarkdown(text)));
-                        if (doc.Blocks.LastBlock is List lastList && lastList.MarkerStyle == TextMarkerStyle.Decimal)
-                            lastList.ListItems.Add(listItem);
-                        else
-                        {
-                            var list = new List { MarkerStyle = TextMarkerStyle.Decimal };
-                            list.ListItems.Add(listItem);
-                            doc.Blocks.Add(list);
-                        }
-                        currentPara = null;
-                    }
-                    else
-                    {
-                        // Regular paragraph or continuation
-                        if (currentPara == null)
-                        {
-                            currentPara = new Paragraph();
-                            doc.Blocks.Add(currentPara);
-                        }
-                        else
-                        {
-                            currentPara.Inlines.Add(new LineBreak());
-                        }
-                        // Parse inline markdown for regular paragraphs too
-                        currentPara.Inlines.Add(ParseInlineMarkdown(trimmed));
-                    }
-                }
-
-                return doc;
+                // 2. HTML → FlowDocument (via RichTextBox clipboard trick)
+                return ConvertHtmlToFlowDocument(html);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[MarkdownConverter] 转换失败: {ex.Message}");
-                return new FlowDocument(new Paragraph(new Run(markdown)));
+                return CreateFallbackDocument(markdown);
             }
         }
 
-        private static Inline ParseInlineMarkdown(string text)
+        private static FlowDocument ConvertHtmlToFlowDocument(string html)
         {
-            var span = new Span();
-            if (string.IsNullOrEmpty(text))
-                return span;
+            string wrapped = "<html><head><meta charset=\"utf-8\"/><style>body{font-family:'Microsoft YaHei';font-size:14px;}</style></head><body>"
+                + html + "</body></html>";
 
-            int i = 0;
-            int plainStart = 0;
+            // Save clipboard
+            IDataObject saved = null;
+            try { saved = Clipboard.GetDataObject(); } catch { }
 
-            void FlushPlainText(int end)
+            try
             {
-                if (plainStart < end)
-                {
-                    span.Inlines.Add(new Run(text.Substring(plainStart, end - plainStart)));
-                    plainStart = end;
-                }
-            }
+                Clipboard.SetText(wrapped, TextDataFormat.Html);
 
-            while (i < text.Length)
+                var rtb = new System.Windows.Controls.RichTextBox();
+                rtb.Paste();
+
+                var doc = rtb.Document;
+
+                // Detach from RichTextBox so Document can live independently
+                rtb.Document = new FlowDocument();
+
+                doc.FontFamily = new System.Windows.Media.FontFamily("Microsoft YaHei");
+                doc.FontSize = 14;
+                doc.PagePadding = new Thickness(0);
+
+                return doc;
+            }
+            finally
             {
-                // Bold+Italic ***...*** (check before Bold to avoid greedy **)
-                if (i < text.Length - 5 && text[i] == '*' && text[i + 1] == '*' && text[i + 2] == '*')
+                // Restore original clipboard content
+                try
                 {
-                    int end = text.IndexOf("***", i + 3);
-                    if (end > i)
-                    {
-                        FlushPlainText(i);
-                        string content = text.Substring(i + 3, end - i - 3);
-                        span.Inlines.Add(new Bold(new Italic(new Run(content))));
-                        i = end + 3;
-                        plainStart = i;
-                        continue;
-                    }
+                    if (saved != null)
+                        Clipboard.SetDataObject(saved);
                 }
-                // Bold **...**
-                if (i < text.Length - 3 && text[i] == '*' && text[i + 1] == '*')
-                {
-                    int end = text.IndexOf("**", i + 2);
-                    if (end > i)
-                    {
-                        FlushPlainText(i);
-                        span.Inlines.Add(new Bold(new Run(text.Substring(i + 2, end - i - 2))));
-                        i = end + 2;
-                        plainStart = i;
-                        continue;
-                    }
-                }
-                // Italic *...* (single *, not part of ** or ***)
-                if (i < text.Length - 1 && text[i] == '*' && text[i + 1] != '*')
-                {
-                    int end = text.IndexOf('*', i + 1);
-                    if (end > i)
-                    {
-                        FlushPlainText(i);
-                        span.Inlines.Add(new Italic(new Run(text.Substring(i + 1, end - i - 1))));
-                        i = end + 1;
-                        plainStart = i;
-                        continue;
-                    }
-                }
-                // Underline <u>text</u>
-                if (i < text.Length - 6 && text[i] == '<' && text[i + 1] == 'u' && text[i + 2] == '>')
-                {
-                    int end = text.IndexOf("</u>", i + 3);
-                    if (end > i)
-                    {
-                        FlushPlainText(i);
-                        string content = text.Substring(i + 3, end - i - 3);
-                        span.Inlines.Add(new Underline(new Run(content)));
-                        i = end + 4;
-                        plainStart = i;
-                        continue;
-                    }
-                }
-                // Image ![alt](path)
-                if (i < text.Length - 4 && text[i] == '!' && text[i + 1] == '[')
-                {
-                    int closeB = text.IndexOf(']', i + 2);
-                    if (closeB > i && closeB + 1 < text.Length && text[closeB + 1] == '(')
-                    {
-                        int closeP = text.IndexOf(')', closeB + 2);
-                        if (closeP > closeB)
-                        {
-                            FlushPlainText(i);
-                            string alt = text.Substring(i + 2, closeB - i - 2);
-                            span.Inlines.Add(new Run($"[图片: {alt}]") { Foreground = System.Windows.Media.Brushes.Gray });
-                            i = closeP + 1;
-                            plainStart = i;
-                            continue;
-                        }
-                    }
-                }
-                // Link [text](url)
-                if (text[i] == '[')
-                {
-                    int closeB = text.IndexOf(']', i);
-                    if (closeB > i && closeB + 1 < text.Length && text[closeB + 1] == '(')
-                    {
-                        int closeP = text.IndexOf(')', closeB + 2);
-                        if (closeP > closeB)
-                        {
-                            FlushPlainText(i);
-                            string linkText = text.Substring(i + 1, closeB - i - 1);
-                            string url = text.Substring(closeB + 2, closeP - closeB - 2);
-                            try
-                            {
-                                span.Inlines.Add(new Hyperlink(new Run(linkText)) { NavigateUri = new Uri(url) });
-                            }
-                            catch
-                            {
-                                span.Inlines.Add(new Run(linkText));
-                            }
-                            i = closeP + 1;
-                            plainStart = i;
-                            continue;
-                        }
-                    }
-                }
-                i++;
+                catch { }
             }
+        }
 
-            FlushPlainText(text.Length);
-            return span;
+        private static FlowDocument CreateFallbackDocument(string text)
+        {
+            var doc = new FlowDocument
+            {
+                FontFamily = new System.Windows.Media.FontFamily("Microsoft YaHei"),
+                FontSize = 14
+            };
+            doc.Blocks.Add(new Paragraph(new Run(text)));
+            return doc;
         }
 
         private static System.Windows.Controls.Image FindImageInGrid(System.Windows.Controls.Grid grid)
