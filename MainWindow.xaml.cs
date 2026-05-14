@@ -718,6 +718,28 @@ namespace AniTechou
                                 if (workService.UpdateWorkOriginalWork(workItem.Id, enhancedInfo.originalWork)) updated = true;
                             }
 
+                            // 保存标签
+                            if (enhancedInfo.tags != null && enhancedInfo.tags.Count > 0)
+                            {
+                                var currentTagsForBatch = workService.GetWorkTags(workItem.Id);
+                                var currentTagSetBatch = new HashSet<string>(
+                                    currentTagsForBatch.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()),
+                                    StringComparer.OrdinalIgnoreCase);
+                                foreach (var tag in enhancedInfo.tags)
+                                {
+                                    string trimmed = (tag ?? "").Trim();
+                                    if (string.IsNullOrWhiteSpace(trimmed)) continue;
+                                    if (!currentTagSetBatch.Contains(trimmed))
+                                    {
+                                        if (workService.AddWorkTag(workItem.Id, trimmed, source: "AI"))
+                                        {
+                                            updated = true;
+                                            currentTagSetBatch.Add(trimmed);
+                                        }
+                                    }
+                                }
+                            }
+
                             // 3. 异步下载封面（如果原本没封面）
                             if (string.IsNullOrEmpty(workItem.CoverPath) && !string.IsNullOrEmpty(enhancedInfo.coverUrl))
                             {
@@ -1119,6 +1141,32 @@ namespace AniTechou
                     case "originalwork":
                         success = workService.UpdateWorkOriginalWork(work.Id, value);
                         if (success) updatedFields.Add("原作");
+                        break;
+
+                    case "tags":
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                            var tagsList = ParseTagString(value);
+                            var currentTagsForUpdate = workService.GetWorkTags(work.Id);
+                            var currentTagSet = new HashSet<string>(
+                                currentTagsForUpdate.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()),
+                                StringComparer.OrdinalIgnoreCase);
+                            bool tagsAdded = false;
+                            foreach (var tag in tagsList)
+                            {
+                                string trimmed = (tag ?? "").Trim();
+                                if (string.IsNullOrWhiteSpace(trimmed)) continue;
+                                if (!currentTagSet.Contains(trimmed))
+                                {
+                                    if (workService.AddWorkTag(work.Id, trimmed, source: "AI"))
+                                    {
+                                        tagsAdded = true;
+                                        currentTagSet.Add(trimmed);
+                                    }
+                                }
+                            }
+                            if (tagsAdded) updatedFields.Add("标签");
+                        }
                         break;
 
                     case "coverurl":
@@ -1636,6 +1684,32 @@ namespace AniTechou
             MainContentArea.Content = addForm;
             ContentPlaceholder.Visibility = Visibility.Collapsed;
             MainContentArea.Visibility = Visibility.Visible;
+        }
+
+        private static List<string> ParseTagString(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return new List<string>();
+
+            string trimmed = value.Trim();
+
+            // JSON array literal like ["tag1", "tag2"]
+            if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
+            {
+                try
+                {
+                    return System.Text.Json.JsonSerializer.Deserialize<List<string>>(trimmed)
+                           ?? new List<string>();
+                }
+                catch { }
+            }
+
+            // Comma-separated (supports both English/Chinese delimiters)
+            return trimmed
+                .Split(new[] { ',', '，', ';', '；', '、', '/' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .ToList();
         }
 
         // 刷新当前视图
