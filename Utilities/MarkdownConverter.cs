@@ -166,7 +166,11 @@ namespace AniTechou.Utilities
 
                 // Convert HTML to FlowDocument by wrapping in XAML-compatible format
                 // Simple approach: use FlowDocument's built-in capabilities
-                var doc = new FlowDocument();
+                var doc = new FlowDocument
+                {
+                    FontFamily = new System.Windows.Media.FontFamily("Microsoft YaHei"),
+                    FontSize = 14
+                };
 
                 // Parse markdown line by line for basic structure
                 var lines = markdown.Split('\n');

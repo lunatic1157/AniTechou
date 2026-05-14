@@ -124,6 +124,14 @@ namespace AniTechou.Views
                 string finishedDate = FinishedDatePicker.SelectedDate.HasValue
                     ? FinishedDatePicker.SelectedDate.Value.ToString("yyyy-MM-dd") : "";
 
+                string bangumiId = BangumiIdBox.Text.Trim();
+                // 支持粘贴完整URL，自动提取数字ID
+                if (bangumiId.Contains("bgm.tv"))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(bangumiId, @"subject/(\d+)");
+                    if (match.Success) bangumiId = match.Groups[1].Value;
+                }
+
                 int workId = workService.AddWork(
                     title,
                     OriginalTitleBox.Text.Trim(),
@@ -140,6 +148,7 @@ namespace AniTechou.Views
                     _selectedCoverPath,
                     author,
                     originalWork,
+                    bangumiId: bangumiId,      // Bangumi ID → 自动补全
                     startedDate: startedDate,
                     finishedDate: finishedDate
                 );

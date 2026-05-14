@@ -279,6 +279,88 @@ namespace AniTechou.Services
         }
 
         /// <summary>
+        /// 获取符合条件的作品总数(不含分页)
+        /// </summary>
+        public int GetWorksCountAsync(string type, string status, string year, string season,
+            string sourceType, string studio, string rating, List<string> tags)
+        {
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+
+                string sql = @"
+                    SELECT COUNT(*)
+                    FROM Works w
+                    INNER JOIN UserList ul ON w.Id = ul.WorkId
+                    WHERE 1=1";
+
+                var parameters = new List<SQLiteParameter>();
+
+                if (type != "all")
+                {
+                    sql += " AND w.Type = @Type";
+                    parameters.Add(new SQLiteParameter("@Type", type));
+                }
+                if (status != "all")
+                {
+                    sql += " AND ul.Status = @Status";
+                    parameters.Add(new SQLiteParameter("@Status", status));
+                }
+                if (year != "全部年份" && !string.IsNullOrEmpty(year))
+                {
+                    sql += " AND w.Year LIKE @Year";
+                    parameters.Add(new SQLiteParameter("@Year", $"{year}%"));
+                }
+                if (season != "全部季节" && !string.IsNullOrEmpty(season))
+                {
+                    sql += " AND w.Season = @Season";
+                    parameters.Add(new SQLiteParameter("@Season", season));
+                }
+                if (sourceType != "全部原作" && !string.IsNullOrEmpty(sourceType))
+                {
+                    sql += " AND w.SourceType = @SourceType";
+                    parameters.Add(new SQLiteParameter("@SourceType", sourceType));
+                }
+                if (studio != "全部制作" && !string.IsNullOrEmpty(studio))
+                {
+                    sql += " AND w.Company = @Studio";
+                    parameters.Add(new SQLiteParameter("@Studio", studio));
+                }
+                if (rating != "全部评分" && !string.IsNullOrEmpty(rating))
+                {
+                    double minR = 0, maxR = 10;
+                    switch (rating)
+                    {
+                        case "一般 (1-4)": minR = 10; maxR = 39; break;
+                        case "还行 (5-6)": minR = 50; maxR = 69; break;
+                        case "佳作 (7-8)": minR = 70; maxR = 89; break;
+                        case "神作 (9-10)": minR = 90; maxR = 100; break;
+                    }
+                    sql += " AND ul.Rating >= @MinRating AND ul.Rating <= @MaxRating";
+                    parameters.Add(new SQLiteParameter("@MinRating", minR));
+                    parameters.Add(new SQLiteParameter("@MaxRating", maxR));
+                }
+                if (tags != null && tags.Count > 0)
+                {
+                    sql += " AND EXISTS (SELECT 1 FROM WorkTags wt WHERE wt.WorkId = w.Id AND wt.TagName IN (";
+                    for (int i = 0; i < tags.Count; i++)
+                    {
+                        sql += $"@Tag{i}";
+                        if (i < tags.Count - 1) sql += ",";
+                        parameters.Add(new SQLiteParameter($"@Tag{i}", tags[i]));
+                    }
+                    sql += "))";
+                }
+
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddRange(parameters.ToArray());
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+                }
+            }
+        }
+
+        /// <summary>
         /// 获取所有年份
         /// </summary>
         public List<string> GetAllYears()
@@ -1020,7 +1102,7 @@ namespace AniTechou.Services
 
                             transaction.Commit();
 
-                            // Auto-fetch Bangumi tags if BangumiId is provided
+                            // Auto-fetch Bangumi details if BangumiId is provided
                             if (!string.IsNullOrEmpty(bangumiId))
                             {
                                 _ = Task.Run(async () =>
@@ -1029,13 +1111,36 @@ namespace AniTechou.Services
                                     {
                                         var bgmProvider = new SearchProviders.BangumiSearchProvider();
                                         var detail = await bgmProvider.GetByIdAsync(bangumiId);
-                                        if (detail?.Tags != null)
+                                        if (detail != null)
                                         {
-                                            foreach (var tag in detail.Tags)
+                                            // 标签
+                                            if (detail.Tags != null)
                                             {
-                                                if (!string.IsNullOrWhiteSpace(tag))
-                                                    AddWorkTag(workId, tag, "Bangumi");
+                                                foreach (var tag in detail.Tags)
+                                                {
+                                                    if (!string.IsNullOrWhiteSpace(tag))
+                                                        AddWorkTag(workId, tag, "Bangumi");
+                                                }
                                             }
+                                            // 补全空字段
+                                            if (string.IsNullOrEmpty(company) && !string.IsNullOrEmpty(detail.Company))
+                                                UpdateWorkCompany(workId, detail.Company);
+                                            if (string.IsNullOrEmpty(author) && !string.IsNullOrEmpty(detail.Author))
+                                                UpdateWorkAuthor(workId, detail.Author);
+                                            if (string.IsNullOrEmpty(originalWork) && !string.IsNullOrEmpty(detail.OriginalWork))
+                                                UpdateWorkOriginalWork(workId, detail.OriginalWork);
+                                            if (string.IsNullOrEmpty(season) && !string.IsNullOrEmpty(detail.Season))
+                                                UpdateWorkSeason(workId, detail.Season);
+                                            if ((string.IsNullOrEmpty(sourceType) || sourceType == "原创") && !string.IsNullOrEmpty(detail.SourceType))
+                                                UpdateWorkSourceType(workId, detail.SourceType);
+                                            if (string.IsNullOrEmpty(episodesVolumes) && !string.IsNullOrEmpty(detail.Episodes))
+                                                UpdateWorkEpisodes(workId, detail.Episodes);
+                                            if (string.IsNullOrEmpty(synopsis) && !string.IsNullOrEmpty(detail.Synopsis))
+                                                UpdateWorkSynopsis(workId, detail.Synopsis);
+                                            // 封面
+                                            if (string.IsNullOrEmpty(coverPath) && !string.IsNullOrEmpty(detail.CoverUrl))
+                                                _ = DownloadAndSaveCoverAsync(
+                                                    $"bgm_id:{bangumiId}|{detail.CoverUrl}", workId);
                                         }
                                     }
                                     catch { /* best-effort */ }

@@ -151,6 +151,8 @@ namespace AniTechou
                 case "wish": status = "wish"; break;
                 case "doing": status = "doing"; break;
                 case "done": status = "done"; break;
+                case "on_hold": status = "on_hold"; break;
+                case "dropped": status = "dropped"; break;
                 case "all": type = "all"; break;
                 case "notes":
                     var notesView = new Views.NotesView(_currentAccountName);
@@ -1415,6 +1417,9 @@ namespace AniTechou
                     
                     if (detailedWork != null)
                     {
+                        // 补全 Bangumi ID（如果原来没有）
+                        if (string.IsNullOrEmpty(detailedWork.BangumiId) && !string.IsNullOrEmpty(work.bangumiId))
+                            workService.UpdateWorkBangumiId(workId, work.bangumiId);
                         // 更新已有作品的信息 (补全空白)
                         if (!string.IsNullOrEmpty(work.company) && string.IsNullOrEmpty(detailedWork.Company)) workService.UpdateWorkCompany(workId, work.company);
                         if (!string.IsNullOrEmpty(work.season) && string.IsNullOrEmpty(detailedWork.Season)) workService.UpdateWorkSeason(workId, work.season);
@@ -1430,6 +1435,30 @@ namespace AniTechou
                         if (!string.IsNullOrEmpty(work.synopsis) && string.IsNullOrEmpty(detailedWork.Synopsis)) workService.UpdateWorkSynopsis(workId, work.synopsis);
                         if (!string.IsNullOrEmpty(work.author) && string.IsNullOrEmpty(detailedWork.Author)) workService.UpdateWorkAuthor(workId, work.author);
                         if (!string.IsNullOrEmpty(work.originalWork) && string.IsNullOrEmpty(detailedWork.OriginalWork)) workService.UpdateWorkOriginalWork(workId, work.originalWork);
+                        // 有 Bangumi ID 后异步补全空字段
+                        if (!string.IsNullOrEmpty(work.bangumiId) || !string.IsNullOrEmpty(detailedWork.BangumiId))
+                        {
+                            var bgmId = work.bangumiId ?? detailedWork.BangumiId;
+                            var ws = workService;
+                            _ = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    var bgmProvider = new Services.SearchProviders.BangumiSearchProvider();
+                                    var detail = await bgmProvider.GetByIdAsync(bgmId);
+                                    if (detail != null)
+                                    {
+                                        if (string.IsNullOrEmpty(detailedWork.Company) && !string.IsNullOrEmpty(detail.Company))
+                                            ws.UpdateWorkCompany(workId, detail.Company);
+                                        if (string.IsNullOrEmpty(detailedWork.Author) && !string.IsNullOrEmpty(detail.Author))
+                                            ws.UpdateWorkAuthor(workId, detail.Author);
+                                        if (string.IsNullOrEmpty(detailedWork.OriginalWork) && !string.IsNullOrEmpty(detail.OriginalWork))
+                                            ws.UpdateWorkOriginalWork(workId, detail.OriginalWork);
+                                    }
+                                }
+                                catch { }
+                            });
+                        }
                     }
                 }
 
@@ -1455,7 +1484,8 @@ namespace AniTechou
                         work.synopsis ?? "",           // 简介
                         "",                            // 封面先留空，下载后再更新
                         work.author ?? "",             // 作者
-                        work.originalWork ?? ""        // 原作
+                        work.originalWork ?? "",       // 原作
+                        bangumiId: work.bangumiId ?? "" // Bangumi ID → 自动补全+外部链接
                     );
                 }
 
@@ -1631,9 +1661,9 @@ namespace AniTechou
                 ("🔍 推荐", "推荐几部好看的治愈番"),
                 ("📋 补全", "帮我补全作品的原作信息"),
                 ("🏷️ 标签", "给我库里的京阿尼作品加上制作公司标签"),
-                ("🆕 新番", "2025年有什么值得看的新番"),
-                ("🎬 热梗", "帮我找一部主角会时间回溯的动画"),
-                ("📝 声优", "花泽香菜配过哪些知名角色"),
+                ("📊 统计", "我有几部动画？几部漫画？"),
+                ("👤 口味", "分析我的口味偏好"),
+                ("🎯 推荐", "根据我的收藏推荐还没看过的作品"),
                 ("📺 动画", "推荐2024年的原创动画"),
                 ("📚 漫画", "有什么悬疑类的漫画推荐"),
                 ("🎮 游戏", "推荐类似弹丸论破的游戏"),

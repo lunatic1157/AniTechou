@@ -215,6 +215,8 @@
                     <Button Content="👀 想看" Style="{StaticResource AppSidebarButtonStyle}" Tag="wish" Click="SidebarMenu_Click"/>
                     <Button Content="▶️ 在看" Style="{StaticResource AppSidebarButtonStyle}" Tag="doing" Click="SidebarMenu_Click"/>
                     <Button Content="✅ 看过" Style="{StaticResource AppSidebarButtonStyle}" Tag="done" Click="SidebarMenu_Click"/>
+                    <Button Content="⏸️ 搁置" Style="{StaticResource AppSidebarButtonStyle}" Tag="on_hold" Click="SidebarMenu_Click"/>
+                    <Button Content="❌ 抛弃" Style="{StaticResource AppSidebarButtonStyle}" Tag="dropped" Click="SidebarMenu_Click"/>
 
                     <!-- 笔记中心 -->
                     <TextBlock Text="📝 笔记中心" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="8,14,0,10"/>

@@ -76,7 +76,8 @@ namespace AniTechou.Services
                         return result;
                     }
 
-                    if (!doc.RootElement.TryGetProperty("data", out var dataArray))
+                    if (!doc.RootElement.TryGetProperty("data", out var dataArray) ||
+                        dataArray.ValueKind != JsonValueKind.Array)
                     {
                         System.Diagnostics.Debug.WriteLine($"[SyncService] Bangumi 响应结构异常: {json?.Substring(0, Math.Min(300, json?.Length ?? 0))}");
                         result.ErrorMessage = "Bangumi 返回数据格式异常，请确认用户名是否正确";
@@ -99,13 +100,15 @@ namespace AniTechou.Services
                             subjectType = SearchProviders.BangumiSearchProvider.MapBangumiType(subType);
                         }
 
-                        // 解析用户个人标签
+                        // 解析用户个人标签（Bangumi v0 API: tags 是字符串数组）
                         var userTags = new List<string>();
                         if (item.TryGetProperty("tags", out var tagsArray) && tagsArray.ValueKind == JsonValueKind.Array)
                         {
                             foreach (var t in tagsArray.EnumerateArray())
                             {
-                                string tagName = SafeGetString(t, "name");
+                                string tagName = t.ValueKind == JsonValueKind.String
+                                    ? t.GetString()
+                                    : SafeGetString(t, "name");
                                 if (!string.IsNullOrWhiteSpace(tagName))
                                     userTags.Add(tagName);
                             }

@@ -32,6 +32,7 @@ namespace AniTechou.Views
         private const int PAGE_SIZE = 50;
         private List<WorkService.WorkCardData> _allLoadedWorks = new List<WorkService.WorkCardData>();
         private bool _hasMoreItems = true;
+        private int _totalCount = 0;
 
         public void SetTagFilter(string tag)
         {
@@ -339,7 +340,14 @@ namespace AniTechou.Views
             else
                 EmptyText.Visibility = Visibility.Collapsed;
 
-            CountText.Text = $"({_allLoadedWorks.Count}部)";
+            if (reset)
+            {
+                // 获取总数(带筛选条件)
+                _totalCount = await Task.Run(() => _workService.GetWorksCountAsync(
+                    _currentType, _currentStatus, _currentYear, _currentSeason,
+                    _currentSourceType, _currentStudio, _currentRating, _selectedTags));
+            }
+            CountText.Text = $"({_totalCount}部)";
             UpdateStatusButtonStyles();
             UpdateTitleText();
         }

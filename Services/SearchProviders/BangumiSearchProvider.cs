@@ -225,6 +225,14 @@ namespace AniTechou.Services.SearchProviders
             // 制作人员信息 (v0 API infobox) — 含声优、原作、制作人员
             if (root.TryGetProperty("infobox", out var infobox))
             {
+                // 收集所有 infobox keys 用于诊断
+                var infoboxKeys = new List<string>();
+                foreach (var item in infobox.EnumerateArray())
+                {
+                    infoboxKeys.Add(SafeGetString(item, "key"));
+                }
+                System.Diagnostics.Debug.WriteLine($"[BangumiSearch] infobox keys for {result.Title}: [{string.Join(", ", infoboxKeys)}]");
+
                 foreach (var item in infobox.EnumerateArray())
                 {
                     string key = SafeGetString(item, "key");
@@ -239,12 +247,30 @@ namespace AniTechou.Services.SearchProviders
                         if (string.IsNullOrEmpty(result.OriginalWork))
                             result.OriginalWork = value;
                     }
-                    // 制作公司
+                    // 制作公司 (动画)
                     else if (key.Contains("动画制作") || key.Contains("制作公司") || key.Contains("製作"))
                     {
                         if (string.IsNullOrEmpty(result.Company))
                             result.Company = value;
                     }
+                    // 出版社 (漫画/轻小说) — 作为 Company 填入
+                    else if (key.Contains("出版社") || key.Contains("出版") || key.Contains("レーベル") || key.Contains("文库"))
+                    {
+                        if (string.IsNullOrEmpty(result.Company))
+                            result.Company = value;
+                    }
+                    // 连载杂志
+                    else if (key.Contains("连载杂志") || key.Contains("掲載誌") || key.Contains("连载"))
+                        AddTagIfNew(result, $"连载:{value}");
+                    // 作者 (漫画/轻小说作者)
+                    else if (key.Contains("作者") || key.Contains("著者") || key.Contains("漫画"))
+                    {
+                        if (string.IsNullOrEmpty(result.Author))
+                            result.Author = value;
+                    }
+                    // 插图 (轻小说插画师)
+                    else if (key.Contains("插图") || key.Contains("イラスト") || key.Contains("插画"))
+                        AddTagIfNew(result, $"插图:{value}");
                     // 导演
                     else if (key.Contains("导演") || key.Contains("监督") || key.Contains("監督") || key.Contains("ディレクター"))
                         AddTagIfNew(result, $"导演:{value}");
@@ -271,14 +297,10 @@ namespace AniTechou.Services.SearchProviders
                         foreach (var name in SplitSeiyuuNames(seiyuuList))
                             AddTagIfNew(result, $"CV:{name}");
                     }
-                    // 小说/漫画作者（区别于动画原作）
-                    else if (key.Contains("作者") || key.Contains("著者") || key.Contains("イラスト") || key.Contains("插图"))
-                    {
-                        if (string.IsNullOrEmpty(result.Author))
-                            result.Author = value;
-                    }
                 }
             }
+
+            System.Diagnostics.Debug.WriteLine($"[BangumiSearch] {result.Title}: Company={result.Company}, Author={result.Author}, OriginalWork={result.OriginalWork}, Type={result.Type}");
 
             // 标签
             if (root.TryGetProperty("tags", out var tags))
@@ -316,6 +338,10 @@ namespace AniTechou.Services.SearchProviders
             {
                 return SafeGetString(valueArray[0], "v");
             }
+            if (valueArray.ValueKind == JsonValueKind.String)
+            {
+                return valueArray.GetString() ?? "";
+            }
             return "";
         }
 
@@ -327,6 +353,8 @@ namespace AniTechou.Services.SearchProviders
         {
             if (!item.TryGetProperty("value", out var valueArray))
                 return "";
+            if (valueArray.ValueKind == JsonValueKind.String)
+                return valueArray.GetString() ?? "";
             if (valueArray.ValueKind != JsonValueKind.Array || valueArray.GetArrayLength() == 0)
                 return "";
 

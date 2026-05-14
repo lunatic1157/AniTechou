@@ -166,8 +166,11 @@ namespace AniTechou.Views
                     _isMarkdownMode = true;
                     MarkdownModeToggle.IsChecked = true;
                     MarkdownEditBox.Text = _note.Content ?? "";
-                    MarkdownEditBox.Visibility = Visibility.Visible;
-                    RichEditor.Visibility = Visibility.Collapsed;
+                    MarkdownEditPanel.Visibility = Visibility.Visible;
+                    MarkdownSplitter.Visibility = Visibility.Visible;
+                    MarkdownPreviewPanel.Visibility = Visibility.Visible;
+                    RichEditorPanel.Visibility = Visibility.Collapsed;
+                    RefreshMarkdownPreview();
                 }
                 else
                 {
@@ -175,8 +178,10 @@ namespace AniTechou.Views
                     LoadRichTextContent(_note.Content);
                     _isMarkdownMode = false;
                     MarkdownModeToggle.IsChecked = false;
-                    MarkdownEditBox.Visibility = Visibility.Collapsed;
-                    RichEditor.Visibility = Visibility.Visible;
+                    MarkdownEditPanel.Visibility = Visibility.Collapsed;
+                    MarkdownSplitter.Visibility = Visibility.Collapsed;
+                    MarkdownPreviewPanel.Visibility = Visibility.Collapsed;
+                    RichEditorPanel.Visibility = Visibility.Visible;
                 }
 
                 _selectedWorkIds = new List<int>(_note.WorkIds);
@@ -630,9 +635,12 @@ namespace AniTechou.Views
                 string xamlContent = GetRichTextContent();
                 string markdown = Utilities.MarkdownConverter.XamlToMarkdown(xamlContent);
                 MarkdownEditBox.Text = markdown;
-                RichEditor.Visibility = Visibility.Collapsed;
-                MarkdownEditBox.Visibility = Visibility.Visible;
+                RichEditorPanel.Visibility = Visibility.Collapsed;
+                MarkdownEditPanel.Visibility = Visibility.Visible;
+                MarkdownSplitter.Visibility = Visibility.Visible;
+                MarkdownPreviewPanel.Visibility = Visibility.Visible;
                 _isMarkdownMode = true;
+                RefreshMarkdownPreview();
             }
             else if (!toMarkdown && _isMarkdownMode)
             {
@@ -640,9 +648,34 @@ namespace AniTechou.Views
                 string markdownContent = MarkdownEditBox.Text;
                 var flowDoc = Utilities.MarkdownConverter.MarkdownToFlowDocument(markdownContent);
                 RichEditor.Document = flowDoc;
-                RichEditor.Visibility = Visibility.Visible;
-                MarkdownEditBox.Visibility = Visibility.Collapsed;
+                RichEditorPanel.Visibility = Visibility.Visible;
+                MarkdownEditPanel.Visibility = Visibility.Collapsed;
+                MarkdownSplitter.Visibility = Visibility.Collapsed;
+                MarkdownPreviewPanel.Visibility = Visibility.Collapsed;
                 _isMarkdownMode = false;
+            }
+        }
+
+        private void MarkdownEditBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (!_suppressTextEvents)
+            {
+                RefreshMarkdownPreview();
+                MarkDirtyAndScheduleSave();
+            }
+        }
+
+        private void RefreshMarkdownPreview()
+        {
+            try
+            {
+                string md = MarkdownEditBox.Text ?? "";
+                var flowDoc = Utilities.MarkdownConverter.MarkdownToFlowDocument(md);
+                MarkdownPreviewViewer.Document = flowDoc;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[NoteEditor] Markdown预览刷新失败: {ex.Message}");
             }
         }
 
