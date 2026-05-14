@@ -251,12 +251,69 @@ namespace AniTechou.Services
                 string newStatus = MapBangumiStatus(bgmStatusInt2);
                 double newRating = item.Rate > 0 ? item.Rate : userWork.Rating;
 
+                // === 元数据补全：已有作品空字段从 Bangumi 拉取 ===
+                string metaBgmId = item.SubjectId > 0 ? item.SubjectId.ToString() : match.BangumiId;
+                if (!string.IsNullOrEmpty(metaBgmId))
+                {
+                    try
+                    {
+                        var fullWork = workService.GetWorkById(match.Id);
+                        if (fullWork != null)
+                        {
+                            bool needMeta = string.IsNullOrEmpty(fullWork.Company) ||
+                                string.IsNullOrEmpty(fullWork.Author) ||
+                                string.IsNullOrEmpty(fullWork.OriginalWork) ||
+                                string.IsNullOrEmpty(fullWork.Season) ||
+                                string.IsNullOrEmpty(fullWork.SourceType) || fullWork.SourceType == "原创" ||
+                                string.IsNullOrEmpty(fullWork.EpisodesVolumes) ||
+                                string.IsNullOrEmpty(fullWork.Synopsis) ||
+                                string.IsNullOrEmpty(fullWork.CoverPath);
+
+                            if (needMeta)
+                            {
+                                var bgmProvider = new SearchProviders.BangumiSearchProvider();
+                                var detail = await bgmProvider.GetByIdAsync(metaBgmId);
+                                if (detail != null)
+                                {
+                                    if (string.IsNullOrEmpty(fullWork.Company) && !string.IsNullOrEmpty(detail.Company))
+                                        workService.UpdateWorkCompany(match.Id, detail.Company);
+                                    if (string.IsNullOrEmpty(fullWork.Author) && !string.IsNullOrEmpty(detail.Author))
+                                        workService.UpdateWorkAuthor(match.Id, detail.Author);
+                                    if (string.IsNullOrEmpty(fullWork.OriginalWork) && !string.IsNullOrEmpty(detail.OriginalWork))
+                                        workService.UpdateWorkOriginalWork(match.Id, detail.OriginalWork);
+                                    if (string.IsNullOrEmpty(fullWork.Season) && !string.IsNullOrEmpty(detail.Season))
+                                        workService.UpdateWorkSeason(match.Id, detail.Season);
+                                    if ((string.IsNullOrEmpty(fullWork.SourceType) || fullWork.SourceType == "原创") && !string.IsNullOrEmpty(detail.SourceType))
+                                        workService.UpdateWorkSourceType(match.Id, detail.SourceType);
+                                    if (string.IsNullOrEmpty(fullWork.EpisodesVolumes) && !string.IsNullOrEmpty(detail.Episodes))
+                                        workService.UpdateWorkEpisodes(match.Id, detail.Episodes);
+                                    if (string.IsNullOrEmpty(fullWork.Synopsis) && !string.IsNullOrEmpty(detail.Synopsis))
+                                        workService.UpdateWorkSynopsis(match.Id, detail.Synopsis);
+                                    if (string.IsNullOrEmpty(fullWork.CoverPath) && !string.IsNullOrEmpty(detail.CoverUrl))
+                                        _ = workService.DownloadAndSaveCoverAsync(
+                                            string.IsNullOrEmpty(detail.BangumiId) ? detail.CoverUrl
+                                            : $"bgm_id:{detail.BangumiId}|{detail.CoverUrl}", match.Id);
+
+                                    System.Diagnostics.Debug.WriteLine($"[SyncService] 元数据补全: {fullWork.Title} Company={detail.Company} Author={detail.Author} OriginalWork={detail.OriginalWork}");
+                                    result.Details.Add($"补全元数据: {item.NameCn ?? item.Name}");
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SyncService] 元数据补全异常 {searchName}: {ex.Message}");
+                    }
+                }
+
+                // Always save BangumiId if missing (enables future metadata補全)
+                if (string.IsNullOrEmpty(match.BangumiId) && item.SubjectId > 0)
+                    workService.UpdateWorkBangumiId(match.Id, item.SubjectId.ToString());
+
                 bool changed = userWork.Status != newStatus || userWork.Rating != newRating;
                 if (changed)
                 {
                     workService.UpdateUserWork(userWork.Id, newStatus, userWork.Progress, newRating);
-                    if (string.IsNullOrEmpty(match.BangumiId) && item.SubjectId > 0)
-                        workService.UpdateWorkBangumiId(match.Id, item.SubjectId.ToString());
                     // Save user tags
                     if (item.Tags != null)
                     {

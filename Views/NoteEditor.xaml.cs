@@ -627,32 +627,40 @@ namespace AniTechou.Views
 
         private void MarkdownModeToggle_Click(object sender, RoutedEventArgs e)
         {
-            bool toMarkdown = MarkdownModeToggle.IsChecked == true;
+            _suppressTextEvents = true;
+            try
+            {
+                bool toMarkdown = MarkdownModeToggle.IsChecked == true;
 
-            if (toMarkdown && !_isMarkdownMode)
-            {
-                // Switching FROM Xaml TO Markdown
-                string xamlContent = GetRichTextContent();
-                string markdown = Utilities.MarkdownConverter.XamlToMarkdown(xamlContent);
-                MarkdownEditBox.Text = markdown;
-                RichEditorPanel.Visibility = Visibility.Collapsed;
-                MarkdownEditPanel.Visibility = Visibility.Visible;
-                MarkdownSplitter.Visibility = Visibility.Visible;
-                MarkdownPreviewPanel.Visibility = Visibility.Visible;
-                _isMarkdownMode = true;
-                RefreshMarkdownPreview();
+                if (toMarkdown && !_isMarkdownMode)
+                {
+                    // Switching FROM Xaml TO Markdown
+                    string xamlContent = GetRichTextContent();
+                    string markdown = Utilities.MarkdownConverter.XamlToMarkdown(xamlContent);
+                    MarkdownEditBox.Text = markdown;
+                    RichEditorPanel.Visibility = Visibility.Collapsed;
+                    MarkdownEditPanel.Visibility = Visibility.Visible;
+                    MarkdownSplitter.Visibility = Visibility.Visible;
+                    MarkdownPreviewPanel.Visibility = Visibility.Visible;
+                    _isMarkdownMode = true;
+                    RefreshMarkdownPreview();
+                }
+                else if (!toMarkdown && _isMarkdownMode)
+                {
+                    // Switching FROM Markdown TO Xaml
+                    string markdownContent = MarkdownEditBox.Text;
+                    var flowDoc = Utilities.MarkdownConverter.MarkdownToFlowDocument(markdownContent);
+                    RichEditor.Document = flowDoc;
+                    RichEditorPanel.Visibility = Visibility.Visible;
+                    MarkdownEditPanel.Visibility = Visibility.Collapsed;
+                    MarkdownSplitter.Visibility = Visibility.Collapsed;
+                    MarkdownPreviewPanel.Visibility = Visibility.Collapsed;
+                    _isMarkdownMode = false;
+                }
             }
-            else if (!toMarkdown && _isMarkdownMode)
+            finally
             {
-                // Switching FROM Markdown TO Xaml
-                string markdownContent = MarkdownEditBox.Text;
-                var flowDoc = Utilities.MarkdownConverter.MarkdownToFlowDocument(markdownContent);
-                RichEditor.Document = flowDoc;
-                RichEditorPanel.Visibility = Visibility.Visible;
-                MarkdownEditPanel.Visibility = Visibility.Collapsed;
-                MarkdownSplitter.Visibility = Visibility.Collapsed;
-                MarkdownPreviewPanel.Visibility = Visibility.Collapsed;
-                _isMarkdownMode = false;
+                _suppressTextEvents = false;
             }
         }
 

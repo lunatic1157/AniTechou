@@ -115,8 +115,8 @@ namespace AniTechou.Utilities
                 }
                 else if (inline is InlineUIContainer container && container.Child is System.Windows.Controls.Grid grid)
                 {
-                    // Image embedded in resizable host
-                    var img = grid.FindName("ContentImage") as System.Windows.Controls.Image;
+                    // Image embedded in resizable host — find Image by traversing children
+                    var img = FindImageInGrid(grid);
                     if (img != null)
                     {
                         string imgPath = img.Uid ?? "";
@@ -274,6 +274,20 @@ namespace AniTechou.Utilities
 
             while (i < text.Length)
             {
+                // Bold+Italic ***...*** (check before Bold to avoid greedy **)
+                if (i < text.Length - 5 && text[i] == '*' && text[i + 1] == '*' && text[i + 2] == '*')
+                {
+                    int end = text.IndexOf("***", i + 3);
+                    if (end > i)
+                    {
+                        FlushPlainText(i);
+                        string content = text.Substring(i + 3, end - i - 3);
+                        span.Inlines.Add(new Bold(new Italic(new Run(content))));
+                        i = end + 3;
+                        plainStart = i;
+                        continue;
+                    }
+                }
                 // Bold **...**
                 if (i < text.Length - 3 && text[i] == '*' && text[i + 1] == '*')
                 {
@@ -287,7 +301,7 @@ namespace AniTechou.Utilities
                         continue;
                     }
                 }
-                // Italic *...* (single *, not part of **)
+                // Italic *...* (single *, not part of ** or ***)
                 if (i < text.Length - 1 && text[i] == '*' && text[i + 1] != '*')
                 {
                     int end = text.IndexOf('*', i + 1);
@@ -298,6 +312,38 @@ namespace AniTechou.Utilities
                         i = end + 1;
                         plainStart = i;
                         continue;
+                    }
+                }
+                // Underline <u>text</u>
+                if (i < text.Length - 6 && text[i] == '<' && text[i + 1] == 'u' && text[i + 2] == '>')
+                {
+                    int end = text.IndexOf("</u>", i + 3);
+                    if (end > i)
+                    {
+                        FlushPlainText(i);
+                        string content = text.Substring(i + 3, end - i - 3);
+                        span.Inlines.Add(new Underline(new Run(content)));
+                        i = end + 4;
+                        plainStart = i;
+                        continue;
+                    }
+                }
+                // Image ![alt](path)
+                if (i < text.Length - 4 && text[i] == '!' && text[i + 1] == '[')
+                {
+                    int closeB = text.IndexOf(']', i + 2);
+                    if (closeB > i && closeB + 1 < text.Length && text[closeB + 1] == '(')
+                    {
+                        int closeP = text.IndexOf(')', closeB + 2);
+                        if (closeP > closeB)
+                        {
+                            FlushPlainText(i);
+                            string alt = text.Substring(i + 2, closeB - i - 2);
+                            span.Inlines.Add(new Run($"[图片: {alt}]") { Foreground = System.Windows.Media.Brushes.Gray });
+                            i = closeP + 1;
+                            plainStart = i;
+                            continue;
+                        }
                     }
                 }
                 // Link [text](url)
@@ -331,6 +377,18 @@ namespace AniTechou.Utilities
 
             FlushPlainText(text.Length);
             return span;
+        }
+
+        private static System.Windows.Controls.Image FindImageInGrid(System.Windows.Controls.Grid grid)
+        {
+            foreach (var child in grid.Children)
+            {
+                if (child is System.Windows.Controls.Border border && border.Child is System.Windows.Controls.Image img)
+                    return img;
+                if (child is System.Windows.Controls.Image directImg)
+                    return directImg;
+            }
+            return null;
         }
     }
 }
