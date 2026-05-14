@@ -671,7 +671,10 @@ namespace AniTechou.Views
             {
                 string md = MarkdownEditBox.Text ?? "";
                 var flowDoc = Utilities.MarkdownConverter.MarkdownToFlowDocument(md);
+                flowDoc.Foreground = MarkdownPreviewViewer.Foreground;
+                flowDoc.FontFamily = MarkdownPreviewViewer.FontFamily;
                 MarkdownPreviewViewer.Document = flowDoc;
+                System.Diagnostics.Debug.WriteLine($"[NoteEditor] Markdown预览已刷新, Block数={flowDoc.Blocks.Count}, 字符数={md.Length}");
             }
             catch (Exception ex)
             {

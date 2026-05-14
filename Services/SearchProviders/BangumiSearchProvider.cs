@@ -241,32 +241,50 @@ namespace AniTechou.Services.SearchProviders
 
                     if (string.IsNullOrEmpty(value) && string.IsNullOrEmpty(allValues)) continue;
 
-                    // 原作 / 原作者
-                    if (key.Contains("原作") || key.Contains("原著") || key.Contains("原案"))
+                    // 原作者 (作者) — 必须在"原作"之前检查，因为"原作者"包含子串"原作"
+                    if (key.Contains("原作者") || key.Contains("著者") || key.Contains("漫画") || key.Contains("作画"))
+                    {
+                        if (string.IsNullOrEmpty(result.Author))
+                            result.Author = value;
+                    }
+                    // 作者
+                    else if (key.Contains("作者"))
+                    {
+                        if (string.IsNullOrEmpty(result.Author))
+                            result.Author = value;
+                    }
+                    // 原作 / 原著 / 原案 — 作品名
+                    else if (key.Contains("原作") || key.Contains("原著") || key.Contains("原案"))
                     {
                         if (string.IsNullOrEmpty(result.OriginalWork))
                             result.OriginalWork = value;
                     }
                     // 制作公司 (动画)
-                    else if (key.Contains("动画制作") || key.Contains("制作公司") || key.Contains("製作"))
+                    else if (key.Contains("动画制作") || key.Contains("制作公司") || key.Contains("製作") || key.Contains("制作"))
                     {
                         if (string.IsNullOrEmpty(result.Company))
                             result.Company = value;
                     }
-                    // 出版社 (漫画/轻小说) — 作为 Company 填入
-                    else if (key.Contains("出版社") || key.Contains("出版") || key.Contains("レーベル") || key.Contains("文库"))
+                    // 出版社/品牌/文库 (漫画/轻小说) — 作为 Company
+                    else if (key.Contains("出版社") || key.Contains("レーベル") || key.Contains("文库") || key.Contains("品牌") || key.Contains(" imprint"))
                     {
                         if (string.IsNullOrEmpty(result.Company))
                             result.Company = value;
                     }
-                    // 连载杂志
-                    else if (key.Contains("连载杂志") || key.Contains("掲載誌") || key.Contains("连载"))
+                    // "出版" 单独匹配（排除"出版社"已匹配的）
+                    else if (key == "出版" || key.Contains("出版元"))
+                    {
+                        if (string.IsNullOrEmpty(result.Company))
+                            result.Company = value;
+                    }
+                    // 连载杂志 — "连载杂志"精确优先
+                    else if (key.Contains("连载杂志") || key.Contains("掲載誌"))
                         AddTagIfNew(result, $"连载:{value}");
-                    // 作者 (漫画/轻小说作者)
-                    else if (key.Contains("作者") || key.Contains("著者") || key.Contains("漫画"))
+                    // 开发 (游戏)
+                    else if (key.Contains("开发") || key.Contains("開発"))
                     {
-                        if (string.IsNullOrEmpty(result.Author))
-                            result.Author = value;
+                        if (string.IsNullOrEmpty(result.Company))
+                            result.Company = value;
                     }
                     // 插图 (轻小说插画师)
                     else if (key.Contains("插图") || key.Contains("イラスト") || key.Contains("插画"))

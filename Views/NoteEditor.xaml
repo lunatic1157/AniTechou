@@ -275,7 +275,9 @@
                 <FlowDocumentScrollViewer x:Name="MarkdownPreviewViewer"
                                           VerticalScrollBarVisibility="Auto"
                                           Padding="10"
-                                          FontFamily="Microsoft YaHei"/>
+                                          FontFamily="Microsoft YaHei"
+                                          Background="{DynamicResource Surface1Brush}"
+                                          Foreground="{DynamicResource TextPrimaryBrush}"/>
             </Border>
         </Grid>
 

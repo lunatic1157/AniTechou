@@ -151,7 +151,6 @@ namespace AniTechou.Utilities
 
         /// <summary>
         /// Convert Markdown text to WPF FlowDocument.
-        /// Uses Markdig pipeline, then converts HTML to FlowDocument via XAML.
         /// </summary>
         public static FlowDocument MarkdownToFlowDocument(string markdown)
         {
@@ -160,20 +159,14 @@ namespace AniTechou.Utilities
 
             try
             {
-                // Use Markdig to convert MD to HTML
-                var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
-                string html = Markdig.Markdown.ToHtml(markdown, pipeline);
-
-                // Convert HTML to FlowDocument by wrapping in XAML-compatible format
-                // Simple approach: use FlowDocument's built-in capabilities
                 var doc = new FlowDocument
                 {
                     FontFamily = new System.Windows.Media.FontFamily("Microsoft YaHei"),
-                    FontSize = 14
+                    FontSize = 14,
+                    PagePadding = new Thickness(0)
                 };
 
-                // Parse markdown line by line for basic structure
-                var lines = markdown.Split('\n');
+                var lines = markdown.Replace("\r\n", "\n").Split('\n');
                 Paragraph currentPara = null;
 
                 foreach (var line in lines)
@@ -182,7 +175,6 @@ namespace AniTechou.Utilities
 
                     if (string.IsNullOrWhiteSpace(trimmed))
                     {
-                        // End current paragraph
                         currentPara = null;
                         continue;
                     }
@@ -190,36 +182,35 @@ namespace AniTechou.Utilities
                     // Headings
                     if (trimmed.StartsWith("### "))
                     {
-                        var para = new Paragraph(new Run(trimmed.Substring(4))) { FontSize = 18, FontWeight = FontWeights.Bold };
+                        var para = new Paragraph(ParseInlineMarkdown(trimmed.Substring(4))) { FontSize = 18, FontWeight = FontWeights.Bold };
                         doc.Blocks.Add(para);
                         currentPara = null;
                     }
                     else if (trimmed.StartsWith("## "))
                     {
-                        var para = new Paragraph(new Run(trimmed.Substring(3))) { FontSize = 22, FontWeight = FontWeights.Bold };
+                        var para = new Paragraph(ParseInlineMarkdown(trimmed.Substring(3))) { FontSize = 22, FontWeight = FontWeights.Bold };
                         doc.Blocks.Add(para);
                         currentPara = null;
                     }
                     else if (trimmed.StartsWith("# "))
                     {
-                        var para = new Paragraph(new Run(trimmed.Substring(2))) { FontSize = 26, FontWeight = FontWeights.Bold };
+                        var para = new Paragraph(ParseInlineMarkdown(trimmed.Substring(2))) { FontSize = 26, FontWeight = FontWeights.Bold };
                         doc.Blocks.Add(para);
                         currentPara = null;
                     }
                     // Unordered list
                     else if (trimmed.StartsWith("- ") || trimmed.StartsWith("* "))
                     {
-                        string text = trimmed.StartsWith("- ") ? trimmed.Substring(2) : trimmed.Substring(2);
+                        string text = trimmed.Substring(2);
                         var listItem = new ListItem(new Paragraph(ParseInlineMarkdown(text)));
-                        List list = null;
                         if (doc.Blocks.LastBlock is List lastList && lastList.MarkerStyle == TextMarkerStyle.Disc)
-                            list = lastList;
+                            lastList.ListItems.Add(listItem);
                         else
                         {
-                            list = new List { MarkerStyle = TextMarkerStyle.Disc };
+                            var list = new List { MarkerStyle = TextMarkerStyle.Disc };
+                            list.ListItems.Add(listItem);
                             doc.Blocks.Add(list);
                         }
-                        list.ListItems.Add(listItem);
                         currentPara = null;
                     }
                     // Ordered list
@@ -227,15 +218,14 @@ namespace AniTechou.Utilities
                     {
                         string text = System.Text.RegularExpressions.Regex.Replace(trimmed, @"^\d+\.\s", "");
                         var listItem = new ListItem(new Paragraph(ParseInlineMarkdown(text)));
-                        List list = null;
                         if (doc.Blocks.LastBlock is List lastList && lastList.MarkerStyle == TextMarkerStyle.Decimal)
-                            list = lastList;
+                            lastList.ListItems.Add(listItem);
                         else
                         {
-                            list = new List { MarkerStyle = TextMarkerStyle.Decimal };
+                            var list = new List { MarkerStyle = TextMarkerStyle.Decimal };
+                            list.ListItems.Add(listItem);
                             doc.Blocks.Add(list);
                         }
-                        list.ListItems.Add(listItem);
                         currentPara = null;
                     }
                     else
@@ -250,24 +240,38 @@ namespace AniTechou.Utilities
                         {
                             currentPara.Inlines.Add(new LineBreak());
                         }
-                        currentPara.Inlines.Add(new Run(trimmed));
+                        // Parse inline markdown for regular paragraphs too
+                        currentPara.Inlines.Add(ParseInlineMarkdown(trimmed));
                     }
                 }
 
                 return doc;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[MarkdownConverter] 转换失败: {ex.Message}");
                 return new FlowDocument(new Paragraph(new Run(markdown)));
             }
         }
 
         private static Inline ParseInlineMarkdown(string text)
         {
-            // Handle **bold**, *italic*, [link](url), ![](img)
             var span = new Span();
+            if (string.IsNullOrEmpty(text))
+                return span;
 
             int i = 0;
+            int plainStart = 0;
+
+            void FlushPlainText(int end)
+            {
+                if (plainStart < end)
+                {
+                    span.Inlines.Add(new Run(text.Substring(plainStart, end - plainStart)));
+                    plainStart = end;
+                }
+            }
+
             while (i < text.Length)
             {
                 // Bold **...**
@@ -276,19 +280,23 @@ namespace AniTechou.Utilities
                     int end = text.IndexOf("**", i + 2);
                     if (end > i)
                     {
+                        FlushPlainText(i);
                         span.Inlines.Add(new Bold(new Run(text.Substring(i + 2, end - i - 2))));
                         i = end + 2;
+                        plainStart = i;
                         continue;
                     }
                 }
-                // Italic *...*
+                // Italic *...* (single *, not part of **)
                 if (i < text.Length - 1 && text[i] == '*' && text[i + 1] != '*')
                 {
                     int end = text.IndexOf('*', i + 1);
                     if (end > i)
                     {
+                        FlushPlainText(i);
                         span.Inlines.Add(new Italic(new Run(text.Substring(i + 1, end - i - 1))));
                         i = end + 1;
+                        plainStart = i;
                         continue;
                     }
                 }
@@ -301,18 +309,27 @@ namespace AniTechou.Utilities
                         int closeP = text.IndexOf(')', closeB + 2);
                         if (closeP > closeB)
                         {
+                            FlushPlainText(i);
                             string linkText = text.Substring(i + 1, closeB - i - 1);
                             string url = text.Substring(closeB + 2, closeP - closeB - 2);
-                            span.Inlines.Add(new Hyperlink(new Run(linkText)) { NavigateUri = new Uri(url) });
+                            try
+                            {
+                                span.Inlines.Add(new Hyperlink(new Run(linkText)) { NavigateUri = new Uri(url) });
+                            }
+                            catch
+                            {
+                                span.Inlines.Add(new Run(linkText));
+                            }
                             i = closeP + 1;
+                            plainStart = i;
                             continue;
                         }
                     }
                 }
-                span.Inlines.Add(new Run(text[i].ToString()));
                 i++;
             }
 
+            FlushPlainText(text.Length);
             return span;
         }
     }
