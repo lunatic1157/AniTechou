@@ -294,7 +294,7 @@ namespace AniTechou.Services.SearchProviders
             return result;
         }
 
-        private static string MapBangumiType(int bgmType) => bgmType switch
+        public static string MapBangumiType(int bgmType) => bgmType switch
         {
             1 => "Manga",       // 书籍 → 漫画/轻小说
             2 => "Anime",       // 动画

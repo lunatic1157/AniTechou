@@ -85,6 +85,11 @@ namespace AniTechou.Services
 
 🔴 更新时只改用户提到的字段，不要覆盖其他信息！
 
+- 用户会问你关于本地收藏的问题，例如「我有哪些京阿尼的作品」「我有几部动画」「推荐几部我没看过的」「帮我找找我的列表里有没有XX」
+- 回答这类问题时，请优先参考 {{USER_COLLECTION_CONTEXT}} 中提供的用户真实收藏数据
+- 如果用户问推荐，基于用户已有作品的口味进行推荐，并说明推荐理由
+- 如果用户问统计类问题（几部、多少），直接统计上下文中的数据回答
+
 示例：{{ ""intent"":""WORK_SEARCH"", ""answer"":""找到以下作品"", ""works"":[{{
   ""title"":""葬送的芙莉莲"", ""originalTitle"":""葬送のフリーレン"", ""type"":""Anime"",
   ""year"":""2023"", ""season"":""秋"", ""company"":""MADHOUSE"", ""author"":"""", ""originalWork"":""山田钟人"",
@@ -612,6 +617,62 @@ namespace AniTechou.Services
                 return new AIResponse { intent = "GENERAL_CHAT", answer = $"抱歉，出了点问题，请稍后再试。{hint}" };
             }
         }
+
+        /// <summary>
+        /// Build a structured summary of the user's entire collection for AI context
+        /// </summary>
+        public static string BuildCollectionContext(List<WorkService.WorkCardData> allWorks, WorkService workService)
+        {
+            if (allWorks == null || allWorks.Count == 0)
+                return "（用户收藏为空）";
+
+            var sb = new StringBuilder();
+
+            // Summary stats by type
+            var byType = allWorks.GroupBy(w => w.Type).ToDictionary(g => g.Key, g => g.Count());
+            sb.AppendLine($"用户共有 {allWorks.Count} 部作品：");
+            foreach (var kv in byType)
+            {
+                string typeName = kv.Key switch
+                {
+                    "Anime" => "动画", "Manga" => "漫画", "LightNovel" => "轻小说", "Game" => "游戏", _ => kv.Key
+                };
+                sb.AppendLine($"  {typeName}: {kv.Value} 部");
+            }
+            sb.AppendLine();
+
+            // Per-work details (limit to 100 for token budget)
+            int limit = Math.Min(allWorks.Count, 100);
+            sb.AppendLine("作品列表（部分）：");
+            for (int i = 0; i < limit; i++)
+            {
+                var w = allWorks[i];
+                var userWork = workService.GetUserWorkByWorkId(w.Id);
+                var tags = workService.GetWorkTags(w.Id);
+                string status = userWork?.Status switch
+                {
+                    "wish" => "想看", "doing" => "在看", "done" => "看过",
+                    "on_hold" => "搁置", "dropped" => "抛弃", _ => "?"
+                };
+                string rating = userWork?.Rating > 0 ? $" 评分{userWork.Rating:F1}" : "";
+                string tagStr = tags.Count > 0 ? $" 标签: {string.Join(", ", tags.Take(5))}" : "";
+                sb.AppendLine($"  [{GetTypeName(w.Type)}]《{w.Title}》({status}){rating}{tagStr}");
+            }
+
+            if (allWorks.Count > 100)
+                sb.AppendLine($"  ... 还有 {allWorks.Count - 100} 部作品未列出");
+
+            return sb.ToString();
+        }
+
+        private static string GetTypeName(string type) => type switch
+        {
+            "Anime" => "动画",
+            "Manga" => "漫画",
+            "LightNovel" => "轻小说",
+            "Game" => "游戏",
+            _ => type
+        };
     }
 
     public class AIWorkSearchResult

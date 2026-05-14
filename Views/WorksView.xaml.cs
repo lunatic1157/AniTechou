@@ -28,6 +28,10 @@ namespace AniTechou.Views
         private bool _isTagsExpanded = false;
         private DispatcherTimer _tagSearchTimer;
         private List<string> _allTags = new List<string>();
+        private int _currentPage = 1;
+        private const int PAGE_SIZE = 50;
+        private List<WorkService.WorkCardData> _allLoadedWorks = new List<WorkService.WorkCardData>();
+        private bool _hasMoreItems = true;
 
         public void SetTagFilter(string tag)
         {
@@ -200,6 +204,8 @@ namespace AniTechou.Views
                 "wish" => " · 想看",
                 "doing" => " · 在看",
                 "done" => " · 看过",
+                "on_hold" => " · 搁置",
+                "dropped" => " · 抛弃",
                 _ => ""
             };
 
@@ -221,6 +227,8 @@ namespace AniTechou.Views
             ApplySelectableButtonState(WishButton, _currentStatus == "wish");
             ApplySelectableButtonState(DoingButton, _currentStatus == "doing");
             ApplySelectableButtonState(DoneButton, _currentStatus == "done");
+            ApplySelectableButtonState(OnHoldButton, _currentStatus == "on_hold");
+            ApplySelectableButtonState(DroppedButton, _currentStatus == "dropped");
         }
 
         private void TypeFilter_Click(object sender, RoutedEventArgs e)
@@ -300,45 +308,45 @@ namespace AniTechou.Views
             LoadWorks();
         }
 
-        private async void LoadWorks()
+        private async void LoadWorks(bool reset = true)
         {
-            try
+            if (reset)
             {
-                if (LoadingText != null) LoadingText.Visibility = Visibility.Visible;
-                if (WorksItemsControl != null) WorksItemsControl.Visibility = Visibility.Collapsed;
-                if (EmptyText != null) EmptyText.Visibility = Visibility.Collapsed;
-
-                var works = await Task.Run(() => _workService.GetWorksAsync(
-                    _currentType, _currentStatus, _currentYear, _currentSeason,
-                    _currentSourceType, _currentStudio, _currentRating, _selectedTags));
-
-                Dispatcher.Invoke(() => {
-                    if (CountText != null) CountText.Text = $"({works.Count})";
-
-                    if (works.Count == 0)
-                    {
-                        if (WorksItemsControl != null) WorksItemsControl.Visibility = Visibility.Collapsed;
-                        if (EmptyText != null) EmptyText.Visibility = Visibility.Visible;
-                    }
-                    else
-                    {
-                        if (WorksItemsControl != null)
-                        {
-                            WorksItemsControl.Visibility = Visibility.Visible;
-                            WorksItemsControl.ItemsSource = works;
-                        }
-                    }
-                });
+                _currentPage = 1;
+                _allLoadedWorks.Clear();
+                _hasMoreItems = true;
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"加载失败：{ex.Message}");
-            }
-            finally
-            {
-                if (LoadingText != null)
-                    LoadingText.Visibility = Visibility.Collapsed;
-            }
+
+            LoadingText.Visibility = Visibility.Visible;
+
+            var works = await Task.Run(() => _workService.GetWorksPaginatedAsync(
+                _currentType, _currentStatus, _currentYear, _currentSeason,
+                _currentSourceType, _currentStudio, _currentRating, _selectedTags,
+                (_currentPage - 1) * PAGE_SIZE, PAGE_SIZE));
+
+            _allLoadedWorks.AddRange(works);
+            _hasMoreItems = works.Count >= PAGE_SIZE;
+            _currentPage++;
+
+            WorksItemsControl.ItemsSource = null;
+            WorksItemsControl.ItemsSource = _allLoadedWorks;
+            LoadMoreButton.Visibility = _hasMoreItems ? Visibility.Visible : Visibility.Collapsed;
+
+            LoadingText.Visibility = Visibility.Collapsed;
+
+            if (_allLoadedWorks.Count == 0)
+                EmptyText.Visibility = Visibility.Visible;
+            else
+                EmptyText.Visibility = Visibility.Collapsed;
+
+            CountText.Text = $"({_allLoadedWorks.Count}部)";
+            UpdateStatusButtonStyles();
+            UpdateTitleText();
+        }
+
+        private void LoadMore_Click(object sender, RoutedEventArgs e)
+        {
+            LoadWorks(reset: false);
         }
 
         private void OnWorkCardClick(object sender, RoutedEventArgs e)

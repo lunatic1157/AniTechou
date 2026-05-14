@@ -28,7 +28,7 @@ namespace AniTechou.Views
             _accountName = accountName;
             _workService = new WorkService(accountName);
 
-            StatusBox.ItemsSource = new List<string> { "想看", "在看", "看过" };
+            StatusBox.ItemsSource = new List<string> { "想看", "在看", "看过", "搁置", "抛弃" };
             StatusBox.SelectedIndex = 0;
             // 评分已是数字文本框
 
@@ -130,6 +130,8 @@ namespace AniTechou.Views
                     "wish" => "想看",
                     "doing" => "在看",
                     "done" => "看过",
+                    "on_hold" => "搁置",
+                    "dropped" => "抛弃",
                     _ => "想看"
                 };
                 StatusBox.SelectedItem = statusText;
@@ -538,6 +540,8 @@ namespace AniTechou.Views
                     "想看" => "wish",
                     "在看" => "doing",
                     "看过" => "done",
+                    "搁置" => "on_hold",
+                    "抛弃" => "dropped",
                     _ => "wish"
                 };
                 

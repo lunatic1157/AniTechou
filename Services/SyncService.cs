@@ -96,7 +96,19 @@ namespace AniTechou.Services
                             name = SafeGetString(subjectEl, "name");
                             nameCn = SafeGetString(subjectEl, "name_cn");
                             int subType = SafeGetInt(subjectEl, "type");
-                            subjectType = subType switch { 2 => "Anime", 3 => "Anime", _ => "Anime" };
+                            subjectType = SearchProviders.BangumiSearchProvider.MapBangumiType(subType);
+                        }
+
+                        // 解析用户个人标签
+                        var userTags = new List<string>();
+                        if (item.TryGetProperty("tags", out var tagsArray) && tagsArray.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var t in tagsArray.EnumerateArray())
+                            {
+                                string tagName = SafeGetString(t, "name");
+                                if (!string.IsNullOrWhiteSpace(tagName))
+                                    userTags.Add(tagName);
+                            }
                         }
 
                         allItems.Add(new BangumiCollectionItem
@@ -105,10 +117,11 @@ namespace AniTechou.Services
                             Name = name,
                             NameCn = nameCn,
                             Type = subjectType,
-                            Status = SafeGetString(item, "type"),
+                            Status = SafeGetInt(item, "type").ToString(),
                             Rate = SafeGetInt(item, "rate"),
                             EpStatus = SafeGetInt(item, "ep_status"),
-                            UpdatedAt = SafeGetString(item, "updated_at")
+                            UpdatedAt = SafeGetString(item, "updated_at"),
+                            Tags = userTags
                         });
                     }
 
@@ -175,17 +188,36 @@ namespace AniTechou.Services
                             if (detail != null)
                             {
                                 string displayTitle = item.NameCn ?? detail.Title;
+                                int bgmStatusInt = int.TryParse(item.Status, out int s) ? s : 1;
+                                string mappedStatus = MapBangumiStatus(bgmStatusInt);
                                 int newId = workService.AddWork(
                                     displayTitle, detail.OriginalTitle, detail.Type,
                                     detail.Company, detail.Year, detail.Season ?? "",
                                     detail.SourceType ?? "", detail.Episodes ?? "",
-                                    "", MapBangumiStatus(item.Status),
+                                    "", mappedStatus,
                                     item.Rate,
                                     detail.Synopsis ?? "", "", detail.Author ?? "",
                                     detail.OriginalWork ?? "", item.SubjectId.ToString());
 
                                 if (newId > 0)
                                 {
+                                    // Save Bangumi tags (public tags from detail + user's personal tags from item)
+                                    if (detail.Tags != null)
+                                    {
+                                        foreach (var tag in detail.Tags)
+                                        {
+                                            if (!string.IsNullOrWhiteSpace(tag))
+                                                workService.AddWorkTag(newId, tag, "Bangumi");
+                                        }
+                                    }
+                                    if (item.Tags != null)
+                                    {
+                                        foreach (var tag in item.Tags)
+                                        {
+                                            if (!string.IsNullOrWhiteSpace(tag) && (detail.Tags == null || !detail.Tags.Contains(tag)))
+                                                workService.AddWorkTag(newId, tag, "Bangumi");
+                                        }
+                                    }
                                     // 下载封面
                                     if (!string.IsNullOrEmpty(detail.CoverUrl))
                                         _ = workService.DownloadAndSaveCoverAsync(
@@ -193,7 +225,7 @@ namespace AniTechou.Services
                                             : $"bgm_id:{detail.BangumiId}|{detail.CoverUrl}", newId);
 
                                     result.NewWorks++;
-                                    result.Details.Add($"新增: {displayTitle} → {MapStatusDisplay(MapBangumiStatus(item.Status))}");
+                                    result.Details.Add($"新增: {displayTitle} → {MapStatusDisplay(mappedStatus)}");
                                     continue;
                                 }
                             }
@@ -212,7 +244,8 @@ namespace AniTechou.Services
                 var userWork = workService.GetUserWorkByWorkId(match.Id);
                 if (userWork == null) continue;
 
-                string newStatus = MapBangumiStatus(item.Status);
+                int bgmStatusInt2 = int.TryParse(item.Status, out int s2) ? s2 : 1;
+                string newStatus = MapBangumiStatus(bgmStatusInt2);
                 double newRating = item.Rate > 0 ? item.Rate : userWork.Rating;
 
                 bool changed = userWork.Status != newStatus || userWork.Rating != newRating;
@@ -221,6 +254,15 @@ namespace AniTechou.Services
                     workService.UpdateUserWork(userWork.Id, newStatus, userWork.Progress, newRating);
                     if (string.IsNullOrEmpty(match.BangumiId) && item.SubjectId > 0)
                         workService.UpdateWorkBangumiId(match.Id, item.SubjectId.ToString());
+                    // Save user tags
+                    if (item.Tags != null)
+                    {
+                        foreach (var tag in item.Tags)
+                        {
+                            if (!string.IsNullOrWhiteSpace(tag))
+                                workService.AddWorkTag(match.Id, tag, "Bangumi");
+                        }
+                    }
                     result.UpdatedWorks++;
                     result.Details.Add($"更新: {item.NameCn ?? item.Name} → {MapStatusDisplay(newStatus)}");
                 }
@@ -234,13 +276,13 @@ namespace AniTechou.Services
             return result;
         }
 
-        private static string MapBangumiStatus(string bgmType) => bgmType switch
+        private static string MapBangumiStatus(int bgmCollectionType) => bgmCollectionType switch
         {
-            "wish" => "wish",
-            "do" => "doing",
-            "collect" => "done",
-            "on_hold" => "doing",
-            "dropped" => "wish",
+            1 => "wish",       // 想看
+            2 => "done",       // 看过
+            3 => "doing",      // 在看
+            4 => "on_hold",    // 搁置
+            5 => "dropped",    // 抛弃
             _ => "wish"
         };
 
@@ -249,6 +291,8 @@ namespace AniTechou.Services
             "wish" => "想看",
             "doing" => "在看",
             "done" => "看过",
+            "on_hold" => "搁置",
+            "dropped" => "抛弃",
             _ => status
         };
 
@@ -286,6 +330,7 @@ namespace AniTechou.Services
             public int Rate { get; set; }
             public int EpStatus { get; set; }
             public string UpdatedAt { get; set; } = "";
+            public List<string> Tags { get; set; } = new List<string>();
         }
     }
 }

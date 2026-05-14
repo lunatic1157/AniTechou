@@ -113,6 +113,7 @@ namespace AniTechou.Views
         private bool _isDirty;
         private bool _isSaving;
         private bool _suppressTextEvents;
+        private bool _isMarkdownMode = false;
         private List<string> _allNoteTags = new List<string>();
         private TextPointer _selectionStartSnapshot;
         private TextPointer _selectionEndSnapshot;
@@ -158,7 +159,26 @@ namespace AniTechou.Views
             if (_note.Id > 0)
             {
                 TitleBox.Text = _note.Title;
-                LoadRichTextContent(_note.Content);
+
+                if (_note.ContentType == "Markdown")
+                {
+                    // Load as Markdown
+                    _isMarkdownMode = true;
+                    MarkdownModeToggle.IsChecked = true;
+                    MarkdownEditBox.Text = _note.Content ?? "";
+                    MarkdownEditBox.Visibility = Visibility.Visible;
+                    RichEditor.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    // Load as Xaml (default)
+                    LoadRichTextContent(_note.Content);
+                    _isMarkdownMode = false;
+                    MarkdownModeToggle.IsChecked = false;
+                    MarkdownEditBox.Visibility = Visibility.Collapsed;
+                    RichEditor.Visibility = Visibility.Visible;
+                }
+
                 _selectedWorkIds = new List<int>(_note.WorkIds);
                 _tags = new List<string>(_note.Tags);
             }
@@ -442,6 +462,10 @@ namespace AniTechou.Views
 
         private string GetRichTextContent()
         {
+            if (_isMarkdownMode)
+            {
+                return MarkdownEditBox.Text ?? "";
+            }
             if (IsDocumentEffectivelyEmpty()) return "";
             try
             {
@@ -500,6 +524,7 @@ namespace AniTechou.Views
                     Id = _note.Id,
                     Title = title,
                     Content = content,
+                    ContentType = _isMarkdownMode ? "Markdown" : "Xaml",
                     CreatedTime = _note.CreatedTime,
                     ModifiedTime = _note.ModifiedTime,
                     WorkIds = _selectedWorkIds.ToList(),
@@ -594,6 +619,32 @@ namespace AniTechou.Views
         private void HighlightButton_Click(object sender, RoutedEventArgs e) => TogglePopup(HighlightPopup, TextColorPopup);
         private void LinkButton_Click(object sender, RoutedEventArgs e) => InsertLink();
         private void ImageButton_Click(object sender, RoutedEventArgs e) => InsertImage();
+
+        private void MarkdownModeToggle_Click(object sender, RoutedEventArgs e)
+        {
+            bool toMarkdown = MarkdownModeToggle.IsChecked == true;
+
+            if (toMarkdown && !_isMarkdownMode)
+            {
+                // Switching FROM Xaml TO Markdown
+                string xamlContent = GetRichTextContent();
+                string markdown = Utilities.MarkdownConverter.XamlToMarkdown(xamlContent);
+                MarkdownEditBox.Text = markdown;
+                RichEditor.Visibility = Visibility.Collapsed;
+                MarkdownEditBox.Visibility = Visibility.Visible;
+                _isMarkdownMode = true;
+            }
+            else if (!toMarkdown && _isMarkdownMode)
+            {
+                // Switching FROM Markdown TO Xaml
+                string markdownContent = MarkdownEditBox.Text;
+                var flowDoc = Utilities.MarkdownConverter.MarkdownToFlowDocument(markdownContent);
+                RichEditor.Document = flowDoc;
+                RichEditor.Visibility = Visibility.Visible;
+                MarkdownEditBox.Visibility = Visibility.Collapsed;
+                _isMarkdownMode = false;
+            }
+        }
 
         private void ToggleBoldCommand_Executed(object sender, ExecutedRoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.ToggleBold);
         private void ToggleItalicCommand_Executed(object sender, ExecutedRoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.ToggleItalic);

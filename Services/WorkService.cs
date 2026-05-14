@@ -163,6 +163,122 @@ namespace AniTechou.Services
         }
 
         /// <summary>
+        /// 分页获取作品列表
+        /// </summary>
+        public async Task<List<WorkCardData>> GetWorksPaginatedAsync(string type, string status, string year, string season,
+                                                     string sourceType, string studio, string rating, List<string> tags,
+                                                     int offset, int limit)
+        {
+            return await Task.Run(() =>
+            {
+                var works = new List<WorkCardData>();
+
+                using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+                {
+                    conn.Open();
+
+                    string sql = @"
+                        SELECT w.Id, w.Title, w.OriginalTitle, w.Year, w.Company, w.CoverPath,
+                               ul.Progress, ul.Rating, w.Author, w.Type
+                        FROM Works w
+                        INNER JOIN UserList ul ON w.Id = ul.WorkId
+                        WHERE 1=1";
+
+                    var parameters = new List<SQLiteParameter>();
+
+                    if (type != "all")
+                    {
+                        sql += " AND w.Type = @Type";
+                        parameters.Add(new SQLiteParameter("@Type", type));
+                    }
+                    if (status != "all")
+                    {
+                        sql += " AND ul.Status = @Status";
+                        parameters.Add(new SQLiteParameter("@Status", status));
+                    }
+                    if (year != "全部年份" && !string.IsNullOrEmpty(year))
+                    {
+                        sql += " AND w.Year LIKE @Year";
+                        parameters.Add(new SQLiteParameter("@Year", $"{year}%"));
+                    }
+                    if (season != "全部季节" && !string.IsNullOrEmpty(season))
+                    {
+                        sql += " AND w.Season = @Season";
+                        parameters.Add(new SQLiteParameter("@Season", season));
+                    }
+                    if (sourceType != "全部原作" && !string.IsNullOrEmpty(sourceType))
+                    {
+                        sql += " AND w.SourceType = @SourceType";
+                        parameters.Add(new SQLiteParameter("@SourceType", sourceType));
+                    }
+                    if (studio != "全部制作" && !string.IsNullOrEmpty(studio))
+                    {
+                        sql += " AND w.Company = @Studio";
+                        parameters.Add(new SQLiteParameter("@Studio", studio));
+                    }
+                    if (rating != "全部评分" && !string.IsNullOrEmpty(rating))
+                    {
+                        double minR = 0, maxR = 10;
+                        switch (rating)
+                        {
+                            case "一般 (1-4)": minR = 10; maxR = 39; break;
+                            case "还行 (5-6)": minR = 50; maxR = 69; break;
+                            case "佳作 (7-8)": minR = 70; maxR = 89; break;
+                            case "神作 (9-10)": minR = 90; maxR = 100; break;
+                        }
+                        sql += " AND ul.Rating >= @MinRating AND ul.Rating <= @MaxRating";
+                        parameters.Add(new SQLiteParameter("@MinRating", minR));
+                        parameters.Add(new SQLiteParameter("@MaxRating", maxR));
+                    }
+                    if (tags != null && tags.Count > 0)
+                    {
+                        sql += " AND EXISTS (SELECT 1 FROM WorkTags wt WHERE wt.WorkId = w.Id AND wt.TagName IN (";
+                        for (int i = 0; i < tags.Count; i++)
+                        {
+                            sql += $"@Tag{i}";
+                            if (i < tags.Count - 1) sql += ",";
+                            parameters.Add(new SQLiteParameter($"@Tag{i}", tags[i]));
+                        }
+                        sql += "))";
+                    }
+
+                    sql += " ORDER BY ul.LastUpdated DESC LIMIT @Limit OFFSET @Offset";
+                    parameters.Add(new SQLiteParameter("@Limit", limit));
+                    parameters.Add(new SQLiteParameter("@Offset", offset));
+
+                    using (var cmd = new SQLiteCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddRange(parameters.ToArray());
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                string company = SafeGetString(reader, 4);
+                                string author = SafeGetString(reader, 8);
+                                string displayMaker = !string.IsNullOrEmpty(company) ? company : author;
+
+                                works.Add(new WorkCardData
+                                {
+                                    Id = SafeGetInt(reader, 0),
+                                    Title = SafeGetString(reader, 1),
+                                    OriginalTitle = SafeGetString(reader, 2),
+                                    Type = SafeGetString(reader, 9),
+                                    Info = $"{SafeGetString(reader, 3)} · {displayMaker}",
+                                    CoverPath = SafeGetString(reader, 5),
+                                    ProgressValue = ParseProgressToValue(SafeGetString(reader, 6)),
+                                    ProgressText = SafeGetString(reader, 6) ?? "未开始",
+                                    RatingDisplay = GetRatingDisplay(SafeGetDouble(reader, 7))
+                                });
+                            }
+                        }
+                    }
+                }
+
+                return works;
+            });
+        }
+
+        /// <summary>
         /// 获取所有年份
         /// </summary>
         public List<string> GetAllYears()
@@ -903,6 +1019,29 @@ namespace AniTechou.Services
                             }
 
                             transaction.Commit();
+
+                            // Auto-fetch Bangumi tags if BangumiId is provided
+                            if (!string.IsNullOrEmpty(bangumiId))
+                            {
+                                _ = Task.Run(async () =>
+                                {
+                                    try
+                                    {
+                                        var bgmProvider = new SearchProviders.BangumiSearchProvider();
+                                        var detail = await bgmProvider.GetByIdAsync(bangumiId);
+                                        if (detail?.Tags != null)
+                                        {
+                                            foreach (var tag in detail.Tags)
+                                            {
+                                                if (!string.IsNullOrWhiteSpace(tag))
+                                                    AddWorkTag(workId, tag, "Bangumi");
+                                            }
+                                        }
+                                    }
+                                    catch { /* best-effort */ }
+                                });
+                            }
+
                             return workId;
                         }
                         catch
@@ -1101,6 +1240,7 @@ namespace AniTechou.Services
             public int Id { get; set; }
             public string Title { get; set; } = "";
             public string Content { get; set; } = "";
+            public string ContentType { get; set; } = "Xaml";
             public DateTime CreatedTime { get; set; }
             public DateTime ModifiedTime { get; set; }
             public List<int> WorkIds { get; set; } = new List<int>();
@@ -1115,6 +1255,7 @@ namespace AniTechou.Services
             public int Id { get; set; }
             public string Title { get; set; } = "";
             public string Content { get; set; } = "";
+            public string ContentType { get; set; } = "Xaml";
             public string Preview { get; set; } = "";
             public DateTime CreatedTime { get; set; }
             public string Tags { get; set; } = "";
@@ -1132,16 +1273,27 @@ namespace AniTechou.Services
         }
 
         /// <summary>
-        /// 从 XAML 或纯文本中提取预览纯文本
+        /// 从 XAML / Markdown / 纯文本中提取预览纯文本
         /// </summary>
-        private string ExtractPreviewText(string content, int maxLength = 100)
+        private string ExtractPreviewText(string content, int maxLength = 100, string contentType = "Xaml")
         {
             if (string.IsNullOrWhiteSpace(content)) return "";
             string text = content;
-            
-            if (content.TrimStart().StartsWith("<FlowDocument", StringComparison.OrdinalIgnoreCase) || 
-                content.TrimStart().StartsWith("<Section", StringComparison.OrdinalIgnoreCase) ||
-                content.TrimStart().StartsWith("<Span", StringComparison.OrdinalIgnoreCase))
+
+            if (contentType == "Markdown")
+            {
+                try
+                {
+                    text = Markdig.Markdown.ToPlainText(content);
+                }
+                catch
+                {
+                    text = content;
+                }
+            }
+            else if (content.TrimStart().StartsWith("<FlowDocument", StringComparison.OrdinalIgnoreCase) ||
+                     content.TrimStart().StartsWith("<Section", StringComparison.OrdinalIgnoreCase) ||
+                     content.TrimStart().StartsWith("<Span", StringComparison.OrdinalIgnoreCase))
             {
                 try
                 {
@@ -1175,7 +1327,9 @@ namespace AniTechou.Services
             {
                 conn.Open();
                 string sql = @"
-                    SELECT n.Id, COALESCE(n.Title, '') as Title, n.Content, n.CreatedTime,
+                    SELECT n.Id, COALESCE(n.Title, '') as Title, n.Content,
+                           COALESCE(n.ContentType, 'Xaml') as ContentType,
+                           n.CreatedTime,
                            GROUP_CONCAT(DISTINCT nt.TagName) as Tags,
                            COUNT(DISTINCT nw.WorkId) as WorkCount
                     FROM Notes n
@@ -1191,9 +1345,10 @@ namespace AniTechou.Services
                     {
                         string title = SafeGetString(reader, 1);
                         string content = SafeGetString(reader, 2);
-                        string preview = ExtractPreviewText(content);
+                        string contentType = SafeGetString(reader, 3);
+                        string preview = ExtractPreviewText(content, 100, contentType);
                         int noteId = SafeGetInt(reader, 0);
-                        int workCount = SafeGetInt(reader, 5);
+                        int workCount = SafeGetInt(reader, 6);
 
                         // 暂存基础数据，统一批量查询关联作品
                         notes.Add(new NoteListItem
@@ -1201,9 +1356,10 @@ namespace AniTechou.Services
                             Id = noteId,
                             Title = title,
                             Content = content,
+                            ContentType = contentType,
                             Preview = preview,
-                            CreatedTime = DateTime.Parse(SafeGetString(reader, 3)),
-                            Tags = SafeGetString(reader, 4) ?? "",
+                            CreatedTime = DateTime.Parse(SafeGetString(reader, 4)),
+                            Tags = SafeGetString(reader, 5) ?? "",
                             WorkCount = workCount,
                             WorkTitles = new List<string>(),
                             WorkIds = new List<int>(),
@@ -1265,7 +1421,7 @@ namespace AniTechou.Services
                 conn.Open();
 
                 // 获取笔记内容
-                string sqlNote = "SELECT Id, COALESCE(Title, '') as Title, Content, CreatedTime, ModifiedTime FROM Notes WHERE Id = @Id";
+                string sqlNote = "SELECT Id, COALESCE(Title, '') as Title, Content, COALESCE(ContentType, 'Xaml') as ContentType, CreatedTime, ModifiedTime FROM Notes WHERE Id = @Id";
                 NoteInfo note = null;
                 using (var cmd = new SQLiteCommand(sqlNote, conn))
                 {
@@ -1279,8 +1435,9 @@ namespace AniTechou.Services
                                 Id = SafeGetInt(reader, 0),
                                 Title = SafeGetString(reader, 1),
                                 Content = SafeGetString(reader, 2),
-                                CreatedTime = DateTime.Parse(SafeGetString(reader, 3)),
-                                ModifiedTime = DateTime.Parse(SafeGetString(reader, 4))
+                                ContentType = SafeGetString(reader, 3),
+                                CreatedTime = DateTime.Parse(SafeGetString(reader, 4)),
+                                ModifiedTime = DateTime.Parse(SafeGetString(reader, 5))
                             };
                         }
                     }
@@ -1338,13 +1495,14 @@ namespace AniTechou.Services
                         {
                             // 新增
                             string insertSql = @"
-                        INSERT INTO Notes (Title, Content, CreatedTime, ModifiedTime)
-                        VALUES (@Title, @Content, @CreatedTime, @ModifiedTime);
+                        INSERT INTO Notes (Title, Content, ContentType, CreatedTime, ModifiedTime)
+                        VALUES (@Title, @Content, @ContentType, @CreatedTime, @ModifiedTime);
                         SELECT last_insert_rowid();";
                             using (var cmd = new SQLiteCommand(insertSql, conn))
                             {
                                 cmd.Parameters.AddWithValue("@Title", note.Title ?? "");
                                 cmd.Parameters.AddWithValue("@Content", note.Content);
+                                cmd.Parameters.AddWithValue("@ContentType", string.IsNullOrEmpty(note.ContentType) ? "Xaml" : note.ContentType);
                                 cmd.Parameters.AddWithValue("@CreatedTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                                 cmd.Parameters.AddWithValue("@ModifiedTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                                 noteId = Convert.ToInt32(cmd.ExecuteScalar());
@@ -1354,11 +1512,12 @@ namespace AniTechou.Services
                         {
                             // 更新
                             string updateSql = @"
-                        UPDATE Notes SET Title = @Title, Content = @Content, ModifiedTime = @ModifiedTime WHERE Id = @Id";
+                        UPDATE Notes SET Title = @Title, Content = @Content, ContentType = @ContentType, ModifiedTime = @ModifiedTime WHERE Id = @Id";
                             using (var cmd = new SQLiteCommand(updateSql, conn))
                             {
                                 cmd.Parameters.AddWithValue("@Title", note.Title ?? "");
                                 cmd.Parameters.AddWithValue("@Content", note.Content);
+                                cmd.Parameters.AddWithValue("@ContentType", string.IsNullOrEmpty(note.ContentType) ? "Xaml" : note.ContentType);
                                 cmd.Parameters.AddWithValue("@ModifiedTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                                 cmd.Parameters.AddWithValue("@Id", note.Id);
                                 cmd.ExecuteNonQuery();

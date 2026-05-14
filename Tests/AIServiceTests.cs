@@ -72,4 +72,29 @@ public class AIServiceTests
         // 纯书名号无关键词，仍触发
         Assert.True((bool)method.Invoke(null, new object[] { "《三体》《流浪地球》" }));
     }
+
+    // === BuildCollectionContext ===
+
+    [Fact]
+    public void BuildCollectionContext_EmptyList_ReturnsEmptyMessage()
+    {
+        var result = AIService.BuildCollectionContext(new List<WorkService.WorkCardData>(), null!);
+        Assert.Contains("空", result);
+    }
+
+    [Fact]
+    public void BuildCollectionContext_NullList_ReturnsEmptyMessage()
+    {
+        var result = AIService.BuildCollectionContext(null!, null!);
+        Assert.Contains("空", result);
+    }
+
+    // === GetDefaultSystemPrompt Localization ===
+
+    [Fact]
+    public void GetDefaultSystemPrompt_ContainsLocalizationInstructions()
+    {
+        var prompt = AIService.GetDefaultSystemPrompt();
+        Assert.Contains("USER_COLLECTION_CONTEXT", prompt);
+    }
 }

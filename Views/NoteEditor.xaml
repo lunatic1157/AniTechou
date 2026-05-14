@@ -112,6 +112,7 @@
 
         <Grid Grid.Row="1" Margin="0,10,0,10">
             <Border Background="{DynamicResource Surface2Brush}" CornerRadius="{DynamicResource CardCornerRadius}" Padding="10">
+                <StackPanel Orientation="Horizontal">
                 <WrapPanel>
                 <Button Content="B" Style="{StaticResource AppToolbarButtonStyle}" Click="BoldButton_Click"/>
                 <Button Content="I" Style="{StaticResource AppToolbarButtonStyle}" Click="ItalicButton_Click"/>
@@ -129,6 +130,15 @@
                 <Button Content="🔗" Style="{StaticResource AppToolbarButtonStyle}" Click="LinkButton_Click"/>
                 <Button Content="🖼️" Style="{StaticResource AppToolbarButtonStyle}" Click="ImageButton_Click"/>
                 </WrapPanel>
+                <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0"/>
+                <ToggleButton x:Name="MarkdownModeToggle"
+                              Content="Markdown"
+                              Width="80" Height="28"
+                              Margin="2,0"
+                              FontSize="12"
+                              IsChecked="False"
+                              Click="MarkdownModeToggle_Click"/>
+                </StackPanel>
             </Border>
 
             <Popup x:Name="TextColorPopup"
@@ -218,6 +228,19 @@
                     </FlowDocument>
                 </RichTextBox>
             </Border>
+            <TextBox x:Name="MarkdownEditBox"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     FontFamily="Consolas"
+                     FontSize="14"
+                     Padding="10"
+                     Background="{DynamicResource Surface2Brush}"
+                     Foreground="{DynamicResource TextPrimaryBrush}"
+                     CaretBrush="{DynamicResource TextPrimaryBrush}"
+                     BorderThickness="0"
+                     Visibility="Collapsed"
+                     VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Disabled"/>
         </Grid>
 
         <StackPanel Grid.Row="4" Margin="0,12,0,0">

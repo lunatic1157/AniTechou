@@ -55,6 +55,7 @@ namespace AniTechou.Services
             public int Id { get; set; }
             public string Title { get; set; }
             public string Content { get; set; }
+            public string ContentType { get; set; }
             public string CreatedTime { get; set; }
             public string ModifiedTime { get; set; }
         }
@@ -401,12 +402,13 @@ namespace AniTechou.Services
                 }
 
                 string insertSql = @"
-                    INSERT INTO Notes (Title, Content, CreatedTime, ModifiedTime)
-                    VALUES (@Title, @Content, @CreatedTime, @ModifiedTime)";
+                    INSERT INTO Notes (Title, Content, ContentType, CreatedTime, ModifiedTime)
+                    VALUES (@Title, @Content, @ContentType, @CreatedTime, @ModifiedTime)";
                 using (var cmd = new SQLiteCommand(insertSql, conn))
                 {
                     cmd.Parameters.AddWithValue("@Title", title);
                     cmd.Parameters.AddWithValue("@Content", content);
+                    cmd.Parameters.AddWithValue("@ContentType", string.IsNullOrEmpty(note.ContentType) ? "Xaml" : note.ContentType);
                     cmd.Parameters.AddWithValue("@CreatedTime", ParseDateTimeOrNow(note.CreatedTime).ToString("yyyy-MM-dd HH:mm:ss"));
                     cmd.Parameters.AddWithValue("@ModifiedTime", ParseDateTimeOrNow(note.ModifiedTime).ToString("yyyy-MM-dd HH:mm:ss"));
                     cmd.ExecuteNonQuery();
@@ -712,7 +714,7 @@ namespace AniTechou.Services
         private List<NoteExportDto> GetNotesForExport(SQLiteConnection conn)
         {
             var notes = new List<NoteExportDto>();
-            string sql = "SELECT Id, Title, Content, CreatedTime, ModifiedTime FROM Notes";
+            string sql = "SELECT Id, Title, Content, COALESCE(ContentType, 'Xaml') as ContentType, CreatedTime, ModifiedTime FROM Notes";
             using (var cmd = new SQLiteCommand(sql, conn))
             using (var reader = cmd.ExecuteReader())
             {
@@ -723,8 +725,9 @@ namespace AniTechou.Services
                         Id = SafeGetInt(reader, 0),
                         Title = SafeGetString(reader, 1),
                         Content = SafeGetString(reader, 2),
-                        CreatedTime = SafeGetString(reader, 3),
-                        ModifiedTime = SafeGetString(reader, 4)
+                        ContentType = SafeGetString(reader, 3),
+                        CreatedTime = SafeGetString(reader, 4),
+                        ModifiedTime = SafeGetString(reader, 5)
                     });
                 }
             }

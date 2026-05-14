@@ -103,7 +103,7 @@ namespace AniTechou.Services
                         CREATE TABLE UserList (
                             Id INTEGER PRIMARY KEY AUTOINCREMENT,
                             WorkId INTEGER NOT NULL,
-                            Status TEXT CHECK(Status IN ('wish','doing','done')) DEFAULT 'wish',
+                            Status TEXT CHECK(Status IN ('wish','doing','done','on_hold','dropped')) DEFAULT 'wish',
                             Progress TEXT,
                             Rating INTEGER,  -- ×10 存 (7.7→77)
                             StartedDate DATETIME,
@@ -117,7 +117,7 @@ namespace AniTechou.Services
                             Id INTEGER PRIMARY KEY AUTOINCREMENT,
                             WorkId INTEGER NOT NULL,
                             TagName TEXT NOT NULL,
-                            Source TEXT CHECK(Source IN ('AI','Manual')) DEFAULT 'Manual',
+                            Source TEXT CHECK(Source IN ('AI','Manual','Bangumi','AI导入')) DEFAULT 'Manual',
                             Category TEXT,
                             FOREIGN KEY(WorkId) REFERENCES Works(Id) ON DELETE CASCADE
                         );
@@ -127,6 +127,7 @@ namespace AniTechou.Services
                             Id INTEGER PRIMARY KEY AUTOINCREMENT,
                             Title TEXT,
                             Content TEXT NOT NULL,
+                            ContentType TEXT DEFAULT 'Xaml',
                             CreatedTime DATETIME DEFAULT CURRENT_TIMESTAMP,
                             ModifiedTime DATETIME DEFAULT CURRENT_TIMESTAMP
                         );
@@ -194,7 +195,7 @@ namespace AniTechou.Services
         /// <summary>
         /// 当前数据库 schema 版本号（递增即可）
         /// </summary>
-        private const int CURRENT_DB_VERSION = 4;
+        private const int CURRENT_DB_VERSION = 5;
 
         /// <summary>
         /// 初始化新账号的数据库（如果不存在则创建）
@@ -291,6 +292,9 @@ namespace AniTechou.Services
 
                     // v4: 旧 Rating 值 ×10
                     FixLegacyRatingValues(conn);
+
+                    // v5: 状态扩展 + 笔记ContentType + WorkTags Source约束
+                    MigrateToVersion5(conn);
                 }
             }
             catch (Exception ex)
@@ -539,6 +543,123 @@ WHERE Id NOT IN (
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] FixLegacyRating: {ex.Message}");
+            }
+        }
+
+        // v5: 状态扩展 + 笔记ContentType + WorkTags Source约束
+        private static void MigrateToVersion5(SQLiteConnection conn)
+        {
+            try
+            {
+                MigrateUserListStatusV5(conn);
+                MigrateNotesContentTypeV5(conn);
+                MigrateWorkTagsSourceV5(conn);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] MigrateToVersion5 error: {ex.Message}");
+            }
+        }
+
+        private static void MigrateUserListStatusV5(SQLiteConnection conn)
+        {
+            try
+            {
+                string schemaSql = "SELECT sql FROM sqlite_master WHERE type='table' AND name='UserList'";
+                using var scmd = new SQLiteCommand(schemaSql, conn);
+                var schema = scmd.ExecuteScalar() as string;
+                if (schema != null && schema.Contains("'wish','doing','done'") && !schema.Contains("'on_hold'"))
+                {
+                    System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Expanding UserList status constraint...");
+                    using var tx = conn.BeginTransaction();
+                    new SQLiteCommand("CREATE TABLE UserList_tmp (" +
+                        "Id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                        "WorkId INTEGER NOT NULL," +
+                        "Status TEXT CHECK(Status IN ('wish','doing','done','on_hold','dropped')) DEFAULT 'wish'," +
+                        "Progress TEXT," +
+                        "Rating INTEGER," +
+                        "StartedDate DATETIME," +
+                        "FinishedDate DATETIME," +
+                        "LastUpdated DATETIME DEFAULT CURRENT_TIMESTAMP," +
+                        "FOREIGN KEY(WorkId) REFERENCES Works(Id) ON DELETE CASCADE)", conn).ExecuteNonQuery();
+                    new SQLiteCommand("INSERT INTO UserList_tmp SELECT Id, WorkId, Status, Progress, Rating, StartedDate, FinishedDate, LastUpdated FROM UserList", conn).ExecuteNonQuery();
+                    new SQLiteCommand("DROP TABLE UserList", conn).ExecuteNonQuery();
+                    new SQLiteCommand("ALTER TABLE UserList_tmp RENAME TO UserList", conn).ExecuteNonQuery();
+                    // Recreate indexes
+                    new SQLiteCommand("CREATE INDEX IF NOT EXISTS idx_userlist_status ON UserList(Status)", conn).ExecuteNonQuery();
+                    tx.Commit();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] MigrateUserListStatusV5: {ex.Message}");
+            }
+        }
+
+        private static void MigrateNotesContentTypeV5(SQLiteConnection conn)
+        {
+            try
+            {
+                string checkSql = "PRAGMA table_info(Notes)";
+                bool hasContentType = false;
+                using (var cmd = new SQLiteCommand(checkSql, conn))
+                {
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            if (reader.GetString(1) == "ContentType")
+                            {
+                                hasContentType = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (!hasContentType)
+                {
+                    System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Adding ContentType column to Notes...");
+                    using var cmdAdd = new SQLiteCommand("ALTER TABLE Notes ADD COLUMN ContentType TEXT DEFAULT 'Xaml'", conn);
+                    cmdAdd.ExecuteNonQuery();
+                    using var cmdUpdate = new SQLiteCommand("UPDATE Notes SET ContentType = 'Xaml' WHERE ContentType IS NULL", conn);
+                    cmdUpdate.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] MigrateNotesContentTypeV5: {ex.Message}");
+            }
+        }
+
+        private static void MigrateWorkTagsSourceV5(SQLiteConnection conn)
+        {
+            try
+            {
+                string schemaSql = "SELECT sql FROM sqlite_master WHERE type='table' AND name='WorkTags'";
+                using var scmd = new SQLiteCommand(schemaSql, conn);
+                var schema = scmd.ExecuteScalar() as string;
+                if (schema != null && schema.Contains("'AI','Manual'") && !schema.Contains("'Bangumi'"))
+                {
+                    System.Diagnostics.Debug.WriteLine("[DatabaseHelper] Expanding WorkTags Source constraint...");
+                    using var tx = conn.BeginTransaction();
+                    new SQLiteCommand("CREATE TABLE WorkTags_tmp (" +
+                        "Id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                        "WorkId INTEGER NOT NULL," +
+                        "TagName TEXT NOT NULL," +
+                        "Source TEXT CHECK(Source IN ('AI','Manual','Bangumi','AI导入')) DEFAULT 'Manual'," +
+                        "Category TEXT," +
+                        "FOREIGN KEY(WorkId) REFERENCES Works(Id) ON DELETE CASCADE)", conn).ExecuteNonQuery();
+                    new SQLiteCommand("INSERT INTO WorkTags_tmp SELECT Id, WorkId, TagName, Source, Category FROM WorkTags", conn).ExecuteNonQuery();
+                    new SQLiteCommand("DROP TABLE WorkTags", conn).ExecuteNonQuery();
+                    new SQLiteCommand("ALTER TABLE WorkTags_tmp RENAME TO WorkTags", conn).ExecuteNonQuery();
+                    new SQLiteCommand("CREATE UNIQUE INDEX IF NOT EXISTS ux_worktags_workid_tagname ON WorkTags(WorkId, TagName)", conn).ExecuteNonQuery();
+                    tx.Commit();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] MigrateWorkTagsSourceV5: {ex.Message}");
             }
         }
 

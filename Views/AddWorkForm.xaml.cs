@@ -31,7 +31,7 @@ namespace AniTechou.Views
             SourceTypeBox.ItemsSource = new List<string> { "无", "原创", "漫改", "小说改", "游戏改", "其他" };
             SourceTypeBox.SelectedIndex = 0;
 
-            StatusBox.ItemsSource = new List<string> { "想看", "在看", "看过" };
+            StatusBox.ItemsSource = new List<string> { "想看", "在看", "看过", "搁置", "抛弃" };
             StatusBox.SelectedIndex = 0;
 
             // 评分已是数字文本框
@@ -90,6 +90,8 @@ namespace AniTechou.Views
                     "想看" => "wish",
                     "在看" => "doing",
                     "看过" => "done",
+                    "搁置" => "on_hold",
+                    "抛弃" => "dropped",
                     _ => "wish"
                 };
 

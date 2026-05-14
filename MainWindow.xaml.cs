@@ -461,28 +461,18 @@ namespace AniTechou
                     return;
                 }
 
-                // 优化：仅在涉及本地操作时才注入列表上下文
-                string collectionSummary = "";
-                string lowerMsg = message.ToLower();
-                bool isCollectionRelated = lowerMsg.Contains("我") || 
-                                         lowerMsg.Contains("列表") || 
-                                         lowerMsg.Contains("全部") || 
-                                         lowerMsg.Contains("所有") || 
-                                         lowerMsg.Contains("完善") || 
-                                         lowerMsg.Contains("补全") || 
-                                         lowerMsg.Contains("删除") || 
-                                         lowerMsg.Contains("更新");
-
-                if (isCollectionRelated)
+                // Always provide full collection context for localized AI
+                string collectionContext = "（未加载）";
+                try
                 {
                     var workService = new WorkService(_currentAccountName);
                     var allWorks = await Task.Run(() => workService.GetWorksAsync("all", "all"));
-                    // 只发送标题，极大减少 Token 消耗
-                    collectionSummary = string.Join(", ", allWorks.Select(w => $"《{w.Title}》"));
+                    collectionContext = AIService.BuildCollectionContext(allWorks, workService);
                 }
+                catch { }
 
                 var aiService = new AIService(config.ApiKey, config.ApiUrl, config.Model);
-                var response = await aiService.SmartChat(message, collectionSummary);
+                var response = await aiService.SmartChat(message, collectionContext);
 
                 RemoveLoadingMessage(loadingMsg);
 

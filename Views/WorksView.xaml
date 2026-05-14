@@ -88,6 +88,16 @@
                             Style="{StaticResource FilterButton}"
                             Click="StatusFilter_Click"
                             x:Name="DoneButton"/>
+                    <Button Content="搁置"
+                            Tag="on_hold"
+                            Style="{StaticResource FilterButton}"
+                            Click="StatusFilter_Click"
+                            x:Name="OnHoldButton"/>
+                    <Button Content="抛弃"
+                            Tag="dropped"
+                            Style="{StaticResource FilterButton}"
+                            Click="StatusFilter_Click"
+                            x:Name="DroppedButton"/>
                 </WrapPanel>
 
                 <!-- 第三行：年份/季度/原作类型/制作 -->
@@ -223,6 +233,7 @@
 
         <!-- 作品列表区域 -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
             <ItemsControl x:Name="WorksItemsControl"
                           Margin="10"
                           ItemsPanel="{StaticResource GridPanel}">
@@ -240,6 +251,15 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <Button x:Name="LoadMoreButton"
+                    Content="加载更多..."
+                    HorizontalAlignment="Center"
+                    Margin="0,0,0,20"
+                    Width="200" Height="36"
+                    Style="{StaticResource AppSecondaryButtonStyle}"
+                    Click="LoadMore_Click"
+                    Visibility="Collapsed"/>
+            </StackPanel>
         </ScrollViewer>
 
         <!-- 加载中提示 -->
