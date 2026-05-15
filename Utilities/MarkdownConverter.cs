@@ -255,8 +255,9 @@ namespace AniTechou.Utilities
                     if (block is MDLeafBlock leaf && leaf.Inline != null)
                     {
                         var fallback = new Paragraph();
+                        var fallbackState = new HtmlState();
                         foreach (var inline in leaf.Inline)
-                            fallback.Inlines.Add(ConvertInline(inline));
+                            fallback.Inlines.Add(ConvertInline(inline, fallbackState));
                         if (fallback.Inlines.Count > 0)
                             output.Add(fallback);
                     }
@@ -282,8 +283,9 @@ namespace AniTechou.Utilities
                 FontWeight = FontWeights.Bold,
                 Margin = new Thickness(0, fontSize * 0.4, 0, 4)
             };
+            var headingState = new HtmlState();
             foreach (var inline in heading.Inline)
-                para.Inlines.Add(ConvertInline(inline));
+                para.Inlines.Add(ConvertInline(inline, headingState));
             return para;
         }
 
@@ -296,8 +298,9 @@ namespace AniTechou.Utilities
             if (paraBlock.Inline == null)
                 return para;
 
+            var paraState = new HtmlState();
             foreach (var inline in paraBlock.Inline)
-                para.Inlines.Add(ConvertInline(inline));
+                para.Inlines.Add(ConvertInline(inline, paraState));
             return para;
         }
 
@@ -455,61 +458,176 @@ namespace AniTechou.Utilities
             return wpfTable;
         }
 
+        // --- HTML inline state tracker ---
+
+        /// <summary>
+        /// Tracks active HTML inline formatting tags (u, span) across sibling inlines.
+        /// Markdig parses &lt;u&gt;text&lt;/u&gt; as HtmlInline("&lt;u&gt;") + LiteralInline("text") + HtmlInline("&lt;/u&gt;").
+        /// </summary>
+        private sealed class HtmlState
+        {
+            public bool Underline;
+            public Brush Foreground;
+            public Brush Background;
+
+            public void ProcessTag(string tag)
+            {
+                if (tag.Equals("<u>", StringComparison.OrdinalIgnoreCase))
+                    Underline = true;
+                else if (tag.Equals("</u>", StringComparison.OrdinalIgnoreCase))
+                    Underline = false;
+                else if (tag.StartsWith("<span ", StringComparison.OrdinalIgnoreCase) && tag.EndsWith(">"))
+                    ParseSpan(tag);
+                else if (tag.Equals("</span>", StringComparison.OrdinalIgnoreCase))
+                {
+                    Foreground = null;
+                    Background = null;
+                }
+            }
+
+            private void ParseSpan(string tag)
+            {
+                int styleIdx = tag.IndexOf("style=\"", StringComparison.OrdinalIgnoreCase);
+                if (styleIdx < 0) return;
+                int start = styleIdx + 7;
+                int end = tag.IndexOf('"', start);
+                if (end < 0) return;
+                string style = tag.Substring(start, end - start);
+
+                foreach (string part in style.Split(';'))
+                {
+                    var kv = part.Split(':', 2);
+                    if (kv.Length != 2) continue;
+                    string key = kv[0].Trim().ToLowerInvariant();
+                    string val = kv[1].Trim();
+
+                    if (key == "color" && TryParseColor(val, out var fg))
+                        Foreground = new SolidColorBrush(fg);
+                    else if (key == "background-color" && TryParseColor(val, out var bg))
+                        Background = new SolidColorBrush(bg);
+                }
+            }
+
+            private static bool TryParseColor(string val, out Color color)
+            {
+                color = Colors.Transparent;
+                if (string.IsNullOrEmpty(val)) return false;
+                try
+                {
+                    if (val.StartsWith("#") && val.Length == 9) // #AARRGGBB
+                        val = "#" + val.Substring(3); // strip alpha for WPF
+                    var c = (Color)ColorConverter.ConvertFromString(val);
+                    color = c;
+                    return true;
+                }
+                catch { return false; }
+            }
+
+        /// <summary>
+        /// Returns a copy of this state (for entering nested containers).
+        /// </summary>
+        public HtmlState Clone()
+        {
+            return new HtmlState { Underline = Underline, Foreground = Foreground, Background = Background };
+        }
+
+        /// <summary>
+        /// Wraps an inline with the active HTML formatting.
+        /// </summary>
+        public WpfInline Apply(WpfInline inner)
+        {
+            WpfInline result = inner;
+
+            if (Foreground != null || Background != null)
+            {
+                if (result is Run run)
+                {
+                    if (Foreground != null) run.Foreground = Foreground;
+                    if (Background != null) run.Background = Background;
+                }
+                else if (result is Span span)
+                {
+                    if (Foreground != null) span.Foreground = Foreground;
+                    if (Background != null) span.Background = Background;
+                }
+            }
+
+            if (Underline && !(result is Underline))
+            {
+                var u = new Underline();
+                u.Inlines.Add(result);
+                result = u;
+            }
+
+            return result;
+        }
+    }
+
         // --- Inline converter ---
 
-        private static WpfInline ConvertInline(MDInline inline)
+        private static WpfInline ConvertInline(MDInline inline, HtmlState htmlState = null)
         {
             switch (inline)
             {
                 case LiteralInline literal:
-                    return new Run(literal.Content.ToString());
+                    var run = new Run(literal.Content.ToString());
+                    return htmlState != null ? htmlState.Apply(run) : run;
 
                 case EmphasisInline emphasis:
-                    return ConvertEmphasis(emphasis);
+                    var emphasisResult = ConvertEmphasis(emphasis, htmlState);
+                    return htmlState != null ? htmlState.Apply(emphasisResult) : emphasisResult;
 
                 case LinkInline link:
                     if (link.IsImage)
                         return ConvertImage(link);
-                    return ConvertHyperlink(link);
+                    return ConvertHyperlink(link, htmlState);
 
                 case CodeInline code:
-                    return new Run(code.Content)
+                    var codeRun = new Run(code.Content)
                     {
                         FontFamily = new FontFamily("Consolas, Courier New"),
                         Background = new SolidColorBrush(Color.FromRgb(55, 55, 60)),
                         Foreground = new SolidColorBrush(Color.FromRgb(224, 108, 117))
                     };
+                    return htmlState != null ? htmlState.Apply(codeRun) : codeRun;
 
                 case LineBreakInline _:
                     return new LineBreak();
 
                 case HtmlInline html:
-                    return new Run(html.Tag) { Foreground = new SolidColorBrush(Colors.Gray) };
+                    // Update tracker state; the tag itself is invisible
+                    htmlState?.ProcessTag(html.Tag);
+                    return new Run(""); // invisible placeholder
 
                 case HtmlEntityInline entity:
-                    return new Run(System.Net.WebUtility.HtmlDecode(entity.Transcoded.ToString()));
+                    var entityRun = new Run(System.Net.WebUtility.HtmlDecode(entity.Transcoded.ToString()));
+                    return htmlState != null ? htmlState.Apply(entityRun) : entityRun;
 
                 default:
                     // Fallback for unknown inline types — walk children if container
                     if (inline is ContainerInline container)
                     {
                         var span = new Span();
+                        // Do NOT pass htmlState to children — outer Apply() wraps the entire result
                         foreach (var child in container)
                             span.Inlines.Add(ConvertInline(child));
-                        return span;
+                        return htmlState != null ? htmlState.Apply(span) : span;
                     }
                     // Best-effort text representation
                     var text = inline.ToString();
-                    return string.IsNullOrEmpty(text) ? new Run("") : new Run(text);
+                    var textRun = string.IsNullOrEmpty(text) ? new Run("") : new Run(text);
+                    return htmlState != null ? htmlState.Apply(textRun) : textRun;
             }
         }
 
-        private static WpfInline ConvertEmphasis(EmphasisInline emphasis)
+        private static WpfInline ConvertEmphasis(EmphasisInline emphasis, HtmlState htmlState = null)
         {
             int count = emphasis.DelimiterCount;
 
             // Build inner content once, then snapshot — WPF Inline can only have
             // one parent, so adding to Italic/Bold removes from innerSpan.Inlines.
+            // Note: do NOT pass htmlState to children — the outer Apply() wraps
+            // the entire result, avoiding double-wrapping.
             var innerSpan = new Span();
             foreach (var child in emphasis)
                 innerSpan.Inlines.Add(ConvertInline(child));
@@ -539,7 +657,7 @@ namespace AniTechou.Utilities
             return boldItalic;
         }
 
-        private static WpfInline ConvertHyperlink(LinkInline link)
+        private static WpfInline ConvertHyperlink(LinkInline link, HtmlState htmlState = null)
         {
             string url = link.Url ?? link.GetDynamicUrl?.Invoke() ?? "";
             var hyperlink = new Hyperlink
@@ -547,6 +665,7 @@ namespace AniTechou.Utilities
                 NavigateUri = string.IsNullOrEmpty(url) ? null : new Uri(url),
                 Foreground = new SolidColorBrush(Color.FromRgb(100, 149, 237))
             };
+            // Do NOT pass htmlState to children — outer Apply() wraps the entire result
             foreach (var child in link)
                 hyperlink.Inlines.Add(ConvertInline(child));
             return hyperlink;
