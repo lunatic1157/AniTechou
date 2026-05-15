@@ -5,7 +5,25 @@ using System.Text;
 using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Markup;
+using System.Windows.Media;
 using Markdig;
+using Markdig.Syntax.Inlines;
+using MDBlock = Markdig.Syntax.Block;
+using MDCodeBlock = Markdig.Syntax.CodeBlock;
+using MDHeadingBlock = Markdig.Syntax.HeadingBlock;
+using MDParagraphBlock = Markdig.Syntax.ParagraphBlock;
+using MDFencedCodeBlock = Markdig.Syntax.FencedCodeBlock;
+using MDListBlock = Markdig.Syntax.ListBlock;
+using MDListItemBlock = Markdig.Syntax.ListItemBlock;
+using MDThematicBreakBlock = Markdig.Syntax.ThematicBreakBlock;
+using MDQuoteBlock = Markdig.Syntax.QuoteBlock;
+using MDTable = Markdig.Extensions.Tables.Table;
+using MDTableRow = Markdig.Extensions.Tables.TableRow;
+using MDTableCell = Markdig.Extensions.Tables.TableCell;
+using MDLeafBlock = Markdig.Syntax.LeafBlock;
+using MDContainerBlock = Markdig.Syntax.ContainerBlock;
+using MDInline = Markdig.Syntax.Inlines.Inline;
+using WpfInline = System.Windows.Documents.Inline;
 
 namespace AniTechou.Utilities
 {
@@ -39,7 +57,6 @@ namespace AniTechou.Utilities
             }
             catch
             {
-                // If XAML parsing fails, return as plain text
                 return xamlContent;
             }
         }
@@ -61,7 +78,6 @@ namespace AniTechou.Utilities
 
         private static void ConvertParagraphToMarkdown(Paragraph para, StringBuilder sb)
         {
-            // Check if it's a heading by font size
             double fontSize = para.FontSize;
             string prefix = "";
             if (fontSize >= 26) prefix = "# ";
@@ -71,7 +87,7 @@ namespace AniTechou.Utilities
             sb.Append(prefix);
             ConvertInlinesToMarkdown(para.Inlines, sb);
             sb.AppendLine();
-            sb.AppendLine(); // blank line after paragraph
+            sb.AppendLine();
         }
 
         private static void ConvertInlinesToMarkdown(InlineCollection inlines, StringBuilder sb)
@@ -115,7 +131,6 @@ namespace AniTechou.Utilities
                 }
                 else if (inline is InlineUIContainer container && container.Child is System.Windows.Controls.Grid grid)
                 {
-                    // Image embedded in resizable host — find Image by traversing children
                     var img = FindImageInGrid(grid);
                     if (img != null)
                     {
@@ -149,79 +164,398 @@ namespace AniTechou.Utilities
             sb.AppendLine();
         }
 
+        // =========================================================================
+        // Markdown → FlowDocument (Markdig AST walker — no HTML, no clipboard)
+        // =========================================================================
+
+        private static readonly FontFamily DefaultFont = new FontFamily("Microsoft YaHei");
+        private const double DefaultFontSize = 14.0;
+
         /// <summary>
-        /// Convert Markdown text to WPF FlowDocument via Markdig HTML.
+        /// Convert Markdown text to WPF FlowDocument by walking Markdig AST.
         /// </summary>
         public static FlowDocument MarkdownToFlowDocument(string markdown)
         {
+            var doc = new FlowDocument
+            {
+                FontFamily = DefaultFont,
+                FontSize = DefaultFontSize,
+                PagePadding = new Thickness(0)
+            };
+
             if (string.IsNullOrWhiteSpace(markdown))
-                return new FlowDocument();
+                return doc;
 
             try
             {
-                // 1. Markdig: Markdown → HTML (full spec support)
                 var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
-                string html = Markdig.Markdown.ToHtml(markdown, pipeline);
+                var mdDoc = Markdig.Markdown.Parse(markdown, pipeline);
 
-                // 2. HTML → FlowDocument (via RichTextBox clipboard trick)
-                return ConvertHtmlToFlowDocument(html);
+                foreach (var block in mdDoc)
+                    ConvertBlock(block, doc.Blocks);
+
+                return doc;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[MarkdownConverter] 转换失败: {ex.Message}");
-                return CreateFallbackDocument(markdown);
-            }
-        }
-
-        private static FlowDocument ConvertHtmlToFlowDocument(string html)
-        {
-            string wrapped = "<html><head><meta charset=\"utf-8\"/><style>body{font-family:'Microsoft YaHei';font-size:14px;}</style></head><body>"
-                + html + "</body></html>";
-
-            // Save clipboard
-            IDataObject saved = null;
-            try { saved = Clipboard.GetDataObject(); } catch { }
-
-            try
-            {
-                Clipboard.SetText(wrapped, TextDataFormat.Html);
-
-                var rtb = new System.Windows.Controls.RichTextBox();
-                rtb.Paste();
-
-                var doc = rtb.Document;
-
-                // Detach from RichTextBox so Document can live independently
-                rtb.Document = new FlowDocument();
-
-                doc.FontFamily = new System.Windows.Media.FontFamily("Microsoft YaHei");
-                doc.FontSize = 14;
-                doc.PagePadding = new Thickness(0);
-
+                doc.Blocks.Add(new Paragraph(new Run(markdown)));
                 return doc;
             }
-            finally
+        }
+
+        private static void ConvertBlock(MDBlock block, BlockCollection output)
+        {
+            switch (block)
             {
-                // Restore original clipboard content
-                try
-                {
-                    if (saved != null)
-                        Clipboard.SetDataObject(saved);
-                }
-                catch { }
+                case MDHeadingBlock heading:
+                    output.Add(ConvertHeading(heading));
+                    break;
+                case MDParagraphBlock para:
+                    output.Add(ConvertParagraph(para));
+                    break;
+                case MDFencedCodeBlock fenced:
+                    output.Add(ConvertFencedCodeBlock(fenced));
+                    break;
+                case MDCodeBlock code:
+                    output.Add(ConvertCodeBlock(code));
+                    break;
+                case MDListBlock listBlock:
+                    var list = ConvertList(listBlock);
+                    if (list != null)
+                        output.Add(list);
+                    break;
+                case MDThematicBreakBlock _:
+                    output.Add(ConvertThematicBreak());
+                    break;
+                case MDQuoteBlock quote:
+                    var section = ConvertQuote(quote);
+                    if (section != null)
+                        output.Add(section);
+                    break;
+                case MDTable table:
+                    var wpfTable = ConvertTable(table);
+                    if (wpfTable != null)
+                        output.Add(wpfTable);
+                    break;
+                default:
+                    // Fallback for leaf blocks with inline content
+                    if (block is MDLeafBlock leaf && leaf.Inline != null)
+                    {
+                        var fallback = new Paragraph();
+                        foreach (var inline in leaf.Inline)
+                            fallback.Inlines.Add(ConvertInline(inline));
+                        if (fallback.Inlines.Count > 0)
+                            output.Add(fallback);
+                    }
+                    break;
             }
         }
 
-        private static FlowDocument CreateFallbackDocument(string text)
+        // --- Block converters ---
+
+        private static Paragraph ConvertHeading(MDHeadingBlock heading)
         {
-            var doc = new FlowDocument
+            double fontSize = heading.Level switch
             {
-                FontFamily = new System.Windows.Media.FontFamily("Microsoft YaHei"),
-                FontSize = 14
+                1 => 26,
+                2 => 22,
+                3 => 18,
+                4 => 16,
+                _ => 15
             };
-            doc.Blocks.Add(new Paragraph(new Run(text)));
-            return doc;
+            var para = new Paragraph
+            {
+                FontSize = fontSize,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, fontSize * 0.4, 0, 4)
+            };
+            foreach (var inline in heading.Inline)
+                para.Inlines.Add(ConvertInline(inline));
+            return para;
         }
+
+        private static Paragraph ConvertParagraph(MDParagraphBlock paraBlock)
+        {
+            var para = new Paragraph
+            {
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            if (paraBlock.Inline == null)
+                return para;
+
+            foreach (var inline in paraBlock.Inline)
+                para.Inlines.Add(ConvertInline(inline));
+            return para;
+        }
+
+        private static Paragraph ConvertCodeBlock(MDCodeBlock codeBlock)
+        {
+            var para = new Paragraph
+            {
+                FontFamily = new FontFamily("Consolas, Courier New"),
+                FontSize = 13,
+                Background = new SolidColorBrush(Color.FromRgb(40, 44, 52)),
+                Foreground = new SolidColorBrush(Color.FromRgb(171, 178, 191)),
+                Margin = new Thickness(0, 4, 0, 8),
+                Padding = new Thickness(10, 8, 10, 8)
+            };
+            string code = codeBlock.Lines.ToString();
+            para.Inlines.Add(new Run(code.TrimEnd('\r', '\n')));
+            return para;
+        }
+
+        private static Paragraph ConvertFencedCodeBlock(MDFencedCodeBlock fenced)
+        {
+            var para = new Paragraph
+            {
+                FontFamily = new FontFamily("Consolas, Courier New"),
+                FontSize = 13,
+                Background = new SolidColorBrush(Color.FromRgb(40, 44, 52)),
+                Foreground = new SolidColorBrush(Color.FromRgb(171, 178, 191)),
+                Margin = new Thickness(0, 4, 0, 8),
+                Padding = new Thickness(10, 8, 10, 8)
+            };
+            string code = fenced.Lines.ToString();
+            para.Inlines.Add(new Run(code.TrimEnd('\r', '\n')));
+            return para;
+        }
+
+        private static System.Windows.Documents.List ConvertList(MDListBlock listBlock)
+        {
+            var list = new System.Windows.Documents.List
+            {
+                Margin = new Thickness(20, 2, 0, 6)
+            };
+
+            // Check if ordered by looking at the bullet type
+            if (listBlock.IsOrdered)
+                list.MarkerStyle = TextMarkerStyle.Decimal;
+            else
+                list.MarkerStyle = TextMarkerStyle.Disc;
+
+            foreach (var item in listBlock)
+            {
+                if (item is MDListItemBlock listItem)
+                {
+                    var listItemWpf = new ListItem();
+                    // Each ListItem can contain multiple blocks (paragraphs, nested lists, etc.)
+                    foreach (var child in listItem)
+                        ConvertBlock(child, listItemWpf.Blocks);
+
+                    if (listItemWpf.Blocks.Count == 0)
+                        listItemWpf.Blocks.Add(new Paragraph());
+                    list.ListItems.Add(listItemWpf);
+                }
+            }
+
+            return list;
+        }
+
+        private static Paragraph ConvertThematicBreak()
+        {
+            var para = new Paragraph
+            {
+                Margin = new Thickness(0, 8, 0, 8),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(128, 128, 128)),
+                Padding = new Thickness(0, 0, 0, 4)
+            };
+            return para;
+        }
+
+        private static Section ConvertQuote(MDQuoteBlock quote)
+        {
+            var section = new Section
+            {
+                BorderThickness = new Thickness(4, 0, 0, 0),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(100, 149, 237)),
+                Padding = new Thickness(12, 4, 0, 4),
+                Margin = new Thickness(0, 4, 0, 8)
+            };
+            foreach (var child in quote)
+                ConvertBlock(child, section.Blocks);
+            return section;
+        }
+
+        private static Table ConvertTable(MDTable table)
+        {
+            var wpfTable = new Table
+            {
+                CellSpacing = 0,
+                BorderThickness = new Thickness(1),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(80, 80, 80)),
+                Margin = new Thickness(0, 4, 0, 8)
+            };
+
+            // Define columns from first row
+            MDTableRow firstMdRow = null;
+            foreach (var r in table)
+            {
+                if (r is MDTableRow tr) { firstMdRow = tr; break; }
+            }
+
+            if (firstMdRow == null)
+                return null;
+
+            int colCount = 0;
+            foreach (var _ in firstMdRow) colCount++;
+
+            if (colCount == 0)
+                return null;
+
+            for (int c = 0; c < colCount; c++)
+                wpfTable.Columns.Add(new TableColumn { Width = GridLength.Auto });
+
+            bool firstRow = true;
+            var rowGroup = new TableRowGroup();
+            foreach (var mdRowObj in table)
+            {
+                if (mdRowObj is MDTableRow mdRow)
+                {
+                    var wpfRow = new TableRow();
+                    if (firstRow)
+                        wpfRow.Background = new SolidColorBrush(Color.FromRgb(55, 55, 60));
+
+                    foreach (var mdCellObj in mdRow)
+                    {
+                        if (mdCellObj is MDTableCell mdCell)
+                        {
+                            var wpfCell = new TableCell
+                            {
+                                Padding = new Thickness(8, 4, 8, 4),
+                                BorderThickness = new Thickness(0.5),
+                                BorderBrush = new SolidColorBrush(Color.FromRgb(60, 60, 65))
+                            };
+                            foreach (var child in mdCell)
+                                ConvertBlock(child, wpfCell.Blocks);
+
+                            if (wpfCell.Blocks.Count == 0)
+                                wpfCell.Blocks.Add(new Paragraph());
+                            wpfRow.Cells.Add(wpfCell);
+                        }
+                    }
+                    rowGroup.Rows.Add(wpfRow);
+                    firstRow = false;
+                }
+            }
+            wpfTable.RowGroups.Add(rowGroup);
+            return wpfTable;
+        }
+
+        // --- Inline converter ---
+
+        private static WpfInline ConvertInline(MDInline inline)
+        {
+            switch (inline)
+            {
+                case LiteralInline literal:
+                    return new Run(literal.Content.ToString());
+
+                case EmphasisInline emphasis:
+                    return ConvertEmphasis(emphasis);
+
+                case LinkInline link:
+                    if (link.IsImage)
+                        return ConvertImage(link);
+                    return ConvertHyperlink(link);
+
+                case CodeInline code:
+                    return new Run(code.Content)
+                    {
+                        FontFamily = new FontFamily("Consolas, Courier New"),
+                        Background = new SolidColorBrush(Color.FromRgb(55, 55, 60)),
+                        Foreground = new SolidColorBrush(Color.FromRgb(224, 108, 117))
+                    };
+
+                case LineBreakInline _:
+                    return new LineBreak();
+
+                case HtmlInline html:
+                    return new Run(html.Tag) { Foreground = new SolidColorBrush(Colors.Gray) };
+
+                case HtmlEntityInline entity:
+                    return new Run(System.Net.WebUtility.HtmlDecode(entity.Transcoded.ToString()));
+
+                default:
+                    // Fallback for unknown inline types — walk children if container
+                    if (inline is ContainerInline container)
+                    {
+                        var span = new Span();
+                        foreach (var child in container)
+                            span.Inlines.Add(ConvertInline(child));
+                        return span;
+                    }
+                    // Best-effort text representation
+                    var text = inline.ToString();
+                    return string.IsNullOrEmpty(text) ? new Run("") : new Run(text);
+            }
+        }
+
+        private static WpfInline ConvertEmphasis(EmphasisInline emphasis)
+        {
+            int count = emphasis.DelimiterCount;
+
+            // Build inner content first
+            var innerSpan = new Span();
+            foreach (var child in emphasis)
+                innerSpan.Inlines.Add(ConvertInline(child));
+
+            // Delimiter count: 1=italic, 2=bold, 3=bold+italic
+            if (count == 1)
+            {
+                var italic = new Italic();
+                foreach (var child in emphasis)
+                    italic.Inlines.Add(ConvertInline(child));
+                return italic;
+            }
+            if (count == 2)
+            {
+                var bold = new Bold();
+                foreach (var child in emphasis)
+                    bold.Inlines.Add(ConvertInline(child));
+                return bold;
+            }
+            // count >= 3: bold + italic
+            var boldItalic = new Bold();
+            var italicInner = new Italic();
+            foreach (var child in emphasis)
+                italicInner.Inlines.Add(ConvertInline(child));
+            boldItalic.Inlines.Add(italicInner);
+            return boldItalic;
+        }
+
+        private static WpfInline ConvertHyperlink(LinkInline link)
+        {
+            string url = link.Url ?? link.GetDynamicUrl?.Invoke() ?? "";
+            var hyperlink = new Hyperlink
+            {
+                NavigateUri = string.IsNullOrEmpty(url) ? null : new Uri(url),
+                Foreground = new SolidColorBrush(Color.FromRgb(100, 149, 237))
+            };
+            foreach (var child in link)
+                hyperlink.Inlines.Add(ConvertInline(child));
+            return hyperlink;
+        }
+
+        private static WpfInline ConvertImage(LinkInline link)
+        {
+            string url = link.Url ?? link.GetDynamicUrl?.Invoke() ?? "";
+            string alt = "";
+            if (link.FirstChild is LiteralInline lit)
+                alt = lit.Content.ToString();
+
+            var span = new Span { Foreground = new SolidColorBrush(Colors.Gray) };
+            span.Inlines.Add(new Run($"🖼 {(string.IsNullOrEmpty(alt) ? "图片" : alt)}"));
+            if (!string.IsNullOrEmpty(url))
+            {
+                span.Inlines.Add(new LineBreak());
+                span.Inlines.Add(new Run(url) { FontSize = 11 });
+            }
+            return span;
+        }
+
+        // --- Helpers ---
 
         private static System.Windows.Controls.Image FindImageInGrid(System.Windows.Controls.Grid grid)
         {
