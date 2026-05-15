@@ -506,30 +506,32 @@ namespace AniTechou.Utilities
         {
             int count = emphasis.DelimiterCount;
 
-            // Build inner content once
+            // Build inner content once, then snapshot — WPF Inline can only have
+            // one parent, so adding to Italic/Bold removes from innerSpan.Inlines.
             var innerSpan = new Span();
             foreach (var child in emphasis)
                 innerSpan.Inlines.Add(ConvertInline(child));
+            var children = innerSpan.Inlines.ToList();
 
             // Delimiter count: 1=italic, 2=bold, 3=bold+italic
             if (count == 1)
             {
                 var italic = new Italic();
-                foreach (WpfInline child in innerSpan.Inlines)
+                foreach (WpfInline child in children)
                     italic.Inlines.Add(child);
                 return italic;
             }
             if (count == 2)
             {
                 var bold = new Bold();
-                foreach (WpfInline child in innerSpan.Inlines)
+                foreach (WpfInline child in children)
                     bold.Inlines.Add(child);
                 return bold;
             }
             // count >= 3: bold + italic
             var boldItalic = new Bold();
             var italicInner = new Italic();
-            foreach (WpfInline child in innerSpan.Inlines)
+            foreach (WpfInline child in children)
                 italicInner.Inlines.Add(child);
             boldItalic.Inlines.Add(italicInner);
             return boldItalic;
