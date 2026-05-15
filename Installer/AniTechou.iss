@@ -22,7 +22,7 @@ WizardStyle=modern
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=output
-OutputBaseFilename=AniTechou-setup-win-x64
+OutputBaseFilename=AniTechou-Setup-v0.9.4
 SetupIconFile=..\Assets\Icon\AniTechou.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
