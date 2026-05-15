@@ -663,7 +663,8 @@ namespace AniTechou.Utilities
             var hyperlink = new Hyperlink
             {
                 NavigateUri = string.IsNullOrEmpty(url) ? null : new Uri(url),
-                Foreground = new SolidColorBrush(Color.FromRgb(100, 149, 237))
+                Foreground = new SolidColorBrush(Color.FromRgb(100, 149, 237)),
+                TextDecorations = TextDecorations.Underline
             };
             // Do NOT pass htmlState to children — outer Apply() wraps the entire result
             foreach (var child in link)
@@ -678,6 +679,38 @@ namespace AniTechou.Utilities
             if (link.FirstChild is LiteralInline lit)
                 alt = lit.Content.ToString();
 
+            // Try to load and display the actual image
+            if (!string.IsNullOrWhiteSpace(url) && File.Exists(url))
+            {
+                try
+                {
+                    var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                    bitmap.UriSource = new Uri(url, UriKind.Absolute);
+                    bitmap.EndInit();
+                    bitmap.Freeze();
+
+                    var image = new System.Windows.Controls.Image
+                    {
+                        Source = bitmap,
+                        Stretch = System.Windows.Media.Stretch.Uniform,
+                        MaxWidth = 700,
+                        MaxHeight = 500,
+                        Margin = new Thickness(0, 6, 0, 6)
+                    };
+                    if (!string.IsNullOrWhiteSpace(alt))
+                        image.ToolTip = alt;
+
+                    return new InlineUIContainer(image);
+                }
+                catch
+                {
+                    // Fall through to placeholder
+                }
+            }
+
+            // Fallback placeholder when image file not available
             var span = new Span { Foreground = new SolidColorBrush(Colors.Gray) };
             span.Inlines.Add(new Run($"🖼 {(string.IsNullOrEmpty(alt) ? "图片" : alt)}"));
             if (!string.IsNullOrEmpty(url))

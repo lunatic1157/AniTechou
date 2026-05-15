@@ -11,6 +11,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
 using System.Windows.Threading;
 using AniTechou.Services;
 using AniTechou.Windows;
@@ -386,6 +387,19 @@ namespace AniTechou.Views
                 var flowDoc = Utilities.MarkdownConverter.MarkdownToFlowDocument(md);
                 flowDoc.Foreground = MarkdownPreviewViewer.Foreground;
                 flowDoc.FontFamily = MarkdownPreviewViewer.FontFamily;
+                // Handle hyperlink clicks — open in default browser
+                flowDoc.AddHandler(Hyperlink.RequestNavigateEvent,
+                    new System.Windows.Navigation.RequestNavigateEventHandler((s, e) =>
+                    {
+                        try
+                        {
+                            System.Diagnostics.Process.Start(
+                                new System.Diagnostics.ProcessStartInfo(e.Uri.AbsoluteUri)
+                                { UseShellExecute = true });
+                        }
+                        catch { }
+                        e.Handled = true;
+                    }));
                 MarkdownPreviewViewer.Document = flowDoc;
                 System.Diagnostics.Debug.WriteLine($"[NoteEditor] Markdown预览已刷新, Block数={flowDoc.Blocks.Count}, 字符数={md.Length}");
             }
