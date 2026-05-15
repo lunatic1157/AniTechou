@@ -12,7 +12,8 @@
 - 剪贴板方案崩溃 → 重写为 **Markdig AST walker**（`Markdown.Parse()` → 递归遍历 → 构建 WPF FlowDocument 元素）
 - 编译错误 → `Table`/`TableRow`/`TableCell` 命名空间修正：`Markdig.Syntax` → `Markdig.Extensions.Tables`（commit `193534f`）
 - 往返转换标记叠加 → `ConvertInlinesToMarkdown` 新增 `inBold/inItalic` 上下文参数，防止 Run 继承 Bold 的 FontWeight 后重复追加 `**`（commit `bc18363`）
-- `ConvertEmphasis` 复用 `innerSpan`，children 只遍历一次
+- `ConvertEmphasis` 复用 `innerSpan` + `.ToList()` 快照，修复集合修改异常（commit `101b03e`）
+- **架构重构为 MD-native**（commit `33d2be5`）：删除 XAML↔MD 双模式切换，底层统一存储 Markdown，编辑=上半源码+下半实时预览，工具栏=插入 MD 语法，旧 XAML 笔记首次打开时自动迁移
 
 **AST Walker 能力**:
 - Block: Heading(1-6级), Paragraph, FencedCodeBlock, CodeBlock, List(有序/无序), ThematicBreak, Quote(左边框), Table
@@ -60,21 +61,24 @@
 ### 本次会话 (2026-05-15)
 
 **Commit: `193534f`** — Markdown AST walker Table/TableRow/TableCell 命名空间修复
-- 修复编译错误：`MDTable`/`MDTableRow`/`MDTableCell` 别名从 `Markdig.Syntax` 改为 `Markdig.Extensions.Tables`
-
-**Commit: `2a3df36`** — CLAUDE.md 文档更新
 
 **Commit: `bc18363`** — XamlToMarkdown 往返转换粗体/斜体标记重复叠加修复
-- `ConvertInlinesToMarkdown` 新增 `inBold/inItalic` 上下文参数
-- Run 在 Bold 内部的 FontWeight 继承不再触发额外的 `**` 标记
-- `ConvertEmphasis` 复用 `innerSpan`，children 只遍历一次
+
+**Commit: `101b03e`** — ConvertEmphasis 集合修改异常修复（.ToList() 快照）
+
+**Commit: `33d2be5`** — **架构重构：MD-native 编辑器**
+- 删除 XAML↔MD 双模式切换，底层统一存储 Markdown
+- NoteEditor: 删除 RichTextBox + 图片缩放/拖拽（~850行），编辑区=源码+实时预览
+- 工具栏按钮改为插入 MD 语法（B→`**`, I→`*`, H1→`# ` 等）
+- 旧 XAML 笔记 LoadData 时自动调用 XamlToMarkdown 迁移
+- WorkService.ImportExport: 图片路径正则同时匹配新旧格式
 
 ## 项目定位
 Windows WPF 桌面端 ACGN 作品管理工具。核心差异：AI 辅助 + 多源同步 + 富文本笔记。
 
 ## 技术栈
 - .NET 8 + WPF + SQLite (System.Data.SQLite)
-- Markdig 0.40 (Markdown 解析) — AST walker 方案
+- Markdig 0.40 (Markdown 解析) — AST walker 方案，底层存储纯 Markdown 文本
 - 测试：xUnit (74 tests, `Tests/AniTechou.Tests.csproj`)
 - 当前版本：v0.9.4
 
@@ -110,7 +114,7 @@ dotnet publish AniTechou.csproj -c Release -r win-x64 --self-contained true -o p
 ## v0.9.4 新特性
 - **5 状态**: 想看/在看/看过/搁置/抛弃
 - **分页加载**: 每页 50 部
-- **Markdown 笔记**: NoteEditor 双模式，Markdig AST walker（编译修复中）
+- **Markdown 笔记**: MD-native 编辑器 — 源码编辑+实时预览，工具栏插入 MD 语法，Markdig AST walker 预览引擎
 - **AI 本地管理**: BuildCollectionContext 汇总收藏数据
 - **Bangumi 同步增强**: 5 状态映射、类型映射、用户标签导入、infobox 解析、已有作品元数据补全
 
