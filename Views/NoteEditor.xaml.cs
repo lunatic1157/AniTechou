@@ -518,15 +518,18 @@ namespace AniTechou.Views
             MarkdownEditBox.Focus();
             if (MarkdownEditBox.SelectionLength > 0)
             {
+                // Save position before modification — SelectedText assignment moves cursor
+                int originalStart = MarkdownEditBox.SelectionStart;
                 string selected = MarkdownEditBox.SelectedText;
                 MarkdownEditBox.SelectedText = prefix + selected + suffix;
-                MarkdownEditBox.SelectionStart = MarkdownEditBox.SelectionStart - suffix.Length - selected.Length;
+                MarkdownEditBox.SelectionStart = Math.Max(0, originalStart + prefix.Length);
                 MarkdownEditBox.SelectionLength = selected.Length;
             }
             else
             {
+                int originalPos = MarkdownEditBox.CaretIndex;
                 InsertTextAtCaret(prefix + suffix);
-                MarkdownEditBox.CaretIndex -= suffix.Length;
+                MarkdownEditBox.CaretIndex = Math.Max(0, originalPos + prefix.Length);
             }
             MarkDirtyAndScheduleSave();
         }
@@ -546,7 +549,7 @@ namespace AniTechou.Views
 
         private void InsertTextAtCaret(string text)
         {
-            int pos = MarkdownEditBox.CaretIndex;
+            int pos = Math.Clamp(MarkdownEditBox.CaretIndex, 0, MarkdownEditBox.Text.Length);
             MarkdownEditBox.Text = MarkdownEditBox.Text.Insert(pos, text);
             MarkdownEditBox.CaretIndex = pos + text.Length;
         }
