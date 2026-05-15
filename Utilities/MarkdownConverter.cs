@@ -90,16 +90,21 @@ namespace AniTechou.Utilities
             sb.AppendLine();
         }
 
-        private static void ConvertInlinesToMarkdown(InlineCollection inlines, StringBuilder sb)
+        private static void ConvertInlinesToMarkdown(InlineCollection inlines, StringBuilder sb,
+            bool inBold = false, bool inItalic = false)
         {
             foreach (var inline in inlines)
             {
                 if (inline is Run run)
                 {
                     string text = run.Text ?? "";
-                    if (run.FontWeight == FontWeights.Bold)
+                    // Only apply **/* markers for direct formatting on Run when NOT
+                    // already inside Bold/Italic (which add their own markers).
+                    // Otherwise inherited font properties cause double-wrapping:
+                    // Bold->Run -> "**" + Run(says Bold)="**text**" + "**" = ****text****
+                    if (!inBold && run.FontWeight == FontWeights.Bold)
                         sb.Append($"**{text}**");
-                    else if (run.FontStyle == FontStyles.Italic)
+                    else if (!inItalic && run.FontStyle == FontStyles.Italic)
                         sb.Append($"*{text}*");
                     else
                         sb.Append(text);
@@ -107,27 +112,32 @@ namespace AniTechou.Utilities
                 else if (inline is Bold bold)
                 {
                     sb.Append("**");
-                    ConvertInlinesToMarkdown(bold.Inlines, sb);
+                    ConvertInlinesToMarkdown(bold.Inlines, sb, inBold: true, inItalic);
                     sb.Append("**");
                 }
                 else if (inline is Italic italic)
                 {
                     sb.Append("*");
-                    ConvertInlinesToMarkdown(italic.Inlines, sb);
+                    ConvertInlinesToMarkdown(italic.Inlines, sb, inBold, inItalic: true);
                     sb.Append("*");
                 }
                 else if (inline is Underline underline)
                 {
                     sb.Append("<u>");
-                    ConvertInlinesToMarkdown(underline.Inlines, sb);
+                    ConvertInlinesToMarkdown(underline.Inlines, sb, inBold, inItalic);
                     sb.Append("</u>");
                 }
                 else if (inline is Hyperlink link)
                 {
                     string url = link.NavigateUri?.ToString() ?? "";
                     sb.Append("[");
-                    ConvertInlinesToMarkdown(link.Inlines, sb);
+                    ConvertInlinesToMarkdown(link.Inlines, sb, inBold, inItalic);
                     sb.Append($"]({url})");
+                }
+                else if (inline is Span span)
+                {
+                    // Span can carry font properties but should not double-wrap
+                    ConvertInlinesToMarkdown(span.Inlines, sb, inBold, inItalic);
                 }
                 else if (inline is InlineUIContainer container && container.Child is System.Windows.Controls.Grid grid)
                 {
@@ -496,7 +506,7 @@ namespace AniTechou.Utilities
         {
             int count = emphasis.DelimiterCount;
 
-            // Build inner content first
+            // Build inner content once
             var innerSpan = new Span();
             foreach (var child in emphasis)
                 innerSpan.Inlines.Add(ConvertInline(child));
@@ -505,22 +515,22 @@ namespace AniTechou.Utilities
             if (count == 1)
             {
                 var italic = new Italic();
-                foreach (var child in emphasis)
-                    italic.Inlines.Add(ConvertInline(child));
+                foreach (WpfInline child in innerSpan.Inlines)
+                    italic.Inlines.Add(child);
                 return italic;
             }
             if (count == 2)
             {
                 var bold = new Bold();
-                foreach (var child in emphasis)
-                    bold.Inlines.Add(ConvertInline(child));
+                foreach (WpfInline child in innerSpan.Inlines)
+                    bold.Inlines.Add(child);
                 return bold;
             }
             // count >= 3: bold + italic
             var boldItalic = new Bold();
             var italicInner = new Italic();
-            foreach (var child in emphasis)
-                italicInner.Inlines.Add(ConvertInline(child));
+            foreach (WpfInline child in innerSpan.Inlines)
+                italicInner.Inlines.Add(child);
             boldItalic.Inlines.Add(italicInner);
             return boldItalic;
         }
