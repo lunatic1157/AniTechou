@@ -22,9 +22,9 @@
 - **技术栈**：WPF + .NET 8 + SQLite + xUnit
 - **仓库**：`F:\AniTechou\AniTechouRepo`（GitHub: lunatic1157/AniTechou）
 - **用户**：nebura，CS 专业学生，中文交流，偏好渐进式引导
-- **当前版本**：v0.9.2+
+- **当前版本**：v0.9.4
 
-核心差异点：AI 辅助搜索推荐 + 富文本笔记系统。不是单纯的追番清单。
+核心差异点：AI 辅助搜索推荐 + Markdown 笔记系统。不是单纯的追番清单。
 
 ---
 
@@ -38,7 +38,7 @@ Services/
   DatabaseHelper.cs      — SQLite 建库、迁移、连接
   AccountManager.cs      — 多账号管理（按账号分库）
   ThemeManager.cs        — 主题切换
-  SearchProviders/       — 外部 API 搜索（新模块 v0.9.3+）
+  SearchProviders/       — 外部 API 搜索（v0.9.3+ 已发布）
     ISearchProvider.cs
     SearchProviderModels.cs
     BangumiSearchProvider.cs
@@ -54,7 +54,7 @@ MainWindow.xaml.cs       — 主窗口、AI 对话面板、意图分发
 
 ---
 
-## 已完成：AI 搜索三层次改进（v0.9.3 开发中）
+## 已完成：AI 搜索三层次改进（v0.9.3 已完成）
 
 ### 第1层 — 真实 API 搜索集成 ✅
 

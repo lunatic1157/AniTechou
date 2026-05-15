@@ -173,7 +173,7 @@
             <Border Style="{StaticResource AppSectionCardStyle}" Padding="24" Margin="0,0,0,20">
                 <StackPanel>
                     <TextBlock Text="🔄 同步追番数据" Style="{StaticResource SectionTitleStyle}"/>
-                    <TextBlock Text="从 Bangumi / B站 同步收藏状态到本地"
+                    <TextBlock Text="从 Bangumi 同步收藏状态到本地"
                                FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,12"/>
 
                     <Grid Margin="0,0,0,10">

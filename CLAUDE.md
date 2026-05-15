@@ -41,40 +41,20 @@
 
 ## 会话改动总结
 
-### 上次会话 (2026-05-15)
+### v0.9.4 开发 (2026-05-15)
 
-**Commit 1: `743959f`** — Markdown预览渲染 + infobox key匹配修复
-- `Utilities/MarkdownConverter.cs`: ParseInlineMarkdown 重构(批量字符,内联解析用于普通段落), FlowDocument PagePadding=0
-- `Views/NoteEditor.xaml`: FlowDocumentScrollViewer + Foreground/Background
-- `Views/NoteEditor.xaml.cs`: RefreshMarkdownPreview 显式设置 Foreground/FontFamily
-- `Services/SearchProviders/BangumiSearchProvider.cs`: infobox key 匹配顺序修复(原作者→Author; 原作→OriginalWork)
-
-**Commit 2: `94dd5c0`** — Markdown解析器完善 + 同步元数据补全
-- `Utilities/MarkdownConverter.cs`: ParseInlineMarkdown 支持 ***粗斜体, <u>下划线, ![](图片占位); XamlToMarkdown 图片提取修复(FindName→Children遍历)
-- `Views/NoteEditor.xaml.cs`: MarkdownModeToggle_Click 包裹 suppressTextEvents 防竞态
-- `Services/SyncService.cs`: ApplyBangumiResultsAsync 匹配到已有作品时从 Bangumi 补全空字段(8个字段), BangumiId 保存移出状态变更判断
-
-**Commit 3: `a7818d8`** — MarkdownToFlowDocument 改用 Markdig HTML（有BUG）
-- 移除手动 ParseInlineMarkdown，改用 Markdig → HTML → RichTextBox.Paste → FlowDocument
-- **引入新问题**: 剪贴板方案导致 CLIPBRD_E_BAD_DATA 崩溃和内容消失
-
-### 本次会话 (2026-05-15)
-
-**Commit: `193534f`** — Markdown AST walker Table/TableRow/TableCell 命名空间修复
-
-**Commit: `bc18363`** — XamlToMarkdown 往返转换粗体/斜体标记重复叠加修复
-
-**Commit: `101b03e`** — ConvertEmphasis 集合修改异常修复（.ToList() 快照）
-
-**Commit: `33d2be5`** — **架构重构：MD-native 编辑器**
-- 删除 XAML↔MD 双模式切换，底层统一存储 Markdown
-- NoteEditor: 删除 RichTextBox + 图片缩放/拖拽（~850行），编辑区=源码+实时预览
-- 工具栏按钮改为插入 MD 语法（B→`**`, I→`*`, H1→`# ` 等）
-- 旧 XAML 笔记 LoadData 时自动调用 XamlToMarkdown 迁移
-- WorkService.ImportExport: 图片路径正则同时匹配新旧格式
+- **Markdig AST Walker**: Markdown→FlowDocument 预览引擎，Markdig 0.40 直接解析构建 WPF FlowDocument
+- **MD-native 编辑器重构**: 删除 XAML↔MD 双模式切换，底层统一存储 Markdown，编辑区=源码+实时预览
+- **工具栏 MD 语法插入**: B→`**`, I→`*`, U→`<u>`, H1-3→`#`, 列表→`-`/`1.`, 链接→`[text](url)`, 图片→`![](path)`
+- **HTML 标签渲染**: `<u>`→下划线, `<span style="color/bgcolor">`→文字颜色/高亮
+- **图片渲染**: `![](path)` 本地图片直接嵌入 FlowDocument
+- **链接交互**: `[text](url)` 蓝色下划线，点击浏览器打开
+- **旧笔记自动迁移**: 首次打开 XAML 笔记时调用 XamlToMarkdown 转换并持久化
+- **ImportExport**: 图片路径正则同时匹配 `ani-image:` 和 `![](path)` 两种格式
+- **Bug 修复**: Table 命名空间、往返转换标记叠加、集合修改异常、WrapSelection 越界
 
 ## 项目定位
-Windows WPF 桌面端 ACGN 作品管理工具。核心差异：AI 辅助 + 多源同步 + 富文本笔记。
+Windows WPF 桌面端 ACGN 作品管理工具。核心差异：AI 辅助 + 多源同步 + Markdown 笔记。
 
 ## 技术栈
 - .NET 8 + WPF + SQLite (System.Data.SQLite)
