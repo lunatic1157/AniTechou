@@ -2,28 +2,22 @@
 
 ## 待修复问题 (P0)
 
-### Bug 1: Markdown 模式不稳定（内容消失 + 剪贴板崩溃）⚠️ 待完成编译修复
+### Bug 1: Markdown 模式不稳定（内容消失 + 剪贴板崩溃）✅ 已修复
 
-**已修复部分**:
+**修复历程**:
 - 预览区不渲染 → 已修复（`FlowDocumentScrollViewer` 添加 Foreground/Background）
 - 暗色主题文字不可见 → 已修复（`RefreshMarkdownPreview` 显式设置 Foreground）
 - 切换 MD 按钮时的自动保存竞态 → 已修复（`MarkdownModeToggle_Click` 包裹 suppressTextEvents）
 - XamlToMarkdown 图片丢失 → 已修复（`FindImageInGrid` 遍历 Children 替代 FindName）
+- 剪贴板方案崩溃 → 重写为 **Markdig AST walker**（`Markdown.Parse()` → 递归遍历 → 构建 WPF FlowDocument 元素）
+- 编译错误 → `Table`/`TableRow`/`TableCell` 命名空间修正：`Markdig.Syntax` → `Markdig.Extensions.Tables`（commit `193534f`）
 
-**当前问题** (`a7818d8` 引入 → 本次会话重写):
-- `MarkdownToFlowDocument` 已从剪贴板方案重写为 **Markdig AST walker**（`Markdown.Parse()` → 递归遍历 → 构建 WPF FlowDocument 元素）
-- 已移除 `ConvertHtmlToFlowDocument`（不再碰剪贴板）
-- 已实现 block 转换器：Heading、Paragraph、FencedCodeBlock、CodeBlock、List、ThematicBreak、Quote、Table
-- 已实现 inline 转换器：LiteralInline、EmphasisInline（`*`/`**`/`***`）、LinkInline（链接+图片）、CodeInline、LineBreakInline、HtmlInline、HtmlEntityInline
-- **编译未通过**：`Table`/`TableRow`/`TableCell` 在 Markdig 0.40 中不在 `Markdig.Syntax` 命名空间，使用别名 `MDTable`/`MDTableRow`/`MDTableCell` 时找不到类型
-
-**下一步**:
-- 找到 Markdig 0.40 中 Table/TableRow/TableCell 的实际命名空间（可能在 `Markdig.Extensions.Tables` 或 `Markdig.Syntax` 的嵌套类中）
-- 或者简化处理：table 暂时降级为文本占位，先让编译通过、核心 format（标题/粗斜体/列表/引用/代码块/链接）跑起来
-- 编译通过后运行 74 个单元测试，手动测试 MD 切换
+**AST Walker 能力**:
+- Block: Heading(1-6级), Paragraph, FencedCodeBlock, CodeBlock, List(有序/无序), ThematicBreak, Quote(左边框), Table
+- Inline: LiteralInline, EmphasisInline(`*`/`**`/`***`), LinkInline(链接+图片), CodeInline, LineBreakInline, HtmlInline, HtmlEntityInline
 
 涉及文件:
-- `Utilities/MarkdownConverter.cs` — `MarkdownToFlowDocument`（AST walker）、`ConvertBlock`（block 分发）、`ConvertInline`（inline 分发）、`XamlToMarkdown`（保留，正常工作）
+- `Utilities/MarkdownConverter.cs` — `MarkdownToFlowDocument`（AST walker）、`ConvertBlock`、`ConvertInline`、`XamlToMarkdown`
 
 ### Bug 2: 自动添加的作品信息不全 ✅ 已基本解决
 
@@ -63,12 +57,9 @@
 
 ### 本次会话 (2026-05-15)
 
-**MarkdownToFlowDocument 重写为 AST Walker（未完成）**:
-- 移除 `ConvertHtmlToFlowDocument` 剪贴板方案
-- 重写为 `Markdig.Markdown.Parse()` → 递归遍历 Markdig AST → 直接构建 WPF FlowDocument
-- Block 支持: Heading(1-6级字体), Paragraph, FencedCodeBlock(深色背景等宽字体), CodeBlock, List(有序/无序), ThematicBreak, Quote(左边框), Table
-- Inline 支持: LiteralInline, EmphasisInline(`*`=斜体/`**`=粗体/`***`=粗斜体), LinkInline(超链接+图片占位), CodeInline, LineBreakInline, HtmlInline, HtmlEntityInline
-- **编译未通过** — MDTable/MDTableRow/MDTableCell 类型在 Markdig 0.40 的 `Markdig.Syntax` 中找不到，需确认实际命名空间
+**Commit: `193534f`** — Markdown AST walker Table/TableRow/TableCell 命名空间修复
+- 修复编译错误：`MDTable`/`MDTableRow`/`MDTableCell` 别名从 `Markdig.Syntax` 改为 `Markdig.Extensions.Tables`
+- 编译通过，74 个单元测试全部通过
 
 ## 项目定位
 Windows WPF 桌面端 ACGN 作品管理工具。核心差异：AI 辅助 + 多源同步 + 富文本笔记。
