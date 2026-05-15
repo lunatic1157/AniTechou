@@ -106,3 +106,54 @@ dotnet publish AniTechou.csproj -c Release -r win-x64 --self-contained true -o p
 - DB 迁移: PRAGMA user_version=5
 - B站 同步已放弃
 - 联网搜索默认关闭
+
+## v0.9.4 开发复盘
+
+### 做了什么
+
+v0.9.4 最初的 Markdown 笔记是实验性的 XAML↔MD 双模式切换方案，存在三个根深蒂固的问题：
+1. **双向转换不可靠**：XamlToMarkdown / MarkdownToFlowDocument 往返时格式标记叠加（`****text****`）
+2. **剪贴板方案崩溃**：Markdig → HTML → RichTextBox.Paste 路径引发 `CLIPBRD_E_BAD_DATA`
+3. **代码膨胀**：NoteEditor 有 ~650 行图片缩放/拖拽代码，全部耦合在 RichTextBox 的 InlineUIContainer 机制上
+
+最终改成了 **MD-native 架构**：底层存储 Markdown 纯文本，编辑=源码 TextBox + FlowDocumentScrollViewer 预览，工具栏=插入 MD 语法。删除了约 860 行旧代码。
+
+### 关键经验
+
+- **避免格式双向转换**：XAML 和 Markdown 的表达力不同，双向转换永远有边界情况。单向（MD→FlowDocument 用于预览）是可控的
+- **WPF Inline 只能有一个父级**：`italic.Inlines.Add(child)` 会从原集合移除 child，枚举前必须 `.ToList()` 快照
+- **TextBox.SelectedText 赋值后光标位置不可靠**：保存 `originalStart` 再计算，不要用赋值后的 `SelectionStart` 做算术
+- **Markdig 将 HTML 标签解析为兄弟节点**：`<u>text</u>` → `HtmlInline("&lt;u&gt;") + Literal("text") + HtmlInline("&lt;/u&gt;")`，需要状态追踪才能渲染
+
+## 后续优化方向
+
+### 笔记编辑器体验
+
+当前上下分栏（源码↑ 预览↓）的主要问题：编辑区和预览区各占一半，空间局促，视线要在上下之间跳跃。
+
+可考虑的改进方案：
+
+| 方案 | 说明 | 复杂度 |
+|------|------|--------|
+| **左右分栏** | 源码左、预览右，更适合宽屏显示器（现代 IDE 标准布局） | 低 |
+| **Tab 切换** | 编辑 / 预览 / 分栏 三个 Tab，用户按需切换，最大化利用空间 | 低 |
+| **所见即所得 (WYSIWYG)** | 类似 Typora，编辑区即预览区，Markdown 语法隐藏只显示渲染结果。最理想的体验但实现难度最高 | 高 |
+| **记住分栏比例** | 用户拖动 GridSplitter 后记住比例，下次打开笔记恢复 | 低 |
+
+### 编辑功能增强
+
+- **Markdown 语法高亮**：TextBox 内对 `#` `**` `[]()` 等语法着色（可用 AvalonEdit 替换原生 TextBox）
+- **自动补全**：输入 `[` 或 `![` 时弹出链接/图片路径补全
+- **图片粘贴**：剪贴板中的图片直接保存并插入 `![](path)`
+- **预览区滚动同步**：编辑区滚动时预览区自动跟随
+
+### 预览渲染增强
+
+- 代码块语法高亮（当前只有等宽字体+深色背景，无语言着色）
+- 任务列表 `- [ ]` / `- [x]` 渲染为 CheckBox
+- 表格在暗色主题下的样式优化
+
+### 性能
+
+- 当前每次 TextChanged 都重新 Parse 整个 Markdown 文档。大笔记（>5000 字）时可用防抖 300ms + 增量渲染优化
+- Markdig 的 `MarkdownPipeline` 可缓存复用，不需要每次新建
