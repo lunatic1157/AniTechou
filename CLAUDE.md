@@ -11,6 +11,8 @@
 - XamlToMarkdown 图片丢失 → 已修复（`FindImageInGrid` 遍历 Children 替代 FindName）
 - 剪贴板方案崩溃 → 重写为 **Markdig AST walker**（`Markdown.Parse()` → 递归遍历 → 构建 WPF FlowDocument 元素）
 - 编译错误 → `Table`/`TableRow`/`TableCell` 命名空间修正：`Markdig.Syntax` → `Markdig.Extensions.Tables`（commit `193534f`）
+- 往返转换标记叠加 → `ConvertInlinesToMarkdown` 新增 `inBold/inItalic` 上下文参数，防止 Run 继承 Bold 的 FontWeight 后重复追加 `**`（commit `bc18363`）
+- `ConvertEmphasis` 复用 `innerSpan`，children 只遍历一次
 
 **AST Walker 能力**:
 - Block: Heading(1-6级), Paragraph, FencedCodeBlock, CodeBlock, List(有序/无序), ThematicBreak, Quote(左边框), Table
@@ -59,14 +61,20 @@
 
 **Commit: `193534f`** — Markdown AST walker Table/TableRow/TableCell 命名空间修复
 - 修复编译错误：`MDTable`/`MDTableRow`/`MDTableCell` 别名从 `Markdig.Syntax` 改为 `Markdig.Extensions.Tables`
-- 编译通过，74 个单元测试全部通过
+
+**Commit: `2a3df36`** — CLAUDE.md 文档更新
+
+**Commit: `bc18363`** — XamlToMarkdown 往返转换粗体/斜体标记重复叠加修复
+- `ConvertInlinesToMarkdown` 新增 `inBold/inItalic` 上下文参数
+- Run 在 Bold 内部的 FontWeight 继承不再触发额外的 `**` 标记
+- `ConvertEmphasis` 复用 `innerSpan`，children 只遍历一次
 
 ## 项目定位
 Windows WPF 桌面端 ACGN 作品管理工具。核心差异：AI 辅助 + 多源同步 + 富文本笔记。
 
 ## 技术栈
 - .NET 8 + WPF + SQLite (System.Data.SQLite)
-- Markdig 0.40 (Markdown 解析) — AST walker 方案（编译修复中）
+- Markdig 0.40 (Markdown 解析) — AST walker 方案
 - 测试：xUnit (74 tests, `Tests/AniTechou.Tests.csproj`)
 - 当前版本：v0.9.4
 
