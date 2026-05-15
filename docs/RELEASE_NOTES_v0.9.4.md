@@ -22,12 +22,15 @@
 ### 跨类型 Bangumi 同步
 - 同步时不再将所有作品标记为动画，漫画、轻小说、游戏各自保持正确类型
 
-### Markdown 笔记（实验性）
-- 笔记编辑器新增 Markdown 编辑模式切换按钮
-- 支持 XAML 富文本 ↔ Markdown 双向转换
-- 笔记底层存储新增 ContentType 字段，区分 Xaml/Markdown 格式
-- 现有笔记自动标记为 Xaml 格式，可手动切换至 Markdown 模式
-- Markdown 预览自动提取纯文本
+### Markdown 笔记
+- 笔记编辑器采用 **MD-native 单一模式**，底层存储统一为 Markdown 纯文本
+- 编辑区 = 上半源码编辑 + 下半 FlowDocumentScrollViewer 实时预览
+- 工具栏按钮直接插入/包裹 Markdown 语法（B→`**`、I→`*`、U→`<u>`、H1→`# ` 等）
+- Markdig 0.40 AST Walker 解析引擎：完整支持 Heading、CodeBlock、List、Table、Quote、Emphasis、Link、Image
+- 预览支持 `<u>` 下划线、`<span style="color/bgcolor">` 文字颜色/高亮
+- `![](path)` 本地图片直接嵌入 FlowDocument 显示
+- `[text](url)` 蓝色下划线，点击浏览器打开
+- 旧 XAML 笔记首次打开时自动迁移为 Markdown
 
 ### AI 本地化增强
 - AI 现在始终了解你的完整收藏列表
