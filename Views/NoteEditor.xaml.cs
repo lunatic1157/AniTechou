@@ -9,7 +9,6 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -21,21 +20,14 @@ namespace AniTechou.Views
 {
     public enum EditorSource
     {
-        NotesList,      // 来自笔记列表
-        WorkDetail,     // 来自作品详情页
-        QuickNote       // 来自快速笔记
+        NotesList,
+        WorkDetail,
+        QuickNote
     }
 
     public partial class NoteEditor : UserControl
     {
-        private const string ResizableImageHostTag = "ResizableNoteImageHost";
         private const string ResizableImagePathPrefix = "ani-image:";
-        private const string NoteImageMoveDataFormat = "AniTechou.NoteImageMoveV2";
-        private const double MinImageWidth = 120;
-        private const double MinImageHeight = 90;
-        private const double MaxImageWidth = 900;
-        private const double MaxImageHeight = 900;
-        private const double ResizeHitThickness = 10;
 
         private sealed class PaletteColor
         {
@@ -113,19 +105,10 @@ namespace AniTechou.Views
         private bool _isDirty;
         private bool _isSaving;
         private bool _suppressTextEvents;
-        private bool _isMarkdownMode = false;
         private List<string> _allNoteTags = new List<string>();
-        private TextPointer _selectionStartSnapshot;
-        private TextPointer _selectionEndSnapshot;
+        private int _selectionStart;
+        private int _selectionLength;
         private int _changeVersion;
-        private Grid _activeResizeHost;
-        private Point _resizeStartPoint;
-        private double _resizeStartWidth;
-        private double _resizeStartHeight;
-        private string _resizeMode;
-        private Grid _pendingMoveHost;
-        private Point _pendingMoveStartPoint;
-        private Grid _movingSourceHost;
 
         public NoteEditor(string accountName, WorkService.NoteInfo note = null, EditorSource source = EditorSource.NotesList, int workId = 0)
         {
@@ -135,8 +118,7 @@ namespace AniTechou.Views
             _note = note ?? new WorkService.NoteInfo();
             _source = source;
             _sourceWorkId = workId;
-            RichEditor.AddHandler(Hyperlink.ClickEvent, new RoutedEventHandler(Hyperlink_Click));
-            DataObject.AddPastingHandler(RichEditor, RichEditor_Pasting);
+            DataObject.AddPastingHandler(MarkdownEditBox, MarkdownEditBox_Pasting);
 
             LoadWorks();
             LoadData();
@@ -159,30 +141,25 @@ namespace AniTechou.Views
             if (_note.Id > 0)
             {
                 TitleBox.Text = _note.Title;
+                string content = _note.Content ?? "";
 
-                if (_note.ContentType == "Markdown")
+                if (_note.ContentType != "Markdown" && !string.IsNullOrWhiteSpace(content))
                 {
-                    // Load as Markdown
-                    _isMarkdownMode = true;
-                    MarkdownModeToggle.IsChecked = true;
-                    MarkdownEditBox.Text = _note.Content ?? "";
-                    MarkdownEditPanel.Visibility = Visibility.Visible;
-                    MarkdownSplitter.Visibility = Visibility.Visible;
-                    MarkdownPreviewPanel.Visibility = Visibility.Visible;
-                    RichEditorPanel.Visibility = Visibility.Collapsed;
-                    RefreshMarkdownPreview();
+                    // Auto-migrate old XAML note to Markdown on first open
+                    try
+                    {
+                        content = Utilities.MarkdownConverter.XamlToMarkdown(content);
+                    }
+                    catch
+                    {
+                        // keep original content if conversion fails
+                    }
+                    _note.Content = content;
+                    _note.ContentType = "Markdown";
                 }
-                else
-                {
-                    // Load as Xaml (default)
-                    LoadRichTextContent(_note.Content);
-                    _isMarkdownMode = false;
-                    MarkdownModeToggle.IsChecked = false;
-                    MarkdownEditPanel.Visibility = Visibility.Collapsed;
-                    MarkdownSplitter.Visibility = Visibility.Collapsed;
-                    MarkdownPreviewPanel.Visibility = Visibility.Collapsed;
-                    RichEditorPanel.Visibility = Visibility.Visible;
-                }
+
+                MarkdownEditBox.Text = content;
+                RefreshMarkdownPreview();
 
                 _selectedWorkIds = new List<int>(_note.WorkIds);
                 _tags = new List<string>(_note.Tags);
@@ -196,10 +173,13 @@ namespace AniTechou.Views
             }
             RefreshWorksPanel();
             RefreshTagsPanel();
-            AttachResizableImagesToDocument();
             _suppressTextEvents = false;
             _changeVersion = 0;
             MarkSaved();
+
+            // Trigger save to persist migration (if any)
+            if (_note.Id > 0 && _isDirty)
+                MarkDirtyAndScheduleSave();
         }
 
         private void RefreshWorksPanel()
@@ -231,7 +211,7 @@ namespace AniTechou.Views
                         BorderBrush = Brushes.Transparent,
                         BorderThickness = new Thickness(0),
                         Padding = new Thickness(0),
-                        Cursor = System.Windows.Input.Cursors.Hand
+                        Cursor = Cursors.Hand
                     };
                     removeBtn.SetResourceReference(Button.ForegroundProperty, "TextSecondaryBrush");
                     removeBtn.Click += (s, e) => { _selectedWorkIds.Remove(workId); RefreshWorksPanel(); MarkDirtyAndScheduleSave(); };
@@ -239,35 +219,6 @@ namespace AniTechou.Views
                     tag.Child = stack;
                     WorksPanel.Children.Add(tag);
                 }
-            }
-        }
-
-        private void Hyperlink_Click(object sender, RoutedEventArgs e)
-        {
-            if (e.OriginalSource is Hyperlink hyperlink && hyperlink.NavigateUri != null)
-            {
-                try
-                {
-                    Process.Start(new ProcessStartInfo(hyperlink.NavigateUri.AbsoluteUri) { UseShellExecute = true });
-                    e.Handled = true;
-                }
-                catch
-                {
-                }
-            }
-        }
-
-        private string StripMarkup(string content)
-        {
-            if (string.IsNullOrWhiteSpace(content)) return "";
-
-            try
-            {
-                return System.Text.RegularExpressions.Regex.Replace(content, "<.*?>", string.Empty).Trim();
-            }
-            catch
-            {
-                return content;
             }
         }
 
@@ -297,7 +248,7 @@ namespace AniTechou.Views
                     BorderBrush = Brushes.Transparent,
                     BorderThickness = new Thickness(0),
                     Padding = new Thickness(0),
-                    Cursor = System.Windows.Input.Cursors.Hand
+                    Cursor = Cursors.Hand
                 };
                 removeBtn.SetResourceReference(Button.ForegroundProperty, "TextSecondaryBrush");
                 removeBtn.Click += (s, e) => { _tags.Remove(tag); RefreshTagsPanel(); MarkDirtyAndScheduleSave(); };
@@ -408,97 +359,45 @@ namespace AniTechou.Views
             MarkDirtyAndScheduleSave();
         }
 
-        private void RichEditor_TextChanged(object sender, TextChangedEventArgs e)
+        private string GetMarkdownContent()
         {
-            if (_suppressTextEvents) return;
-            MarkDirtyAndScheduleSave();
+            return MarkdownEditBox.Text ?? "";
         }
 
-        private void RichEditor_SelectionChanged(object sender, RoutedEventArgs e)
+        private void MarkdownEditBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (!_suppressTextEvents)
+            {
+                RefreshMarkdownPreview();
+                MarkDirtyAndScheduleSave();
+            }
+        }
+
+        private void MarkdownEditBox_SelectionChanged(object sender, RoutedEventArgs e)
         {
             SaveSelectionSnapshot();
+        }
+
+        private void RefreshMarkdownPreview()
+        {
+            try
+            {
+                string md = MarkdownEditBox.Text ?? "";
+                var flowDoc = Utilities.MarkdownConverter.MarkdownToFlowDocument(md);
+                flowDoc.Foreground = MarkdownPreviewViewer.Foreground;
+                flowDoc.FontFamily = MarkdownPreviewViewer.FontFamily;
+                MarkdownPreviewViewer.Document = flowDoc;
+                System.Diagnostics.Debug.WriteLine($"[NoteEditor] Markdown预览已刷新, Block数={flowDoc.Blocks.Count}, 字符数={md.Length}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[NoteEditor] Markdown预览刷新失败: {ex.Message}");
+            }
         }
 
         private void UpdateTitlePlaceholder()
         {
             TitlePlaceholder.Visibility = string.IsNullOrWhiteSpace(TitleBox.Text) ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private void LoadRichTextContent(string content)
-        {
-            if (string.IsNullOrWhiteSpace(content))
-            {
-                RichEditor.Document = CreateEmptyDocument();
-                return;
-            }
-
-            try
-            {
-                if (content.TrimStart().StartsWith("<FlowDocument", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (XamlReader.Parse(content) is FlowDocument parsedDocument)
-                    {
-                        RichEditor.Document = parsedDocument;
-                        AttachResizableImagesToDocument();
-                        return;
-                    }
-                }
-            }
-            catch
-            {
-            }
-
-            var fallbackDocument = CreateEmptyDocument();
-            try
-            {
-                var range = new TextRange(fallbackDocument.ContentStart, fallbackDocument.ContentEnd);
-                using var stream = new MemoryStream(Encoding.UTF8.GetBytes(content));
-                range.Load(stream, DataFormats.Xaml);
-                RichEditor.Document = fallbackDocument;
-                AttachResizableImagesToDocument();
-            }
-            catch
-            {
-                fallbackDocument.Blocks.Clear();
-                fallbackDocument.Blocks.Add(new Paragraph(new Run(StripMarkup(content))));
-                RichEditor.Document = fallbackDocument;
-            }
-        }
-
-        private string GetRichTextContent()
-        {
-            if (_isMarkdownMode)
-            {
-                return MarkdownEditBox.Text ?? "";
-            }
-            if (IsDocumentEffectivelyEmpty()) return "";
-            try
-            {
-                return XamlWriter.Save(RichEditor.Document);
-            }
-            catch
-            {
-                var range = new TextRange(RichEditor.Document.ContentStart, RichEditor.Document.ContentEnd);
-                return range.Text;
-            }
-        }
-
-        private FlowDocument CreateEmptyDocument()
-        {
-            var document = new FlowDocument { PagePadding = new Thickness(0) };
-            document.Blocks.Add(new Paragraph());
-            return document;
-        }
-
-        private bool IsDocumentEffectivelyEmpty()
-        {
-            var range = new TextRange(RichEditor.Document.ContentStart, RichEditor.Document.ContentEnd);
-            if (!string.IsNullOrWhiteSpace(range.Text))
-            {
-                return false;
-            }
-
-            return !EnumerateResizableImageHosts(RichEditor.Document).Any();
         }
 
         private async System.Threading.Tasks.Task<bool> SaveNoteInternalAsync(bool manual)
@@ -508,12 +407,12 @@ namespace AniTechou.Views
 
             int versionAtSaveStart = _changeVersion;
             string title = (TitleBox.Text ?? "").Trim();
-            string content = GetRichTextContent();
+            string content = GetMarkdownContent();
             if (string.IsNullOrEmpty(content))
             {
                 if (manual)
                 {
-                    Windows.AppMessageDialog.Show(Application.Current.MainWindow, "提示", "请输入笔记内容");
+                    AppMessageDialog.Show(Application.Current.MainWindow, "提示", "请输入笔记内容");
                 }
                 return false;
             }
@@ -529,7 +428,7 @@ namespace AniTechou.Views
                     Id = _note.Id,
                     Title = title,
                     Content = content,
-                    ContentType = _isMarkdownMode ? "Markdown" : "Xaml",
+                    ContentType = "Markdown",
                     CreatedTime = _note.CreatedTime,
                     ModifiedTime = _note.ModifiedTime,
                     WorkIds = _selectedWorkIds.ToList(),
@@ -547,6 +446,7 @@ namespace AniTechou.Views
                     _note.Id = noteId;
                     _note.Title = noteSnapshot.Title;
                     _note.Content = noteSnapshot.Content;
+                    _note.ContentType = "Markdown";
                     _note.WorkIds = noteSnapshot.WorkIds;
                     _note.Tags = noteSnapshot.Tags;
 
@@ -589,157 +489,134 @@ namespace AniTechou.Views
 
         private void UndoButton_Click(object sender, RoutedEventArgs e)
         {
-            if (RichEditor.CanUndo) RichEditor.Undo();
+            if (MarkdownEditBox.CanUndo) MarkdownEditBox.Undo();
         }
 
         private void RedoButton_Click(object sender, RoutedEventArgs e)
         {
-            if (RichEditor.CanRedo) RichEditor.Redo();
+            if (MarkdownEditBox.CanRedo) MarkdownEditBox.Redo();
         }
 
         private async void SaveCommand_Executed(object sender, ExecutedRoutedEventArgs e) => await SaveNoteInternalAsync(true);
 
         private void UndoCommand_Executed(object sender, ExecutedRoutedEventArgs e)
         {
-            if (RichEditor.CanUndo) RichEditor.Undo();
+            if (MarkdownEditBox.CanUndo) MarkdownEditBox.Undo();
         }
 
         private void RedoCommand_Executed(object sender, ExecutedRoutedEventArgs e)
         {
-            if (RichEditor.CanRedo) RichEditor.Redo();
+            if (MarkdownEditBox.CanRedo) MarkdownEditBox.Redo();
         }
 
-        private void BoldButton_Click(object sender, RoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.ToggleBold);
-        private void ItalicButton_Click(object sender, RoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.ToggleItalic);
-        private void UnderlineButton_Click(object sender, RoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.ToggleUnderline);
-        private void H1Button_Click(object sender, RoutedEventArgs e) => ExecuteHeading(26);
-        private void H2Button_Click(object sender, RoutedEventArgs e) => ExecuteHeading(22);
-        private void H3Button_Click(object sender, RoutedEventArgs e) => ExecuteHeading(18);
-        private void BulletedListButton_Click(object sender, RoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.ToggleBullets);
-        private void NumberedListButton_Click(object sender, RoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.ToggleNumbering);
-        private void AlignLeftButton_Click(object sender, RoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.AlignLeft);
-        private void AlignCenterButton_Click(object sender, RoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.AlignCenter);
-        private void AlignRightButton_Click(object sender, RoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.AlignRight);
+        // =========================================================================
+        // MD text manipulation helpers
+        // =========================================================================
+
+        private void WrapSelection(string prefix, string suffix)
+        {
+            MarkdownEditBox.Focus();
+            if (MarkdownEditBox.SelectionLength > 0)
+            {
+                string selected = MarkdownEditBox.SelectedText;
+                MarkdownEditBox.SelectedText = prefix + selected + suffix;
+                MarkdownEditBox.SelectionStart = MarkdownEditBox.SelectionStart - suffix.Length - selected.Length;
+                MarkdownEditBox.SelectionLength = selected.Length;
+            }
+            else
+            {
+                InsertTextAtCaret(prefix + suffix);
+                MarkdownEditBox.CaretIndex -= suffix.Length;
+            }
+            MarkDirtyAndScheduleSave();
+        }
+
+        private void PrefixLine(string prefix)
+        {
+            MarkdownEditBox.Focus();
+            int pos = Math.Max(0, MarkdownEditBox.CaretIndex);
+            int lineStart = MarkdownEditBox.Text.LastIndexOf('\n', Math.Max(0, pos - 1)) + 1;
+            int selectionLen = MarkdownEditBox.SelectionLength;
+            MarkdownEditBox.Text = MarkdownEditBox.Text.Insert(lineStart, prefix);
+            int shift = prefix.Length;
+            MarkdownEditBox.CaretIndex = lineStart + shift + selectionLen;
+            MarkdownEditBox.SelectionLength = 0;
+            MarkDirtyAndScheduleSave();
+        }
+
+        private void InsertTextAtCaret(string text)
+        {
+            int pos = MarkdownEditBox.CaretIndex;
+            MarkdownEditBox.Text = MarkdownEditBox.Text.Insert(pos, text);
+            MarkdownEditBox.CaretIndex = pos + text.Length;
+        }
+
+        private void InsertMdImageAtCaret(string imagePath)
+        {
+            MarkdownEditBox.Focus();
+            int pos = MarkdownEditBox.CaretIndex;
+            string mdImage = $"![]({imagePath})";
+            MarkdownEditBox.Text = MarkdownEditBox.Text.Insert(pos, mdImage);
+            MarkdownEditBox.CaretIndex = pos + mdImage.Length;
+            MarkDirtyAndScheduleSave();
+        }
+
+        private void SaveSelectionSnapshot()
+        {
+            if (MarkdownEditBox == null) return;
+            _selectionStart = MarkdownEditBox.SelectionStart;
+            _selectionLength = MarkdownEditBox.SelectionLength;
+        }
+
+        private void RestoreSelectionSnapshot()
+        {
+            MarkdownEditBox.Focus();
+            MarkdownEditBox.SelectionStart = _selectionStart;
+            MarkdownEditBox.SelectionLength = _selectionLength;
+        }
+
+        // =========================================================================
+        // Toolbar button handlers — insert Markdown syntax
+        // =========================================================================
+
+        private void BoldButton_Click(object sender, RoutedEventArgs e) => WrapSelection("**", "**");
+        private void ItalicButton_Click(object sender, RoutedEventArgs e) => WrapSelection("*", "*");
+        private void UnderlineButton_Click(object sender, RoutedEventArgs e) => WrapSelection("<u>", "</u>");
+        private void H1Button_Click(object sender, RoutedEventArgs e) => PrefixLine("# ");
+        private void H2Button_Click(object sender, RoutedEventArgs e) => PrefixLine("## ");
+        private void H3Button_Click(object sender, RoutedEventArgs e) => PrefixLine("### ");
+        private void BulletedListButton_Click(object sender, RoutedEventArgs e) => PrefixLine("- ");
+        private void NumberedListButton_Click(object sender, RoutedEventArgs e) => PrefixLine("1. ");
+        private void AlignLeftButton_Click(object sender, RoutedEventArgs e) => WrapSelection("<p align=\"left\">\n\n", "\n\n</p>");
+        private void AlignCenterButton_Click(object sender, RoutedEventArgs e) => WrapSelection("<p align=\"center\">\n\n", "\n\n</p>");
+        private void AlignRightButton_Click(object sender, RoutedEventArgs e) => WrapSelection("<p align=\"right\">\n\n", "\n\n</p>");
+
         private void TextColorButton_Click(object sender, RoutedEventArgs e) => TogglePopup(TextColorPopup, HighlightPopup);
         private void HighlightButton_Click(object sender, RoutedEventArgs e) => TogglePopup(HighlightPopup, TextColorPopup);
         private void LinkButton_Click(object sender, RoutedEventArgs e) => InsertLink();
         private void ImageButton_Click(object sender, RoutedEventArgs e) => InsertImage();
 
-        private void MarkdownModeToggle_Click(object sender, RoutedEventArgs e)
-        {
-            _suppressTextEvents = true;
-            try
-            {
-                bool toMarkdown = MarkdownModeToggle.IsChecked == true;
+        // =========================================================================
+        // Command Executed — keyboard shortcuts
+        // =========================================================================
 
-                if (toMarkdown && !_isMarkdownMode)
-                {
-                    // Switching FROM Xaml TO Markdown
-                    string xamlContent = GetRichTextContent();
-                    string markdown = Utilities.MarkdownConverter.XamlToMarkdown(xamlContent);
-                    MarkdownEditBox.Text = markdown;
-                    RichEditorPanel.Visibility = Visibility.Collapsed;
-                    MarkdownEditPanel.Visibility = Visibility.Visible;
-                    MarkdownSplitter.Visibility = Visibility.Visible;
-                    MarkdownPreviewPanel.Visibility = Visibility.Visible;
-                    _isMarkdownMode = true;
-                    RefreshMarkdownPreview();
-                }
-                else if (!toMarkdown && _isMarkdownMode)
-                {
-                    // Switching FROM Markdown TO Xaml
-                    string markdownContent = MarkdownEditBox.Text;
-                    var flowDoc = Utilities.MarkdownConverter.MarkdownToFlowDocument(markdownContent);
-                    RichEditor.Document = flowDoc;
-                    RichEditorPanel.Visibility = Visibility.Visible;
-                    MarkdownEditPanel.Visibility = Visibility.Collapsed;
-                    MarkdownSplitter.Visibility = Visibility.Collapsed;
-                    MarkdownPreviewPanel.Visibility = Visibility.Collapsed;
-                    _isMarkdownMode = false;
-                }
-            }
-            finally
-            {
-                _suppressTextEvents = false;
-            }
-        }
-
-        private void MarkdownEditBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            if (!_suppressTextEvents)
-            {
-                RefreshMarkdownPreview();
-                MarkDirtyAndScheduleSave();
-            }
-        }
-
-        private void RefreshMarkdownPreview()
-        {
-            try
-            {
-                string md = MarkdownEditBox.Text ?? "";
-                var flowDoc = Utilities.MarkdownConverter.MarkdownToFlowDocument(md);
-                flowDoc.Foreground = MarkdownPreviewViewer.Foreground;
-                flowDoc.FontFamily = MarkdownPreviewViewer.FontFamily;
-                MarkdownPreviewViewer.Document = flowDoc;
-                System.Diagnostics.Debug.WriteLine($"[NoteEditor] Markdown预览已刷新, Block数={flowDoc.Blocks.Count}, 字符数={md.Length}");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[NoteEditor] Markdown预览刷新失败: {ex.Message}");
-            }
-        }
-
-        private void ToggleBoldCommand_Executed(object sender, ExecutedRoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.ToggleBold);
-        private void ToggleItalicCommand_Executed(object sender, ExecutedRoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.ToggleItalic);
-        private void ToggleUnderlineCommand_Executed(object sender, ExecutedRoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.ToggleUnderline);
-        private void Heading1Command_Executed(object sender, ExecutedRoutedEventArgs e) => ExecuteHeading(26);
-        private void Heading2Command_Executed(object sender, ExecutedRoutedEventArgs e) => ExecuteHeading(22);
-        private void Heading3Command_Executed(object sender, ExecutedRoutedEventArgs e) => ExecuteHeading(18);
-        private void BulletedListCommand_Executed(object sender, ExecutedRoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.ToggleBullets);
-        private void NumberedListCommand_Executed(object sender, ExecutedRoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.ToggleNumbering);
+        private void ToggleBoldCommand_Executed(object sender, ExecutedRoutedEventArgs e) => WrapSelection("**", "**");
+        private void ToggleItalicCommand_Executed(object sender, ExecutedRoutedEventArgs e) => WrapSelection("*", "*");
+        private void ToggleUnderlineCommand_Executed(object sender, ExecutedRoutedEventArgs e) => WrapSelection("<u>", "</u>");
+        private void Heading1Command_Executed(object sender, ExecutedRoutedEventArgs e) => PrefixLine("# ");
+        private void Heading2Command_Executed(object sender, ExecutedRoutedEventArgs e) => PrefixLine("## ");
+        private void Heading3Command_Executed(object sender, ExecutedRoutedEventArgs e) => PrefixLine("### ");
+        private void BulletedListCommand_Executed(object sender, ExecutedRoutedEventArgs e) => PrefixLine("- ");
+        private void NumberedListCommand_Executed(object sender, ExecutedRoutedEventArgs e) => PrefixLine("1. ");
         private void InsertLinkCommand_Executed(object sender, ExecutedRoutedEventArgs e) => InsertLink();
         private void InsertImageCommand_Executed(object sender, ExecutedRoutedEventArgs e) => InsertImage();
-        private void AlignLeftCommand_Executed(object sender, ExecutedRoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.AlignLeft);
-        private void AlignCenterCommand_Executed(object sender, ExecutedRoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.AlignCenter);
-        private void AlignRightCommand_Executed(object sender, ExecutedRoutedEventArgs e) => ExecuteEditingCommand(EditingCommands.AlignRight);
+        private void AlignLeftCommand_Executed(object sender, ExecutedRoutedEventArgs e) => WrapSelection("<p align=\"left\">\n\n", "\n\n</p>");
+        private void AlignCenterCommand_Executed(object sender, ExecutedRoutedEventArgs e) => WrapSelection("<p align=\"center\">\n\n", "\n\n</p>");
+        private void AlignRightCommand_Executed(object sender, ExecutedRoutedEventArgs e) => WrapSelection("<p align=\"right\">\n\n", "\n\n</p>");
 
-        private void ExecuteEditingCommand(RoutedUICommand command)
-        {
-            RichEditor.Focus();
-            RestoreSelectionSnapshot();
-            if (command.CanExecute(null, RichEditor))
-            {
-                command.Execute(null, RichEditor);
-                MarkDirtyAndScheduleSave();
-                SaveSelectionSnapshot();
-            }
-        }
-
-        private void ExecuteColor(Brush brush, bool isBackground)
-        {
-            RichEditor.Focus();
-            RestoreSelectionSnapshot();
-            if (RichEditor.Selection != null)
-            {
-                RichEditor.Selection.ApplyPropertyValue(isBackground ? TextElement.BackgroundProperty : TextElement.ForegroundProperty, brush);
-                MarkDirtyAndScheduleSave();
-                SaveSelectionSnapshot();
-            }
-        }
-
-        private void ExecuteHeading(double fontSize)
-        {
-            RichEditor.Focus();
-            RestoreSelectionSnapshot();
-            if (RichEditor.Selection != null)
-            {
-                RichEditor.Selection.ApplyPropertyValue(TextElement.FontSizeProperty, fontSize);
-                RichEditor.Selection.ApplyPropertyValue(TextElement.FontWeightProperty, FontWeights.Bold);
-                MarkDirtyAndScheduleSave();
-                SaveSelectionSnapshot();
-            }
-        }
+        // =========================================================================
+        // Link insertion
+        // =========================================================================
 
         private void InsertLink()
         {
@@ -752,33 +629,23 @@ namespace AniTechou.Views
                 if (string.IsNullOrWhiteSpace(url)) return;
                 if (string.IsNullOrWhiteSpace(text)) text = url;
 
-                RichEditor.Focus();
-                RestoreSelectionSnapshot();
-                if (RichEditor.Selection != null)
+                MarkdownEditBox.Focus();
+                if (MarkdownEditBox.SelectionLength > 0)
                 {
-                    try
-                    {
-                        if (RichEditor.Selection.IsEmpty)
-                        {
-                            RichEditor.Selection.Text = text;
-                            var end = RichEditor.CaretPosition;
-                            var start = end.GetPositionAtOffset(-text.Length, LogicalDirection.Backward) ?? RichEditor.Document.ContentStart;
-                            RichEditor.Selection.Select(start, end);
-                        }
-
-                        var hyperlink = new Hyperlink(RichEditor.Selection.Start, RichEditor.Selection.End)
-                        {
-                            NavigateUri = Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri : null
-                        };
-                        hyperlink.Foreground = System.Windows.Media.Brushes.SteelBlue;
-                        hyperlink.TextDecorations = TextDecorations.Underline;
-                        MarkDirtyAndScheduleSave();
-                        SaveSelectionSnapshot();
-                    }
-                    catch { }
+                    string selected = MarkdownEditBox.SelectedText;
+                    MarkdownEditBox.SelectedText = $"[{selected}]({url})";
                 }
+                else
+                {
+                    InsertTextAtCaret($"[{text}]({url})");
+                }
+                MarkDirtyAndScheduleSave();
             }
         }
+
+        // =========================================================================
+        // Image insertion
+        // =========================================================================
 
         private void InsertImage()
         {
@@ -798,7 +665,7 @@ namespace AniTechou.Views
             try
             {
                 string dest = CopyImageToNotesStorage(filePath);
-                InsertImageAtSelection(dest);
+                InsertMdImageAtCaret(dest);
                 return true;
             }
             catch
@@ -812,7 +679,7 @@ namespace AniTechou.Views
             try
             {
                 string dest = SaveBitmapToNotesStorage(bitmapSource);
-                InsertImageAtSelection(dest);
+                InsertMdImageAtCaret(dest);
                 return true;
             }
             catch
@@ -847,374 +714,12 @@ namespace AniTechou.Views
             return baseDir;
         }
 
-        private void InsertImageAtSelection(string imagePath, double? width = null, double? height = null)
+        // =========================================================================
+        // Drag-drop and paste handlers for images
+        // =========================================================================
+
+        private void MarkdownEditBox_PreviewDragOver(object sender, DragEventArgs e)
         {
-            var imageHost = CreateResizableImageHost(imagePath, width, height);
-
-            RichEditor.Focus();
-            RestoreSelectionSnapshot();
-            if (RichEditor.Selection != null)
-            {
-                RichEditor.Selection.Text = "";
-                new InlineUIContainer(imageHost, RichEditor.Selection.Start);
-                MarkDirtyAndScheduleSave();
-                SaveSelectionSnapshot();
-            }
-        }
-
-        private void InsertImageAtPosition(TextPointer position, string imagePath, double? width, double? height)
-        {
-            if (position == null) return;
-
-            var imageHost = CreateResizableImageHost(imagePath, width, height);
-            new InlineUIContainer(imageHost, position);
-            MarkDirtyAndScheduleSave();
-        }
-
-        private Grid CreateResizableImageHost(string imagePath, double? width = null, double? height = null)
-        {
-            var source = CreateBitmapFromPath(imagePath);
-            (double defaultWidth, double defaultHeight) = GetInitialImageSize(source);
-            double imageWidth = width ?? defaultWidth;
-            double imageHeight = height ?? defaultHeight;
-
-            var host = new Grid
-            {
-                Width = imageWidth,
-                Height = imageHeight,
-                Margin = new Thickness(0, 6, 0, 6),
-                Background = Brushes.Transparent,
-                Tag = ResizableImageHostTag,
-                Cursor = Cursors.Arrow
-            };
-
-            var border = new Border
-            {
-                Background = Brushes.Transparent
-            };
-
-            var image = new Image
-            {
-                Source = source,
-                Stretch = Stretch.Uniform,
-                Uid = $"{ResizableImagePathPrefix}{imagePath}",
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch
-            };
-
-            border.Child = image;
-            host.Children.Add(border);
-
-            AttachResizableImageHandlers(host);
-            return host;
-        }
-
-        private BitmapImage CreateBitmapFromPath(string imagePath)
-        {
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.UriSource = new Uri(imagePath, UriKind.Absolute);
-            bitmap.EndInit();
-            bitmap.Freeze();
-            return bitmap;
-        }
-
-        private static (double width, double height) GetInitialImageSize(BitmapSource bitmapSource)
-        {
-            double width = 320;
-            double height = 220;
-
-            if (bitmapSource.PixelWidth > 0 && bitmapSource.PixelHeight > 0)
-            {
-                width = bitmapSource.PixelWidth;
-                height = bitmapSource.PixelHeight;
-                double scale = Math.Min(1.0, 360.0 / Math.Max(width, height));
-                width = Math.Max(MinImageWidth, width * scale);
-                height = Math.Max(MinImageHeight, height * scale);
-            }
-
-            return (width, height);
-        }
-
-        private void AttachResizableImagesToDocument()
-        {
-            foreach (var host in EnumerateResizableImageHosts(RichEditor.Document))
-            {
-                if (host.Children.OfType<Border>().FirstOrDefault() is Border border)
-                {
-                    if (border.Child is Image image && image.Source == null)
-                    {
-                        string imagePath = GetImagePathFromElement(image);
-                        if (!string.IsNullOrWhiteSpace(imagePath) && File.Exists(imagePath))
-                        {
-                            image.Source = CreateBitmapFromPath(imagePath);
-                        }
-                    }
-
-                    AttachResizableImageHandlers(host);
-                }
-            }
-        }
-
-        private IEnumerable<Grid> EnumerateResizableImageHosts(FlowDocument document)
-        {
-            if (document == null) yield break;
-
-            foreach (var block in document.Blocks)
-            {
-                foreach (var host in EnumerateResizableImageHosts(block))
-                {
-                    yield return host;
-                }
-            }
-        }
-
-        private IEnumerable<Grid> EnumerateResizableImageHosts(Block block)
-        {
-            switch (block)
-            {
-                case Paragraph paragraph:
-                    foreach (var inline in paragraph.Inlines)
-                    {
-                        foreach (var host in EnumerateResizableImageHosts(inline))
-                        {
-                            yield return host;
-                        }
-                    }
-                    break;
-                case Section section:
-                    foreach (var child in section.Blocks)
-                    {
-                        foreach (var host in EnumerateResizableImageHosts(child))
-                        {
-                            yield return host;
-                        }
-                    }
-                    break;
-                case List list:
-                    foreach (var item in list.ListItems)
-                    {
-                        foreach (var child in item.Blocks)
-                        {
-                            foreach (var host in EnumerateResizableImageHosts(child))
-                            {
-                                yield return host;
-                            }
-                        }
-                    }
-                    break;
-                case BlockUIContainer blockUi when blockUi.Child is Grid grid && Equals(grid.Tag, ResizableImageHostTag):
-                    yield return grid;
-                    break;
-            }
-        }
-
-        private IEnumerable<Grid> EnumerateResizableImageHosts(Inline inline)
-        {
-            switch (inline)
-            {
-                case Span span:
-                    foreach (var child in span.Inlines)
-                    {
-                        foreach (var host in EnumerateResizableImageHosts(child))
-                        {
-                            yield return host;
-                        }
-                    }
-                    break;
-                case InlineUIContainer inlineUi when inlineUi.Child is Grid grid && Equals(grid.Tag, ResizableImageHostTag):
-                    yield return grid;
-                    break;
-            }
-        }
-
-        private void AttachResizableImageHandlers(Grid host)
-        {
-            host.PreviewMouseMove -= ResizableImageHost_PreviewMouseMove;
-            host.PreviewMouseMove += ResizableImageHost_PreviewMouseMove;
-            host.PreviewMouseLeftButtonDown -= ResizableImageHost_PreviewMouseLeftButtonDown;
-            host.PreviewMouseLeftButtonDown += ResizableImageHost_PreviewMouseLeftButtonDown;
-            host.PreviewMouseLeftButtonUp -= ResizableImageHost_PreviewMouseLeftButtonUp;
-            host.PreviewMouseLeftButtonUp += ResizableImageHost_PreviewMouseLeftButtonUp;
-            host.MouseLeave -= ResizableImageHost_MouseLeave;
-            host.MouseLeave += ResizableImageHost_MouseLeave;
-        }
-
-        private void ResizableImageHost_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (sender is not Grid host) return;
-
-            string mode = GetResizeMode(host, e.GetPosition(host));
-            if (!string.IsNullOrEmpty(mode))
-            {
-                _activeResizeHost = host;
-                _resizeMode = mode;
-                _resizeStartPoint = e.GetPosition(this);
-                _resizeStartWidth = host.Width;
-                _resizeStartHeight = host.Height;
-                host.CaptureMouse();
-                host.Cursor = GetResizeCursor(mode);
-                e.Handled = true;
-                return;
-            }
-
-            _pendingMoveHost = host;
-            _pendingMoveStartPoint = e.GetPosition(this);
-            e.Handled = true;
-        }
-
-        private void ResizableImageHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            if (sender is not Grid host) return;
-            host.ReleaseMouseCapture();
-            _activeResizeHost = null;
-            _resizeMode = null;
-            _pendingMoveHost = null;
-            UpdateResizeCursor(host, e.GetPosition(host));
-            e.Handled = true;
-        }
-
-        private void ResizableImageHost_MouseLeave(object sender, MouseEventArgs e)
-        {
-            if (_activeResizeHost == null && sender is Grid host)
-            {
-                host.Cursor = Cursors.Arrow;
-            }
-        }
-
-        private void ResizableImageHost_PreviewMouseMove(object sender, MouseEventArgs e)
-        {
-            if (sender is not Grid host) return;
-
-            if (_activeResizeHost == host && e.LeftButton == MouseButtonState.Pressed && !string.IsNullOrWhiteSpace(_resizeMode))
-            {
-                ResizeImageHost(host, e.GetPosition(this));
-                host.Cursor = GetResizeCursor(_resizeMode);
-                e.Handled = true;
-                return;
-            }
-
-            if (_pendingMoveHost == host && e.LeftButton == MouseButtonState.Pressed)
-            {
-                var currentPoint = e.GetPosition(this);
-                if (Math.Abs(currentPoint.X - _pendingMoveStartPoint.X) >= 6 ||
-                    Math.Abs(currentPoint.Y - _pendingMoveStartPoint.Y) >= 6)
-                {
-                    _pendingMoveHost = null;
-                    StartMoveImageDrag(host);
-                    e.Handled = true;
-                    return;
-                }
-            }
-
-            UpdateResizeCursor(host, e.GetPosition(host));
-        }
-
-        private void ResizeImageHost(Grid host, Point currentPoint)
-        {
-            if (host.Width <= 0 || host.Height <= 0) return;
-
-            double aspectRatio = _resizeStartWidth / _resizeStartHeight;
-            if (aspectRatio <= 0) aspectRatio = 1;
-
-            double dx = currentPoint.X - _resizeStartPoint.X;
-            double dy = currentPoint.Y - _resizeStartPoint.Y;
-            double newWidth = _resizeStartWidth;
-            double newHeight = _resizeStartHeight;
-
-            if (_resizeMode == "right" || _resizeMode == "left")
-            {
-                double signedDelta = _resizeMode == "right" ? dx : -dx;
-                newWidth = _resizeStartWidth + signedDelta;
-                newWidth = Math.Clamp(newWidth, MinImageWidth, MaxImageWidth);
-                newHeight = newWidth / aspectRatio;
-            }
-            else if (_resizeMode == "bottom" || _resizeMode == "top")
-            {
-                double signedDelta = _resizeMode == "bottom" ? dy : -dy;
-                newHeight = _resizeStartHeight + signedDelta;
-                newHeight = Math.Clamp(newHeight, MinImageHeight, MaxImageHeight);
-                newWidth = newHeight * aspectRatio;
-            }
-            else
-            {
-                double widthDelta = _resizeMode.Contains("left") ? -dx : dx;
-                double heightDelta = _resizeMode.Contains("top") ? -dy : dy;
-                double widthCandidate = Math.Clamp(_resizeStartWidth + widthDelta, MinImageWidth, MaxImageWidth);
-                double heightCandidate = Math.Clamp(_resizeStartHeight + heightDelta, MinImageHeight, MaxImageHeight);
-
-                if (Math.Abs(widthDelta) >= Math.Abs(heightDelta))
-                {
-                    newWidth = widthCandidate;
-                    newHeight = newWidth / aspectRatio;
-                }
-                else
-                {
-                    newHeight = heightCandidate;
-                    newWidth = newHeight * aspectRatio;
-                }
-            }
-
-            host.Width = Math.Clamp(newWidth, MinImageWidth, MaxImageWidth);
-            host.Height = Math.Clamp(newHeight, MinImageHeight, MaxImageHeight);
-            MarkDirtyAndScheduleSave();
-        }
-
-        private void UpdateResizeCursor(FrameworkElement element, Point point)
-        {
-            element.Cursor = GetResizeCursor(GetResizeMode(element, point));
-        }
-
-        private string GetResizeMode(FrameworkElement element, Point point)
-        {
-            if (element.ActualWidth <= 0 || element.ActualHeight <= 0) return "";
-
-            bool left = point.X <= ResizeHitThickness;
-            bool right = point.X >= element.ActualWidth - ResizeHitThickness;
-            bool top = point.Y <= ResizeHitThickness;
-            bool bottom = point.Y >= element.ActualHeight - ResizeHitThickness;
-
-            if (left && top) return "top-left";
-            if (right && top) return "top-right";
-            if (left && bottom) return "bottom-left";
-            if (right && bottom) return "bottom-right";
-            if (left) return "left";
-            if (right) return "right";
-            if (top) return "top";
-            if (bottom) return "bottom";
-            return "";
-        }
-
-        private static Cursor GetResizeCursor(string resizeMode)
-        {
-            return resizeMode switch
-            {
-                "left" or "right" => Cursors.SizeWE,
-                "top" or "bottom" => Cursors.SizeNS,
-                "top-left" or "bottom-right" => Cursors.SizeNWSE,
-                "top-right" or "bottom-left" => Cursors.SizeNESW,
-                _ => Cursors.Arrow
-            };
-        }
-
-        private string GetImagePathFromElement(Image image)
-        {
-            if (image == null || string.IsNullOrWhiteSpace(image.Uid)) return "";
-            return image.Uid.StartsWith(ResizableImagePathPrefix, StringComparison.OrdinalIgnoreCase)
-                ? image.Uid.Substring(ResizableImagePathPrefix.Length)
-                : "";
-        }
-
-        private void RichEditor_PreviewDragOver(object sender, DragEventArgs e)
-        {
-            if (e.Data != null && e.Data.GetDataPresent(NoteImageMoveDataFormat))
-            {
-                e.Effects = DragDropEffects.Move;
-                e.Handled = true;
-                return;
-            }
-
             if (ContainsImageData(e.Data))
             {
                 e.Effects = DragDropEffects.Copy;
@@ -1222,26 +727,15 @@ namespace AniTechou.Views
             }
         }
 
-        private void RichEditor_Drop(object sender, DragEventArgs e)
+        private void MarkdownEditBox_Drop(object sender, DragEventArgs e)
         {
-            if (e.Data != null && e.Data.GetDataPresent(NoteImageMoveDataFormat) &&
-                e.Data.GetData(NoteImageMoveDataFormat) is string payload &&
-                TryParseImageMovePayload(payload, out string path, out double width, out double height))
-            {
-                var pos = RichEditor.GetPositionFromPoint(e.GetPosition(RichEditor), true) ?? RichEditor.Document.ContentEnd;
-                InsertImageAtPosition(pos, path, width, height);
-                e.Effects = DragDropEffects.Move;
-                e.Handled = true;
-                return;
-            }
-
             if (TryInsertImagesFromDataObject(e.Data))
             {
                 e.Handled = true;
             }
         }
 
-        private void RichEditor_Pasting(object sender, DataObjectPastingEventArgs e)
+        private void MarkdownEditBox_Pasting(object sender, DataObjectPastingEventArgs e)
         {
             if (TryInsertImagesFromDataObject(e.DataObject))
             {
@@ -1252,7 +746,6 @@ namespace AniTechou.Views
         private bool ContainsImageData(IDataObject dataObject)
         {
             if (dataObject == null) return false;
-            if (dataObject.GetDataPresent(NoteImageMoveDataFormat)) return true;
             if (dataObject.GetDataPresent(DataFormats.Bitmap)) return true;
             if (!dataObject.GetDataPresent(DataFormats.FileDrop)) return false;
 
@@ -1290,133 +783,9 @@ namespace AniTechou.Views
             return ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".bmp";
         }
 
-        private void StartMoveImageDrag(Grid host)
-        {
-            if (host == null) return;
-
-            string imagePath = "";
-            if (host.Children.OfType<Border>().FirstOrDefault()?.Child is Image image)
-            {
-                imagePath = GetImagePathFromElement(image);
-            }
-            if (string.IsNullOrWhiteSpace(imagePath)) return;
-
-            _movingSourceHost = host;
-            string payload = BuildImageMovePayload(imagePath, host.Width, host.Height);
-            var data = new DataObject();
-            data.SetData(NoteImageMoveDataFormat, payload);
-
-            var effect = DragDrop.DoDragDrop(host, data, DragDropEffects.Move);
-            if (effect == DragDropEffects.Move)
-            {
-                RemoveImageHostFromDocument(_movingSourceHost);
-            }
-            _movingSourceHost = null;
-        }
-
-        private void RemoveImageHostFromDocument(Grid host)
-        {
-            if (host == null) return;
-
-            var container = FindInlineContainerForHostInDocument(RichEditor.Document, host);
-            if (container == null) return;
-
-            if (container.Parent is Paragraph paragraph)
-            {
-                paragraph.Inlines.Remove(container);
-                MarkDirtyAndScheduleSave();
-            }
-        }
-
-        private InlineUIContainer FindInlineContainerForHostInDocument(FlowDocument document, Grid host)
-        {
-            if (document == null || host == null) return null;
-
-            foreach (var block in document.Blocks)
-            {
-                var found = FindInlineContainerForHostInBlock(block, host);
-                if (found != null) return found;
-            }
-            return null;
-        }
-
-        private InlineUIContainer FindInlineContainerForHostInBlock(Block block, Grid host)
-        {
-            switch (block)
-            {
-                case Paragraph paragraph:
-                    foreach (var inline in paragraph.Inlines)
-                    {
-                        var found = FindInlineContainerForHostInInline(inline, host);
-                        if (found != null) return found;
-                    }
-                    break;
-                case Section section:
-                    foreach (var child in section.Blocks)
-                    {
-                        var found = FindInlineContainerForHostInBlock(child, host);
-                        if (found != null) return found;
-                    }
-                    break;
-                case List list:
-                    foreach (var item in list.ListItems)
-                    {
-                        foreach (var child in item.Blocks)
-                        {
-                            var found = FindInlineContainerForHostInBlock(child, host);
-                            if (found != null) return found;
-                        }
-                    }
-                    break;
-            }
-            return null;
-        }
-
-        private InlineUIContainer FindInlineContainerForHostInInline(Inline inline, Grid host)
-        {
-            switch (inline)
-            {
-                case InlineUIContainer ui when ui.Child == host:
-                    return ui;
-                case Span span:
-                    foreach (var child in span.Inlines)
-                    {
-                        var found = FindInlineContainerForHostInInline(child, host);
-                        if (found != null) return found;
-                    }
-                    break;
-            }
-            return null;
-        }
-
-        private static string BuildImageMovePayload(string imagePath, double width, double height)
-        {
-            string b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(imagePath));
-            return $"{b64}|{width}|{height}";
-        }
-
-        private static bool TryParseImageMovePayload(string payload, out string imagePath, out double width, out double height)
-        {
-            imagePath = "";
-            width = 0;
-            height = 0;
-
-            if (string.IsNullOrWhiteSpace(payload)) return false;
-            var parts = payload.Split('|');
-            if (parts.Length != 3) return false;
-
-            try
-            {
-                imagePath = Encoding.UTF8.GetString(Convert.FromBase64String(parts[0]));
-                if (!double.TryParse(parts[1], out width)) return false;
-                if (!double.TryParse(parts[2], out height)) return false;
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
-        }
+        // =========================================================================
+        // Color palettes
+        // =========================================================================
 
         private void InitializeColorPalettes()
         {
@@ -1439,7 +808,12 @@ namespace AniTechou.Views
                 };
                 button.Click += (s, e) =>
                 {
-                    ExecuteColor((Brush)((Button)s).Tag, isBackground);
+                    var b = (SolidColorBrush)((Button)s).Tag;
+                    string hex = b.Color.ToString();
+                    string tag = isBackground
+                        ? $"span style=\"background-color:{hex}\""
+                        : $"span style=\"color:{hex}\"";
+                    WrapSelection($"<{tag}>", "</span>");
                     TextColorPopup.IsOpen = false;
                     HighlightPopup.IsOpen = false;
                 };
@@ -1454,24 +828,15 @@ namespace AniTechou.Views
             return brush;
         }
 
-        private void TogglePopup(System.Windows.Controls.Primitives.Popup targetPopup, System.Windows.Controls.Primitives.Popup otherPopup)
+        private void TogglePopup(Popup targetPopup, Popup otherPopup)
         {
             otherPopup.IsOpen = false;
             targetPopup.IsOpen = !targetPopup.IsOpen;
         }
 
-        private void SaveSelectionSnapshot()
-        {
-            if (RichEditor?.Selection == null) return;
-            _selectionStartSnapshot = RichEditor.Selection.Start;
-            _selectionEndSnapshot = RichEditor.Selection.End;
-        }
-
-        private void RestoreSelectionSnapshot()
-        {
-            if (_selectionStartSnapshot == null || _selectionEndSnapshot == null) return;
-            RichEditor.Selection.Select(_selectionStartSnapshot, _selectionEndSnapshot);
-        }
+        // =========================================================================
+        // Tag input
+        // =========================================================================
 
         private void NewTagBox_TextChanged(object sender, TextChangedEventArgs e)
         {

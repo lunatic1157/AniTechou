@@ -765,7 +765,8 @@ namespace AniTechou.Services
         {
             if (string.IsNullOrEmpty(content)) yield break;
 
-            foreach (Match match in Regex.Matches(content, "ani-image:(?<path>[^\"]+)", RegexOptions.IgnoreCase))
+            // Match both old XAML (ani-image:path) and MD (![](path)) formats
+            foreach (Match match in Regex.Matches(content, @"(?:ani-image:(?<path>[^""]+))|(?:!\[[^\]]*\]\((?<path>[^)]+)\))", RegexOptions.IgnoreCase))
             {
                 var p = (match.Groups["path"]?.Value ?? "").Trim();
                 if (!string.IsNullOrWhiteSpace(p)) yield return p;
@@ -777,7 +778,8 @@ namespace AniTechou.Services
             if (string.IsNullOrEmpty(content)) return content;
             if ((mapByOriginal == null || mapByOriginal.Count == 0) && (mapByFileName == null || mapByFileName.Count == 0)) return content;
 
-            return Regex.Replace(
+            // Rewrite old XAML format: ani-image:path -> ani-image:newPath
+            content = Regex.Replace(
                 content,
                 "ani-image:(?<path>[^\"]+)",
                 m =>
@@ -800,6 +802,27 @@ namespace AniTechou.Services
                 },
                 RegexOptions.IgnoreCase
             );
+
+            // Rewrite MD format: ![alt](path) -> ![alt](newPath)
+            content = Regex.Replace(
+                content,
+                @"!\[(?<alt>[^\]]*)\]\((?<path>[^)]+)\)",
+                m =>
+                {
+                    string p = (m.Groups["path"]?.Value ?? "").Trim();
+                    if (string.IsNullOrWhiteSpace(p)) return m.Value;
+                    if (mapByOriginal != null && mapByOriginal.TryGetValue(p, out var mapped))
+                        return $"![{m.Groups["alt"].Value}]({mapped})";
+
+                    string fileName = Path.GetFileName(p);
+                    if (!string.IsNullOrWhiteSpace(fileName) && mapByFileName != null && mapByFileName.TryGetValue(fileName, out var mappedByName))
+                        return $"![{m.Groups["alt"].Value}]({mappedByName})";
+                    return m.Value;
+                },
+                RegexOptions.IgnoreCase
+            );
+
+            return content;
         }
 
         private static string ResolveCoverFilePath(string coverPath)

@@ -30,7 +30,9 @@ namespace AniTechou.Utilities
     public static class MarkdownConverter
     {
         /// <summary>
-        /// Convert XAML FlowDocument string to Markdown text.
+        /// [Migration-only] Convert XAML FlowDocument string to Markdown text.
+        /// Only used for one-time migration of old XAML-format notes to Markdown.
+        /// Not called during normal editor operation.
         /// </summary>
         public static string XamlToMarkdown(string xamlContent)
         {

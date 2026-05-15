@@ -129,14 +129,6 @@
                 <Button x:Name="HighlightButton" Content="🖍" Style="{StaticResource AppToolbarButtonStyle}" Margin="0,0,8,0" Click="HighlightButton_Click" ToolTip="高亮颜色"/>
                 <Button Content="🔗" Style="{StaticResource AppToolbarButtonStyle}" Click="LinkButton_Click"/>
                 <Button Content="🖼️" Style="{StaticResource AppToolbarButtonStyle}" Click="ImageButton_Click"/>
-                <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="2,0"/>
-                <ToggleButton x:Name="MarkdownModeToggle"
-                              Content="MD"
-                              Width="38" Height="28"
-                              Margin="2,0"
-                              FontSize="11"
-                              IsChecked="False"
-                              Click="MarkdownModeToggle_Click"/>
                 </WrapPanel>
                 </StackPanel>
             </Border>
@@ -205,49 +197,16 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- 富文本编辑器 -->
-            <Border x:Name="RichEditorPanel"
-                    Grid.Row="0" Grid.RowSpan="3"
-                    Background="{DynamicResource Surface1Brush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource CardCornerRadius}">
-                <RichTextBox x:Name="RichEditor"
-                             AcceptsReturn="True"
-                             AllowDrop="True"
-                             IsDocumentEnabled="True"
-                             VerticalScrollBarVisibility="Auto"
-                             FontSize="14"
-                             Foreground="{DynamicResource TextPrimaryBrush}"
-                             Background="{DynamicResource Surface1Brush}"
-                             BorderThickness="0"
-                             Padding="10"
-                             PreviewDragOver="RichEditor_PreviewDragOver"
-                             Drop="RichEditor_Drop"
-                             SelectionChanged="RichEditor_SelectionChanged"
-                             TextChanged="RichEditor_TextChanged">
-                    <RichTextBox.ContextMenu>
-                        <ContextMenu>
-                            <MenuItem Command="ApplicationCommands.Cut" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Header="剪切"/>
-                            <MenuItem Command="ApplicationCommands.Copy" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Header="复制"/>
-                            <MenuItem Command="ApplicationCommands.Paste" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Header="粘贴"/>
-                            <Separator/>
-                            <MenuItem Command="ApplicationCommands.SelectAll" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Header="全选"/>
-                        </ContextMenu>
-                    </RichTextBox.ContextMenu>
-                    <FlowDocument PagePadding="0">
-                        <Paragraph></Paragraph>
-                    </FlowDocument>
-                </RichTextBox>
-            </Border>
-
-            <!-- Markdown 编辑区域 (双栏: 编辑+预览) -->
+            <!-- Markdown 编辑区域 -->
             <Border Grid.Row="0"
                     x:Name="MarkdownEditPanel"
                     Background="{DynamicResource Surface2Brush}"
                     BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource CardCornerRadius}"
-                    Visibility="Collapsed">
+                    CornerRadius="{DynamicResource CardCornerRadius}">
                 <TextBox x:Name="MarkdownEditBox"
                          AcceptsReturn="True"
                          TextWrapping="Wrap"
+                         AllowDrop="True"
                          FontFamily="Microsoft YaHei"
                          FontSize="14"
                          Padding="10"
@@ -257,21 +216,32 @@
                          BorderThickness="0"
                          VerticalScrollBarVisibility="Auto"
                          HorizontalScrollBarVisibility="Disabled"
-                         TextChanged="MarkdownEditBox_TextChanged"/>
+                         SelectionChanged="MarkdownEditBox_SelectionChanged"
+                         TextChanged="MarkdownEditBox_TextChanged"
+                         PreviewDragOver="MarkdownEditBox_PreviewDragOver"
+                         Drop="MarkdownEditBox_Drop">
+                    <TextBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Command="ApplicationCommands.Cut" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Header="剪切"/>
+                            <MenuItem Command="ApplicationCommands.Copy" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Header="复制"/>
+                            <MenuItem Command="ApplicationCommands.Paste" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Header="粘贴"/>
+                            <Separator/>
+                            <MenuItem Command="ApplicationCommands.SelectAll" CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Header="全选"/>
+                        </ContextMenu>
+                    </TextBox.ContextMenu>
+                </TextBox>
             </Border>
 
             <GridSplitter Grid.Row="1" x:Name="MarkdownSplitter" Height="4"
                           Background="{DynamicResource BorderSubtleBrush}"
-                          HorizontalAlignment="Stretch" VerticalAlignment="Center"
-                          Visibility="Collapsed"/>
+                          HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
 
             <!-- Markdown 预览区域 -->
             <Border Grid.Row="2"
                     x:Name="MarkdownPreviewPanel"
                     Background="{DynamicResource Surface1Brush}"
                     BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource CardCornerRadius}"
-                    Visibility="Collapsed">
+                    CornerRadius="{DynamicResource CardCornerRadius}">
                 <FlowDocumentScrollViewer x:Name="MarkdownPreviewViewer"
                                           VerticalScrollBarVisibility="Auto"
                                           Padding="10"
