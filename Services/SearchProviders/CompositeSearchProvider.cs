@@ -98,6 +98,25 @@ namespace AniTechou.Services.SearchProviders
                 allResults = allResults.Take(maxResults).ToList();
             }
 
+            if (allResults.Count == 0 && _providers.Any(p => p is BangumiSearchProvider))
+            {
+                System.Diagnostics.Debug.WriteLine("[CompositeSearch] Bangumi 无结果或不可达，尝试 MAL/AniList 降级搜索");
+                var fallbackProviders = new ISearchProvider[] { new MALSearchProvider(), new AniListSearchProvider() }
+                    .Where(p => !_providers.Any(existing => existing.ProviderName == p.ProviderName))
+                    .ToArray();
+                if (fallbackProviders.Length > 0)
+                {
+                    var fallbackTasks = fallbackProviders.Select(p => SearchProviderSafe(p, query, typeHint)).ToArray();
+                    var fallbackResults = await Task.WhenAll(fallbackTasks);
+                    allResults = fallbackResults
+                        .SelectMany(r => r)
+                        .GroupBy(r => (r.Title + r.OriginalTitle).ToLowerInvariant())
+                        .Select(g => g.First())
+                        .Take(maxResults)
+                        .ToList();
+                }
+            }
+
             // 写入缓存
             if (allResults.Count > 0)
             {

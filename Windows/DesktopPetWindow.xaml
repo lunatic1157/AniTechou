@@ -1,0 +1,196 @@
+<Window x:Class="AniTechou.Windows.DesktopPetWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Yoruko"
+        Width="190"
+        Height="206"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False">
+    <Window.ContextMenu>
+        <ContextMenu>
+            <MenuItem Header="和夜子打招呼" Click="Greet_Click"/>
+            <MenuItem Header="打开对话框" Click="OpenDialog_Click"/>
+            <MenuItem Header="暂时隐藏" Click="HidePet_Click"/>
+            <Separator/>
+            <MenuItem Header="关闭桌宠" Click="ClosePet_Click"/>
+        </ContextMenu>
+    </Window.ContextMenu>
+
+    <Grid Background="Transparent">
+        <Border x:Name="SpeechBubble"
+                MinWidth="96"
+                MaxWidth="168"
+                Padding="9,6"
+                Margin="4,0,4,0"
+                VerticalAlignment="Top"
+                HorizontalAlignment="Center"
+                Background="#F8FAFC"
+                BorderBrush="#4C1D95"
+                BorderThickness="1"
+                CornerRadius="8"
+                Visibility="Collapsed">
+            <TextBlock x:Name="SpeechText"
+                       TextWrapping="Wrap"
+                       FontSize="12"
+                       Foreground="#221229"/>
+        </Border>
+
+        <Grid x:Name="PetRoot"
+              Width="170"
+              Height="170"
+              VerticalAlignment="Bottom"
+              HorizontalAlignment="Center"
+              Cursor="Hand"
+              MouseLeftButtonDown="PetRoot_MouseLeftButtonDown"
+              RenderTransformOrigin="0.5,0.9">
+            <Grid.RenderTransform>
+                <TransformGroup>
+                    <ScaleTransform x:Name="PetScale" ScaleX="1" ScaleY="1"/>
+                    <RotateTransform x:Name="PetTilt" Angle="0"/>
+                    <TranslateTransform x:Name="PetBounce" Y="0"/>
+                </TransformGroup>
+            </Grid.RenderTransform>
+
+            <Image x:Name="PetSprite"
+                   Width="166"
+                   Height="166"
+                   Stretch="Uniform"
+                   RenderOptions.BitmapScalingMode="HighQuality"
+                   Visibility="Collapsed"/>
+
+            <Canvas x:Name="VectorFallback" Width="148" Height="140">
+                <Ellipse Canvas.Left="42" Canvas.Top="24" Width="64" Height="68" Fill="#F7D7C8"/>
+                <Path Fill="#1A1024" Data="M38,66 C36,35 54,15 75,15 C101,15 115,36 111,70 C101,54 91,44 75,44 C58,44 47,53 38,66 Z"/>
+                <Path Fill="#3B2354" Opacity="0.86" Data="M46,43 C52,18 69,10 86,17 C76,22 67,33 66,50 C58,47 52,45 46,43 Z"/>
+                <Path Fill="#26142F" Data="M34,88 C40,70 54,62 75,62 C96,62 111,71 116,90 L108,132 L42,132 Z"/>
+                <Path Fill="#17111F" Data="M49,91 C56,78 67,73 76,73 C89,73 99,80 104,92 L98,130 L55,130 Z"/>
+                <Path Fill="#E8D8A7" Data="M67,84 L84,84 L80,107 L71,107 Z"/>
+                <Rectangle Canvas.Left="69" Canvas.Top="96" Width="13" Height="19" RadiusX="4" RadiusY="4" Fill="#5B4B2A"/>
+                <Ellipse Canvas.Left="72" Canvas.Top="103" Width="7" Height="7" Fill="#E2C76A"/>
+                <Path Stroke="#F7D7C8" StrokeThickness="7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M45,93 C31,96 25,106 22,118"/>
+                <Path Stroke="#F7D7C8" StrokeThickness="7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M105,93 C121,96 126,108 128,120"/>
+                <Path x:Name="BookCover" Fill="#5D2C86" Data="M18,111 L58,102 L64,129 L24,136 Z"/>
+                <Path Fill="#F6E9C7" Data="M24,114 L57,107 L60,125 L28,132 Z"/>
+                <Ellipse Canvas.Left="59" Canvas.Top="49" Width="8" Height="10" Fill="#1D102A"/>
+                <Ellipse Canvas.Left="84" Canvas.Top="49" Width="8" Height="10" Fill="#1D102A"/>
+                <Path Stroke="#8B3A4A" StrokeThickness="2" StrokeStartLineCap="Round" Data="M70,67 C75,70 80,70 85,67"/>
+                <Path Stroke="#2B1738" StrokeThickness="5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M46,34 C45,74 36,95 27,125"/>
+                <Path Stroke="#2B1738" StrokeThickness="5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M104,36 C108,73 115,96 123,126"/>
+                <Path Fill="#17111F" Data="M55,130 L65,130 L61,140 L50,140 Z"/>
+                <Path Fill="#17111F" Data="M88,130 L98,130 L102,140 L91,140 Z"/>
+            </Canvas>
+        </Grid>
+
+        <Popup x:Name="DialogPopup"
+               PlacementTarget="{Binding ElementName=PetRoot}"
+               Placement="Top"
+               VerticalOffset="-8"
+               HorizontalOffset="-26"
+               AllowsTransparency="True"
+               StaysOpen="True"
+               PopupAnimation="Fade">
+            <Border Width="220"
+                    Padding="10"
+                    Background="#F8FAFC"
+                    BorderBrush="#312E81"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="夜子"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="#312E81"
+                               VerticalAlignment="Center"/>
+                    <Button Grid.Column="1"
+                            Width="22"
+                            Height="22"
+                            Padding="0"
+                            Content="×"
+                            Click="CloseDialog_Click"/>
+
+                    <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="54"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid Grid.Column="0">
+                            <TextBox x:Name="DialogInput"
+                                     MinHeight="28"
+                                     MaxLength="120"
+                                     FontSize="12"
+                                     VerticalContentAlignment="Center"
+                                     KeyDown="DialogInput_KeyDown"
+                                     TextChanged="DialogInput_TextChanged"/>
+                            <TextBlock x:Name="DialogPlaceholder"
+                                       Margin="8,0,0,0"
+                                       VerticalAlignment="Center"
+                                       IsHitTestVisible="False"
+                                       FontSize="12"
+                                       Foreground="#9CA3AF"
+                                       Text="说吧，别浪费时间"/>
+                        </Grid>
+                        <Button Grid.Column="1"
+                                Margin="6,0,0,0"
+                                Content="发送"
+                                Click="SendDialog_Click"/>
+                    </Grid>
+
+                    <StackPanel Grid.Row="2"
+                                Grid.ColumnSpan="2"
+                                Margin="0,8,0,0"
+                                Orientation="Horizontal">
+                        <Button Content="思考"
+                                Tag="Thinking"
+                                Width="40"
+                                Margin="0,0,5,0"
+                                Click="DebugState_Click"/>
+                        <Button Content="满意"
+                                Tag="Pleased"
+                                Width="40"
+                                Margin="0,0,5,0"
+                                Click="DebugState_Click"/>
+                        <Button Content="烦躁"
+                                Tag="Annoyed"
+                                Width="40"
+                                Margin="0,0,5,0"
+                                Click="DebugState_Click"/>
+                        <Button Content="睡觉"
+                                Tag="Sleeping"
+                                Width="40"
+                                Click="DebugState_Click"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="3"
+                                Grid.ColumnSpan="2"
+                                Margin="0,8,0,0"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+                        <Button Content="隐藏"
+                                Width="52"
+                                Margin="0,0,6,0"
+                                Click="HideFromDialog_Click"/>
+                        <Button Content="关闭"
+                                Width="52"
+                                Click="CloseFromDialog_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Popup>
+    </Grid>
+</Window>

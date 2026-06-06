@@ -21,6 +21,13 @@ namespace AniTechou
         {
             ThemeManager.Initialize(this);
             RegisterInputWheelHandlers();
+            DesktopPetService.Instance.Initialize();
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            DesktopPetService.Instance.Shutdown();
+            base.OnExit(e);
         }
 
         private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

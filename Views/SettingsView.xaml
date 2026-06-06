@@ -101,6 +101,57 @@
                               Margin="0,0,0,4"
                               Style="{StaticResource AppCheckBoxStyle}"/>
 
+                    <TextBlock Text="🌐 网络与代理" Margin="0,18,0,6"
+                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="代理模式" Style="{StaticResource FieldLabelStyle}"/>
+                        <ComboBox x:Name="ProxyModeBox"
+                                  Grid.Row="0"
+                                  Grid.Column="1"
+                                  Height="36"
+                                  Margin="0,0,12,10"
+                                  Style="{StaticResource AppComboBoxStyle}"
+                                  SelectedIndex="0">
+                            <ComboBoxItem Content="使用系统代理" Tag="System"/>
+                            <ComboBoxItem Content="自定义代理" Tag="Custom"/>
+                            <ComboBoxItem Content="不使用代理" Tag="None"/>
+                        </ComboBox>
+                        <Button Grid.Row="0"
+                                Grid.Column="2"
+                                Content="网络诊断"
+                                Width="96"
+                                Height="36"
+                                Style="{StaticResource AppSecondaryButtonStyle}"
+                                Click="NetworkDiagnostic_Click"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="代理地址" Style="{StaticResource FieldLabelStyle}"/>
+                        <TextBox x:Name="ProxyAddressBox"
+                                 Grid.Row="1"
+                                 Grid.Column="1"
+                                 Grid.ColumnSpan="2"
+                                 Height="36"
+                                 Style="{StaticResource AppTextBoxStyle}"
+                                 ToolTip="例如 http://127.0.0.1:7890；不填写时自定义代理不会生效"/>
+                    </Grid>
+                    <TextBlock Text="应用只能复用系统代理或你填写的代理地址；本机没有可用代理/VPN 时无法自动访问被封锁的网站。"
+                               FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                               Margin="20,2,0,0" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="NetworkDiagnosticStatusText"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextMutedBrush}"
+                               Margin="20,6,0,0"
+                               TextWrapping="Wrap"/>
+
                     <WrapPanel Margin="0,14,0,0">
                         <Button Content="测试连接"
                                 Width="96"
@@ -129,6 +180,10 @@
                               Content="启动时自动登录"
                               Margin="0,0,0,18"
                               Style="{StaticResource AppCheckBoxStyle}"/>
+                    <CheckBox x:Name="DalianPetBox"
+                              Content="启用夜子桌宠"
+                              Margin="0,0,0,18"
+                              Style="{StaticResource AppCheckBoxStyle}"/>
                     <Button Content="退出登录"
                             Width="110"
                             Height="36"
@@ -151,8 +206,14 @@
                         <Button Content="导出所有数据"
                                 Width="132"
                                 Height="36"
+                                Margin="0,0,12,0"
                                 Style="{StaticResource AppPrimaryButtonStyle}"
                                 Click="ExportData_Click"/>
+                        <Button Content="标签清理预览"
+                                Width="132"
+                                Height="36"
+                                Style="{StaticResource AppSecondaryButtonStyle}"
+                                Click="TagCleanupPreview_Click"/>
                     </WrapPanel>
                     <TextBlock Text="数据保存位置"
                                FontSize="12"

@@ -18,8 +18,15 @@ namespace AniTechou.Services
         public bool EnableBangumiSearch { get; set; } = true;
         public bool EnableMALSearch { get; set; } = false;
         public bool EnableAniListSearch { get; set; } = false;
+        public string ProxyMode { get; set; } = "System";
+        public string ProxyAddress { get; set; } = "";
         public string ThemeAccent { get; set; } = "Aurora";
         public string ThemeMode { get; set; } = "Light";
+        public bool EnableDesktopPet { get; set; } = false;
+        public double DesktopPetX { get; set; } = -1;
+        public double DesktopPetY { get; set; } = -1;
+        public double DesktopPetScale { get; set; } = 1.0;
+        public double NoteEditorSplitRatio { get; set; } = 0.5;
     }
 
     public static class ConfigManager

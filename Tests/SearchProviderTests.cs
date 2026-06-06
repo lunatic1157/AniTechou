@@ -55,7 +55,7 @@ public class SearchProviderTests
         Assert.Equal("28", r.Episodes);
         Assert.Contains("奇幻", r.Tags);
         Assert.Contains("冒险", r.Tags);
-        Assert.Contains("评分:8.5", r.Tags);
+        Assert.DoesNotContain("评分:8.5", r.Tags);
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public class SearchProviderTests
         Assert.Equal("Studio Bind", r.Company);
         Assert.Contains("Fantasy", r.Tags);
         Assert.Contains("Isekai", r.Tags);
-        Assert.Contains("MAL评分:8.3", r.Tags);
+        Assert.DoesNotContain("MAL评分:8.3", r.Tags);
     }
 
     [Fact]
@@ -202,7 +202,7 @@ public class SearchProviderTests
         Assert.Equal("https://example.com/anilist.jpg", r.CoverUrl);
         Assert.Equal("漫改", r.SourceType);
         Assert.Contains("Fantasy", r.Tags);
-        Assert.Contains("AniList评分:89%", r.Tags);
+        Assert.DoesNotContain("AniList评分:89%", r.Tags);
     }
 
     [Fact]
@@ -302,10 +302,6 @@ internal class TestableBangumiSearchProvider : ISearchProvider
 
         if (item.TryGetProperty("eps", out var eps)) result.Episodes = eps.GetInt32().ToString();
 
-        if (item.TryGetProperty("rating", out var rating))
-            if (rating.TryGetProperty("score", out var score))
-                result.Tags.Add($"评分:{score.GetDouble():F1}");
-
         if (item.TryGetProperty("tags", out var tags))
             foreach (var t in tags.EnumerateArray())
             {
@@ -376,8 +372,6 @@ internal class TestableMALSearchProvider : ISearchProvider
                     r.Company = string.Join(" / ", names);
                 }
                 r.SourceType = SafeGet(item, "source") switch { "Original" => "原创", "Manga" => "漫改", "Light novel" => "小说改", "Game" => "游戏改", _ => "" };
-                if (item.TryGetProperty("score", out var sc) && sc.TryGetDouble(out double sd) && sd > 0)
-                    r.Tags.Add($"MAL评分:{sd:F1}");
                 if (item.TryGetProperty("genres", out var gen))
                     foreach (var g in gen.EnumerateArray())
                     { string gn = SafeGet(g, "name"); if (!string.IsNullOrEmpty(gn)) r.Tags.Add(gn); }
@@ -450,8 +444,6 @@ internal class TestableAniListSearchProvider : ISearchProvider
                     r.Company = string.Join(" / ", names);
                 }
                 r.SourceType = SafeGet(item, "source") switch { "ORIGINAL" => "原创", "MANGA" => "漫改", "LIGHT_NOVEL" => "小说改", "GAME" => "游戏改", _ => "" };
-                if (item.TryGetProperty("averageScore", out var avs) && avs.TryGetInt32(out int sc) && sc > 0)
-                    r.Tags.Add($"AniList评分:{sc}%");
                 if (item.TryGetProperty("genres", out var gen))
                     foreach (var g in gen.EnumerateArray()) { string gn = g.GetString() ?? ""; if (!string.IsNullOrEmpty(gn)) r.Tags.Add(gn); }
                 results.Add(r);

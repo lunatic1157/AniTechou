@@ -1,0 +1,17 @@
+{
+  "id": "yoruko",
+  "displayName": "\u904a\u884c\u5bfa\u591c\u5b50",
+  "source": "\u7d19\u306e\u4e0a\u306e\u9b54\u6cd5\u4f7f\u3044",
+  "implementation": "png spritesheet",
+  "frameWidth": 256,
+  "frameHeight": 256,
+  "states": {
+    "idle": { "file": "idle_256x256_1f.png", "frames": 1, "fps": 1 },
+    "thinking": { "file": "thinking_256x256_1f.png", "frames": 1, "fps": 1 },
+    "pleased": { "file": "pleased_256x256_1f.png", "frames": 1, "fps": 1 },
+    "annoyed": { "file": "annoyed_256x256_1f.png", "frames": 1, "fps": 1 },
+    "moving": { "file": "moving_256x256_1f.png", "frames": 1, "fps": 1 },
+    "sleeping": { "file": "sleeping_256x256_1f.png", "frames": 1, "fps": 1 }
+  },
+  "visualNotes": "Temporary v0.9.5 replacement pet using Yoruko Yugyouji: long silver-white hair, purple-pink eyes, pale blue capelet, navy dress, peach bow, white frills, black strap shoes, and a quiet guarded library-girl mood. The directory remains Assets/Pets/Dalian so DesktopPetService does not need to change in this patch."
+}

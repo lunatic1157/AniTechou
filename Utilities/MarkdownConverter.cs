@@ -181,6 +181,7 @@ namespace AniTechou.Utilities
         // =========================================================================
 
         private static readonly FontFamily DefaultFont = new FontFamily("Microsoft YaHei");
+        private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
         private const double DefaultFontSize = 14.0;
 
         /// <summary>
@@ -200,8 +201,7 @@ namespace AniTechou.Utilities
 
             try
             {
-                var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
-                var mdDoc = Markdig.Markdown.Parse(markdown, pipeline);
+                var mdDoc = Markdig.Markdown.Parse(markdown, Pipeline);
 
                 foreach (var block in mdDoc)
                     ConvertBlock(block, doc.Blocks);

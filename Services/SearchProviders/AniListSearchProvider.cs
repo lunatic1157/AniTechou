@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AniTechou.Services;
+using AniTechou.Utilities;
 
 namespace AniTechou.Services.SearchProviders
 {
@@ -22,13 +23,7 @@ namespace AniTechou.Services.SearchProviders
 
         public AniListSearchProvider()
         {
-            _httpClient = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(15)
-            };
-            _httpClient.DefaultRequestHeaders.Add("User-Agent",
-                "AniTechou/1.0 (https://github.com/lunatic1157/AniTechou)");
-            _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+            _httpClient = NetworkClientFactory.CreateHttpClient(TimeSpan.FromSeconds(15));
         }
 
         public async Task<List<ExternalSearchResult>> SearchAsync(string query, string typeHint = null)
@@ -280,11 +275,6 @@ namespace AniTechou.Services.SearchProviders
                 _ => ""
             };
 
-            // 评分
-            int avgScore = SafeGetInt(item, "averageScore");
-            if (avgScore > 0)
-                result.Tags.Add($"AniList评分:{avgScore}%");
-
             // 流派
             if (item.TryGetProperty("genres", out var genres))
             {
@@ -307,6 +297,7 @@ namespace AniTechou.Services.SearchProviders
                 }
             }
 
+            result.Tags = TagPolicy.NormalizeAutomaticTags(result.Tags, TagPolicy.FromExternalResult(result));
             return result;
         }
 

@@ -103,6 +103,7 @@ namespace AniTechou.Views
         public static RoutedUICommand AlignRightCommand { get; } = new RoutedUICommand("AlignRight", "AlignRight", typeof(NoteEditor));
 
         private DispatcherTimer _autoSaveTimer;
+        private DispatcherTimer _previewRefreshTimer;
         private bool _isDirty;
         private bool _isSaving;
         private bool _suppressTextEvents;
@@ -110,6 +111,7 @@ namespace AniTechou.Views
         private int _selectionStart;
         private int _selectionLength;
         private int _changeVersion;
+        private bool _splitRatioReady;
 
         public NoteEditor(string accountName, WorkService.NoteInfo note = null, EditorSource source = EditorSource.NotesList, int workId = 0)
         {
@@ -120,12 +122,15 @@ namespace AniTechou.Views
             _source = source;
             _sourceWorkId = workId;
             DataObject.AddPastingHandler(MarkdownEditBox, MarkdownEditBox_Pasting);
+            ApplySavedNoteSplitRatio();
+            Loaded += (s, e) => _splitRatioReady = true;
 
             LoadWorks();
             LoadData();
             LoadTagSuggestions();
             InitializeColorPalettes();
             InitializeAutoSave();
+            InitializePreviewRefresh();
             UpdateTitlePlaceholder();
             SaveSelectionSnapshot();
         }
@@ -321,6 +326,54 @@ namespace AniTechou.Views
             };
         }
 
+        private void InitializePreviewRefresh()
+        {
+            _previewRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(280) };
+            _previewRefreshTimer.Tick += (s, e) =>
+            {
+                _previewRefreshTimer.Stop();
+                RefreshMarkdownPreview();
+            };
+        }
+
+        private void ApplySavedNoteSplitRatio()
+        {
+            var config = ConfigManager.Load();
+            double ratio = Math.Clamp(config.NoteEditorSplitRatio, 0.25, 0.75);
+            MarkdownEditColumn.Width = new GridLength(ratio, GridUnitType.Star);
+            MarkdownPreviewColumn.Width = new GridLength(1.0 - ratio, GridUnitType.Star);
+        }
+
+        private void MarkdownSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
+        {
+            SaveNoteSplitRatio();
+        }
+
+        private void MarkdownSplitter_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            SaveNoteSplitRatio();
+        }
+
+        private void MarkdownSplitPanel_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (_splitRatioReady)
+            {
+                SaveNoteSplitRatio();
+            }
+        }
+
+        private void SaveNoteSplitRatio()
+        {
+            double editWidth = MarkdownEditPanel.ActualWidth;
+            double previewWidth = MarkdownPreviewPanel.ActualWidth;
+            double total = editWidth + previewWidth;
+            if (total <= 0) return;
+
+            var config = ConfigManager.Load();
+            config.NoteEditorSplitRatio = Math.Clamp(editWidth / total, 0.25, 0.75);
+            ConfigManager.Save(config);
+        }
+
         private void LoadTagSuggestions()
         {
             var workService = new WorkService(_accountName);
@@ -369,7 +422,7 @@ namespace AniTechou.Views
         {
             if (!_suppressTextEvents)
             {
-                RefreshMarkdownPreview();
+                ScheduleMarkdownPreviewRefresh();
                 MarkDirtyAndScheduleSave();
             }
         }
@@ -377,6 +430,18 @@ namespace AniTechou.Views
         private void MarkdownEditBox_SelectionChanged(object sender, RoutedEventArgs e)
         {
             SaveSelectionSnapshot();
+        }
+
+        private void ScheduleMarkdownPreviewRefresh()
+        {
+            if (_previewRefreshTimer == null)
+            {
+                RefreshMarkdownPreview();
+                return;
+            }
+
+            _previewRefreshTimer.Stop();
+            _previewRefreshTimer.Start();
         }
 
         private void RefreshMarkdownPreview()
@@ -478,6 +543,7 @@ namespace AniTechou.Views
                     {
                         NoteSaved?.Invoke();
                     }
+                    DesktopPetService.Instance.Notify(PetActivity.Pleased, "这页笔记保存好了。下次别让我再替你找散落的书签。");
                     return true;
                 }
                 MarkSaveFailed("");
@@ -486,6 +552,7 @@ namespace AniTechou.Views
             catch (Exception ex)
             {
                 MarkSaveFailed(ex.Message);
+                DesktopPetService.Instance.Notify(PetActivity.Annoyed, "笔记保存失败了。哼，先检查一下错误再继续写。");
                 return false;
             }
             finally

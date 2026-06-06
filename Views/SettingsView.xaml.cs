@@ -21,6 +21,7 @@ namespace AniTechou.Views
             public string ApiUrl { get; set; }
             public string Model { get; set; }
             public bool IsCustom { get; set; }
+            public override string ToString() => Name;
         }
 
         public SettingsView(string accountName)
@@ -87,11 +88,14 @@ namespace AniTechou.Views
 
             ApiKeyBox.Password = config.ApiKey;
             AutoLoginBox.IsChecked = config.AutoLogin;
+            DalianPetBox.IsChecked = config.EnableDesktopPet;
             WebSearchBox.IsChecked = config.EnableWebSearch;
             BangumiSearchBox.IsChecked = config.EnableBangumiSearch;
             MALSearchBox.IsChecked = config.EnableMALSearch;
             AniListSearchBox.IsChecked = config.EnableAniListSearch;
             BangumiUserBox.Text = config.BangumiUsername ?? "";
+            SelectProxyMode(config.ProxyMode);
+            ProxyAddressBox.Text = config.ProxyAddress ?? "";
         }
 
         private void Platform_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -145,6 +149,26 @@ namespace AniTechou.Views
             return assembly.GetName().Version?.ToString(3) ?? "未知";
         }
 
+        private void SelectProxyMode(string proxyMode)
+        {
+            string normalized = NetworkClientFactory.NormalizeProxyMode(proxyMode);
+            foreach (var item in ProxyModeBox.Items.OfType<ComboBoxItem>())
+            {
+                if (string.Equals(item.Tag?.ToString(), normalized, StringComparison.OrdinalIgnoreCase))
+                {
+                    ProxyModeBox.SelectedItem = item;
+                    return;
+                }
+            }
+            ProxyModeBox.SelectedIndex = 0;
+        }
+
+        private string GetSelectedProxyMode()
+        {
+            return (ProxyModeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString()
+                   ?? NetworkClientFactory.ProxyModeSystem;
+        }
+
         private async void TestConnection_Click(object sender, RoutedEventArgs e)
         {
             string apiKey = ApiKeyBox.Password;
@@ -181,6 +205,37 @@ namespace AniTechou.Views
             {
                 TestStatusText.Text = $"✗ 连接失败：{ex.Message}";
                 TestStatusText.SetResourceReference(TextBlock.ForegroundProperty, "DangerBrush");
+            }
+        }
+
+        private async void NetworkDiagnostic_Click(object sender, RoutedEventArgs e)
+        {
+            NetworkDiagnosticStatusText.Text = "诊断中...";
+            NetworkDiagnosticStatusText.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
+
+            try
+            {
+                var tempConfig = ConfigManager.Load();
+                tempConfig.ProxyMode = GetSelectedProxyMode();
+                tempConfig.ProxyAddress = ProxyAddressBox.Text.Trim();
+                ConfigManager.Save(tempConfig);
+
+                var results = await NetworkClientFactory.RunDiagnosticsAsync(
+                    ApiUrlBox.Text.Trim(),
+                    ApiKeyBox.Password,
+                    ModelBox.Text.Trim());
+
+                NetworkDiagnosticStatusText.Text = string.Join("\n", results.Select(r =>
+                    $"{(r.Success ? "OK" : "FAIL")} {r.Name}: {r.Message} ({r.ElapsedMilliseconds}ms)"));
+
+                bool allCoreOk = results.Where(r => r.Name != "AI API").Any(r => r.Success);
+                NetworkDiagnosticStatusText.SetResourceReference(TextBlock.ForegroundProperty,
+                    allCoreOk ? "SuccessBrush" : "DangerBrush");
+            }
+            catch (Exception ex)
+            {
+                NetworkDiagnosticStatusText.Text = $"诊断失败：{ex.Message}";
+                NetworkDiagnosticStatusText.SetResourceReference(TextBlock.ForegroundProperty, "DangerBrush");
             }
         }
 
@@ -332,6 +387,30 @@ namespace AniTechou.Views
             }
         }
 
+        private void TagCleanupPreview_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var workService = new WorkService(_accountName);
+                var preview = workService.GenerateTagCleanupPreview();
+                var dialog = new Windows.TagCleanupPreviewWindow(_accountName, preview)
+                {
+                    Owner = Application.Current.MainWindow
+                };
+
+                bool? applied = dialog.ShowDialog();
+                if (applied == true)
+                {
+                    var mainWindow = Application.Current.MainWindow as MainWindow;
+                    mainWindow?.RefreshCurrentView();
+                }
+            }
+            catch (Exception ex)
+            {
+                Windows.AppMessageDialog.Show(Application.Current.MainWindow, "标签清理预览失败", ex.Message);
+            }
+        }
+
         private void OpenDataFolder_Click(object sender, RoutedEventArgs e)
         {
             string dataPath = Path.Combine(
@@ -375,19 +454,24 @@ namespace AniTechou.Views
                 config.ApiUrl = ApiUrlBox.Text;
                 config.Model = ModelBox.Text;
                 config.AutoLogin = AutoLoginBox.IsChecked ?? true;
+                config.EnableDesktopPet = DalianPetBox.IsChecked ?? false;
                 config.EnableWebSearch = WebSearchBox.IsChecked ?? false;
                 config.EnableBangumiSearch = BangumiSearchBox.IsChecked ?? true;
                 config.EnableMALSearch = MALSearchBox.IsChecked ?? false;
                 config.EnableAniListSearch = AniListSearchBox.IsChecked ?? false;
                 config.BangumiUsername = BangumiUserBox.Text.Trim();
+                config.ProxyMode = GetSelectedProxyMode();
+                config.ProxyAddress = ProxyAddressBox.Text.Trim();
 
                 ConfigManager.Save(config);
+                DesktopPetService.Instance.RefreshFromConfig();
 
                 // 验证保存是否成功
                 var loaded = ConfigManager.Load();
                 if (loaded.ApiKey == config.ApiKey &&
                     loaded.ApiUrl == config.ApiUrl &&
-                    loaded.Model == config.Model)
+                    loaded.Model == config.Model &&
+                    loaded.EnableDesktopPet == config.EnableDesktopPet)
                 {
                     System.Diagnostics.Debug.WriteLine($"[Settings] 保存后验证通过 - Platform: {loaded.Platform}");
                     Windows.AppMessageDialog.Show(Application.Current.MainWindow, "成功", "设置已保存并生效");

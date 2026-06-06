@@ -944,6 +944,166 @@ namespace AniTechou.Services
             }
         }
 
+        public List<string> AddAutomaticWorkTags(int workId, IEnumerable<string> rawTags, TagPolicy.WorkTagContext context, string source = "AI")
+        {
+            var added = new List<string>();
+            var currentTagSet = new HashSet<string>(
+                GetWorkTags(workId).Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var tag in TagPolicy.NormalizeAutomaticTags(rawTags, context))
+            {
+                if (currentTagSet.Contains(tag)) continue;
+                if (AddWorkTag(workId, tag, TagPolicy.GetCategoryForTag(tag), source))
+                {
+                    added.Add(tag);
+                    currentTagSet.Add(tag);
+                }
+            }
+
+            return added;
+        }
+
+        public TagPolicy.TagCleanupPlan CleanTagsForAiTouchedWork(int workId)
+        {
+            var work = GetWorkById(workId);
+            var context = TagPolicy.FromWork(work);
+            var cleanup = TagPolicy.PlanCleanupForAiTouchedWork(GetWorkTags(workId), context);
+
+            foreach (var tag in cleanup.TagsToRemove)
+                RemoveWorkTag(workId, tag);
+
+            foreach (var tag in cleanup.TagsToAdd)
+                AddWorkTag(workId, tag, TagPolicy.GetCategoryForTag(tag), "AI");
+
+            return cleanup;
+        }
+
+        public TagCleanupPreview GenerateTagCleanupPreview()
+        {
+            var preview = new TagCleanupPreview();
+
+            using (var conn = DatabaseHelper.GetConnection(_currentAccount))
+            {
+                conn.Open();
+                string sql = @"SELECT Id, Title, OriginalTitle, Type, Company, Year, Season, SourceType, Author, OriginalWork
+                               FROM Works
+                               ORDER BY Title";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        var work = new WorkInfo
+                        {
+                            Id = SafeGetInt(reader, 0),
+                            Title = SafeGetString(reader, 1),
+                            OriginalTitle = SafeGetString(reader, 2),
+                            Type = SafeGetString(reader, 3),
+                            Company = SafeGetString(reader, 4),
+                            Year = SafeGetString(reader, 5),
+                            Season = SafeGetString(reader, 6),
+                            SourceType = SafeGetString(reader, 7),
+                            Author = SafeGetString(reader, 8),
+                            OriginalWork = SafeGetString(reader, 9)
+                        };
+
+                        var tags = GetWorkTags(work.Id);
+                        var cleanup = TagPolicy.PlanCleanupForAiTouchedWork(tags, TagPolicy.FromWork(work));
+                        if (cleanup.TagsToRemove.Count == 0 && cleanup.TagsToAdd.Count == 0)
+                            continue;
+
+                        preview.Items.Add(new TagCleanupPreviewItem
+                        {
+                            WorkId = work.Id,
+                            Title = work.Title ?? "",
+                            Type = work.Type ?? "",
+                            Year = work.Year ?? "",
+                            Company = work.Company ?? "",
+                            TagsToRemove = cleanup.TagsToRemove,
+                            TagsToAdd = cleanup.TagsToAdd,
+                            TagsKept = tags
+                                .Where(t => !cleanup.TagsToRemove.Contains(t, StringComparer.OrdinalIgnoreCase))
+                                .ToList()
+                        });
+                    }
+                }
+            }
+
+            return preview;
+        }
+
+        public TagCleanupApplyResult ApplyTagCleanupPreview(TagCleanupPreview preview = null)
+        {
+            var result = new TagCleanupApplyResult();
+            var sourcePreview = preview ?? GenerateTagCleanupPreview();
+
+            foreach (var item in sourcePreview.Items)
+            {
+                var work = GetWorkById(item.WorkId);
+                if (work == null) continue;
+
+                var cleanup = TagPolicy.PlanCleanupForAiTouchedWork(
+                    GetWorkTags(item.WorkId),
+                    TagPolicy.FromWork(work));
+
+                bool changed = false;
+                foreach (var tag in cleanup.TagsToRemove)
+                {
+                    if (RemoveWorkTag(item.WorkId, tag))
+                    {
+                        result.RemovedTags++;
+                        changed = true;
+                    }
+                }
+
+                foreach (var tag in cleanup.TagsToAdd)
+                {
+                    if (AddWorkTag(item.WorkId, tag, TagPolicy.GetCategoryForTag(tag), "AI"))
+                    {
+                        result.AddedTags++;
+                        changed = true;
+                    }
+                }
+
+                if (changed)
+                    result.AffectedWorks++;
+            }
+
+            return result;
+        }
+
+        public class TagCleanupPreview
+        {
+            public List<TagCleanupPreviewItem> Items { get; set; } = new List<TagCleanupPreviewItem>();
+            public int TotalWorksAffected => Items.Count;
+            public int TagsToRemoveCount => Items.Sum(i => i.TagsToRemove.Count);
+            public int TagsToAddCount => Items.Sum(i => i.TagsToAdd.Count);
+            public bool HasChanges => Items.Count > 0;
+        }
+
+        public class TagCleanupPreviewItem
+        {
+            public int WorkId { get; set; }
+            public string Title { get; set; } = "";
+            public string Type { get; set; } = "";
+            public string Year { get; set; } = "";
+            public string Company { get; set; } = "";
+            public List<string> TagsToRemove { get; set; } = new List<string>();
+            public List<string> TagsToAdd { get; set; } = new List<string>();
+            public List<string> TagsKept { get; set; } = new List<string>();
+            public string RemoveDisplay => string.Join("、", TagsToRemove);
+            public string AddDisplay => string.Join("、", TagsToAdd);
+            public string KeptDisplay => string.Join("、", TagsKept.Take(8));
+        }
+
+        public class TagCleanupApplyResult
+        {
+            public int AffectedWorks { get; set; }
+            public int RemovedTags { get; set; }
+            public int AddedTags { get; set; }
+        }
+
         /// <summary>
         /// 解析进度字符串为数值
         /// </summary>
@@ -1116,11 +1276,9 @@ namespace AniTechou.Services
                                             // 标签
                                             if (detail.Tags != null)
                                             {
-                                                foreach (var tag in detail.Tags)
-                                                {
-                                                    if (!string.IsNullOrWhiteSpace(tag))
-                                                        AddWorkTag(workId, tag, "Bangumi");
-                                                }
+                                                AddAutomaticWorkTags(workId, detail.Tags,
+                                                    TagPolicy.FromExternalResult(detail), "Bangumi");
+                                                CleanTagsForAiTouchedWork(workId);
                                             }
                                             // 补全空字段
                                             if (string.IsNullOrEmpty(company) && !string.IsNullOrEmpty(detail.Company))

@@ -69,10 +69,8 @@ namespace AniTechou.Services
                 }
             }
 
-            using (var client = new HttpClient())
+            using (var client = NetworkClientFactory.CreateHttpClient(TimeSpan.FromSeconds(30), jsonAccept: false))
             {
-                client.Timeout = TimeSpan.FromSeconds(30); 
-                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
                 client.DefaultRequestHeaders.Add("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
                 client.DefaultRequestHeaders.Add("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8");
                 
@@ -127,8 +125,6 @@ namespace AniTechou.Services
                     try
                     {
                         System.Diagnostics.Debug.WriteLine($"[WorkService] 封面来源: Bangumi API (ID: {bangumiId})");
-                        client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "AniTechou/1.0 (https://github.com/your-repo/AniTechou)");
-                        
                         var apiResponse = await client.GetAsync($"https://api.bgm.tv/v0/subjects/{bangumiId}");
                         if (apiResponse.IsSuccessStatusCode)
                         {
@@ -157,8 +153,6 @@ namespace AniTechou.Services
                     try
                     {
                         System.Diagnostics.Debug.WriteLine($"[WorkService] 封面来源: Bangumi 标题搜索 (关键词: {jikanSearchQuery})");
-                        client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "AniTechou/1.0 (https://github.com/your-repo/AniTechou)");
-                        
                         // 调用 Bangumi 的搜索 API
                         var searchResponse = await client.GetAsync($"https://api.bgm.tv/search/subject/{Uri.EscapeDataString(jikanSearchQuery)}?type=2&responseGroup=small");
                         if (searchResponse.IsSuccessStatusCode)

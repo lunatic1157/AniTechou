@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using AniTechou.Models;
 using AniTechou.Services;
 using AniTechou.Utilities;
 
@@ -452,6 +453,7 @@ namespace AniTechou
             AIChatInputBox.Text = "";
 
             var loadingMsg = AddLoadingMessage();
+            DesktopPetService.Instance.Notify(PetActivity.Thinking, "别催。让我先把这些书页翻完。");
 
             try
             {
@@ -460,15 +462,18 @@ namespace AniTechou
                 {
                     AddMessageToChat("请先在设置中配置API Key", false);
                     RemoveLoadingMessage(loadingMsg);
+                    DesktopPetService.Instance.Notify(PetActivity.Annoyed, "没有钥匙就想打开书架？先去设置 API Key。");
                     return;
                 }
 
                 // Always provide full collection context for localized AI
                 string collectionContext = "（未加载）";
+                List<WorkService.WorkCardData> allLocalWorksForAi = new List<WorkService.WorkCardData>();
                 try
                 {
                     var workService = new WorkService(_currentAccountName);
                     var allWorks = await Task.Run(() => workService.GetWorksAsync("all", "all"));
+                    allLocalWorksForAi = allWorks;
                     collectionContext = AIService.BuildCollectionContext(allWorks, workService);
                 }
                 catch { }
@@ -477,6 +482,7 @@ namespace AniTechou
                 var response = await aiService.SmartChat(message, collectionContext);
 
                 RemoveLoadingMessage(loadingMsg);
+                DesktopPetService.Instance.Notify(PetActivity.Pleased);
 
                 switch (response.intent)
                 {
@@ -486,7 +492,15 @@ namespace AniTechou
                         AddMessageToChat(response.answer, false);
                         if (response.works != null && response.works.Count > 0)
                         {
-                            ShowSearchResults(response.works);
+                            var newWorks = AIService.ExcludeExistingWorks(response.works, allLocalWorksForAi);
+                            if (newWorks.Count > 0)
+                            {
+                                ShowSearchResults(newWorks);
+                            }
+                            else
+                            {
+                                AddMessageToChat("这些推荐已经都在你的收藏里了。我会继续尝试更偏拓展或补课方向的推荐。", false);
+                            }
                         }
                         break;
 
@@ -563,6 +577,7 @@ namespace AniTechou
             {
                 RemoveLoadingMessage(loadingMsg);
                 AddMessageToChat($"抱歉，出了点问题：{ex.Message}", false);
+                DesktopPetService.Instance.Notify(PetActivity.Annoyed, "书架的门卡住了。先把错误处理掉。");
             }
         }
 
@@ -710,26 +725,19 @@ namespace AniTechou
                                 if (workService.UpdateWorkOriginalWork(workItem.Id, enhancedInfo.originalWork)) updated = true;
                             }
 
+                            var cleanup = workService.CleanTagsForAiTouchedWork(workItem.Id);
+                            if (cleanup.TagsToRemove.Count > 0 || cleanup.TagsToAdd.Count > 0)
+                                updated = true;
+
                             // 保存标签
                             if (enhancedInfo.tags != null && enhancedInfo.tags.Count > 0)
                             {
-                                var currentTagsForBatch = workService.GetWorkTags(workItem.Id);
-                                var currentTagSetBatch = new HashSet<string>(
-                                    currentTagsForBatch.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()),
-                                    StringComparer.OrdinalIgnoreCase);
-                                foreach (var tag in enhancedInfo.tags)
-                                {
-                                    string trimmed = (tag ?? "").Trim();
-                                    if (string.IsNullOrWhiteSpace(trimmed)) continue;
-                                    if (!currentTagSetBatch.Contains(trimmed))
-                                    {
-                                        if (workService.AddWorkTag(workItem.Id, trimmed, source: "AI"))
-                                        {
-                                            updated = true;
-                                            currentTagSetBatch.Add(trimmed);
-                                        }
-                                    }
-                                }
+                                var addedTags = workService.AddAutomaticWorkTags(
+                                    workItem.Id,
+                                    enhancedInfo.tags,
+                                    BuildTagContext(enhancedInfo, existingWork),
+                                    "AI");
+                                if (addedTags.Count > 0) updated = true;
                             }
 
                             // 3. 异步下载封面（如果原本没封面）
@@ -1139,25 +1147,12 @@ namespace AniTechou
                         if (!string.IsNullOrEmpty(value))
                         {
                             var tagsList = ParseTagString(value);
-                            var currentTagsForUpdate = workService.GetWorkTags(work.Id);
-                            var currentTagSet = new HashSet<string>(
-                                currentTagsForUpdate.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()),
-                                StringComparer.OrdinalIgnoreCase);
-                            bool tagsAdded = false;
-                            foreach (var tag in tagsList)
-                            {
-                                string trimmed = (tag ?? "").Trim();
-                                if (string.IsNullOrWhiteSpace(trimmed)) continue;
-                                if (!currentTagSet.Contains(trimmed))
-                                {
-                                    if (workService.AddWorkTag(work.Id, trimmed, source: "AI"))
-                                    {
-                                        tagsAdded = true;
-                                        currentTagSet.Add(trimmed);
-                                    }
-                                }
-                            }
-                            if (tagsAdded) updatedFields.Add("标签");
+                            var addedTags = workService.AddAutomaticWorkTags(
+                                work.Id,
+                                tagsList,
+                                TagPolicy.FromWork(workService.GetWorkById(work.Id) ?? detailedWork),
+                                "AI");
+                            if (addedTags.Count > 0) updatedFields.Add("标签");
                         }
                         break;
 
@@ -1207,6 +1202,13 @@ namespace AniTechou
                         }
                         break;
                 }
+            }
+
+            var tagCleanup = workService.CleanTagsForAiTouchedWork(work.Id);
+            if ((tagCleanup.TagsToRemove.Count > 0 || tagCleanup.TagsToAdd.Count > 0) &&
+                !updatedFields.Contains("标签"))
+            {
+                updatedFields.Add("标签整理");
             }
 
             if (updatedFields.Count > 0)
@@ -1271,6 +1273,42 @@ namespace AniTechou
                     VerticalAlignment = VerticalAlignment.Center
                 });
                 workStack.Children.Add(headerStack);
+
+                var recommendationDisplay = AIRecommendationDisplayHelper.BuildRecommendationDisplay(work);
+                if (recommendationDisplay.HasRecommendationBlock)
+                {
+                    var reasonBorder = new Border
+                    {
+                        Background = ThemeManager.GetBrush("AccentSoftBrush"),
+                        CornerRadius = new CornerRadius(8),
+                        Padding = new Thickness(8, 6, 8, 6),
+                        Margin = new Thickness(0, 6, 0, 2)
+                    };
+                    var reasonStack = new StackPanel();
+                    if (!string.IsNullOrEmpty(recommendationDisplay.Category))
+                    {
+                        reasonStack.Children.Add(new TextBlock
+                        {
+                            Text = recommendationDisplay.Category,
+                            FontSize = 10,
+                            FontWeight = System.Windows.FontWeights.SemiBold,
+                            Foreground = ThemeManager.GetBrush("TextPrimaryBrush")
+                        });
+                    }
+                    if (!string.IsNullOrEmpty(recommendationDisplay.Reason))
+                    {
+                        reasonStack.Children.Add(new TextBlock
+                        {
+                            Text = recommendationDisplay.Reason,
+                            FontSize = 10,
+                            TextWrapping = TextWrapping.Wrap,
+                            Foreground = ThemeManager.GetBrush("TextSecondaryBrush"),
+                            Margin = new Thickness(0, string.IsNullOrEmpty(recommendationDisplay.Category) ? 0 : 2, 0, 0)
+                        });
+                    }
+                    reasonBorder.Child = reasonStack;
+                    workStack.Children.Add(reasonBorder);
+                }
 
                 // 声优与角色信息
                 if (!string.IsNullOrEmpty(work.voiceActorInfo))
@@ -1511,58 +1549,31 @@ namespace AniTechou
                         });
                     }
 
-                    // 添加标签
+                    // 添加并整理 AI / 外部数据标签
+                    var candidateTags = new List<string>();
                     if (work.tags != null && work.tags.Count > 0)
+                        candidateTags.AddRange(work.tags);
+                    if ((typeEn == "Manga" || typeEn == "LightNovel") && !string.IsNullOrEmpty(work.author))
+                        candidateTags.Add($"原作:{work.author.Trim()}");
+                    if (typeEn == "Anime" && !string.IsNullOrEmpty(work.originalWork))
+                        candidateTags.Add($"原作:{work.originalWork.Trim()}");
+
+                    var cleanup = workService.CleanTagsForAiTouchedWork(workId);
+                    if (candidateTags.Count > 0)
                     {
-                        var currentTags = workService.GetWorkTags(workId);
-                        var currentTagSet = new HashSet<string>(currentTags.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()), StringComparer.OrdinalIgnoreCase);
-                        var newTags = new List<string>();
-                        foreach (var tag in work.tags)
-                        {
-                            string trimmed = (tag ?? "").Trim();
-                            if (string.IsNullOrWhiteSpace(trimmed)) continue;
-                            if (!currentTagSet.Contains(trimmed))
-                            {
-                                if (workService.AddWorkTag(workId, trimmed, source: "AI"))
-                                {
-                                    newTags.Add(trimmed);
-                                    currentTagSet.Add(trimmed);
-                                }
-                            }
-                        }
-                        
-                        // 特殊处理：如果是漫画或小说，并且有作者，把作者也当作一个标签加进去
-                        if ((typeEn == "Manga" || typeEn == "LightNovel") && !string.IsNullOrEmpty(work.author))
-                        {
-                            string author = work.author.Trim();
-                            if (!string.IsNullOrWhiteSpace(author) && !currentTagSet.Contains(author))
-                            {
-                                if (workService.AddWorkTag(workId, author, category: "作者", source: "AI"))
-                                {
-                                    newTags.Add(author);
-                                    currentTagSet.Add(author);
-                                }
-                            }
-                        }
-
-                        // 特殊处理：如果是动画，并且有原作，把原作也当作一个标签加进去
-                        if (typeEn == "Anime" && !string.IsNullOrEmpty(work.originalWork))
-                        {
-                            string originalWork = work.originalWork.Trim();
-                            if (!string.IsNullOrWhiteSpace(originalWork) && !currentTagSet.Contains(originalWork))
-                            {
-                                if (workService.AddWorkTag(workId, originalWork, category: "原作", source: "AI"))
-                                {
-                                    newTags.Add(originalWork);
-                                    currentTagSet.Add(originalWork);
-                                }
-                            }
-                        }
-
+                        var newTags = workService.AddAutomaticWorkTags(
+                            workId,
+                            candidateTags,
+                            BuildTagContext(work, workService.GetWorkById(workId)),
+                            "AI");
                         if (newTags.Count > 0)
                         {
                             AddMessageToChat($"🏷️ 已新增标签：{string.Join("、", newTags)}", false);
                         }
+                    }
+                    else if (cleanup.TagsToRemove.Count > 0 || cleanup.TagsToAdd.Count > 0)
+                    {
+                        AddMessageToChat("🏷️ 已整理旧标签", false);
                     }
 
                     RefreshCurrentView();
@@ -1704,6 +1715,22 @@ namespace AniTechou
             MainContentArea.Content = addForm;
             ContentPlaceholder.Visibility = Visibility.Collapsed;
             MainContentArea.Visibility = Visibility.Visible;
+        }
+
+        private static TagPolicy.WorkTagContext BuildTagContext(AIWorkSearchResult aiWork, WorkInfo existingWork = null)
+        {
+            return new TagPolicy.WorkTagContext
+            {
+                Title = aiWork?.title ?? existingWork?.Title ?? "",
+                OriginalTitle = aiWork?.originalTitle ?? existingWork?.OriginalTitle ?? "",
+                Type = aiWork?.type ?? existingWork?.Type ?? "",
+                Year = aiWork?.year ?? existingWork?.Year ?? "",
+                Season = aiWork?.season ?? existingWork?.Season ?? "",
+                SourceType = aiWork?.sourceType ?? existingWork?.SourceType ?? "",
+                Company = aiWork?.company ?? existingWork?.Company ?? "",
+                Author = aiWork?.author ?? existingWork?.Author ?? "",
+                OriginalWork = aiWork?.originalWork ?? existingWork?.OriginalWork ?? ""
+            };
         }
 
         private static List<string> ParseTagString(string value)

@@ -18,9 +18,7 @@ namespace AniTechou.Services
         public SyncService(string accountName)
         {
             _accountName = accountName;
-            _http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-            _http.DefaultRequestHeaders.Add("User-Agent",
-                "AniTechou/1.0 (https://github.com/lunatic1157/AniTechou)");
+            _http = NetworkClientFactory.CreateHttpClient(TimeSpan.FromSeconds(30));
         }
 
         public class SyncResult
@@ -140,7 +138,7 @@ namespace AniTechou.Services
             }
             catch (Exception ex)
             {
-                result.ErrorMessage = $"同步失败：{ex.Message}";
+                result.ErrorMessage = $"Bangumi 网络不可达或代理未配置：{ex.Message}";
             }
 
             return result;
@@ -207,11 +205,12 @@ namespace AniTechou.Services
                                     // Save Bangumi tags (public tags from detail + user's personal tags from item)
                                     if (detail.Tags != null)
                                     {
-                                        foreach (var tag in detail.Tags)
-                                        {
-                                            if (!string.IsNullOrWhiteSpace(tag))
-                                                workService.AddWorkTag(newId, tag, "Bangumi");
-                                        }
+                                        workService.AddAutomaticWorkTags(
+                                            newId,
+                                            detail.Tags,
+                                            AniTechou.Utilities.TagPolicy.FromExternalResult(detail),
+                                            "Bangumi");
+                                        workService.CleanTagsForAiTouchedWork(newId);
                                     }
                                     if (item.Tags != null)
                                     {
@@ -289,6 +288,15 @@ namespace AniTechou.Services
                                         workService.UpdateWorkEpisodes(match.Id, detail.Episodes);
                                     if (string.IsNullOrEmpty(fullWork.Synopsis) && !string.IsNullOrEmpty(detail.Synopsis))
                                         workService.UpdateWorkSynopsis(match.Id, detail.Synopsis);
+                                    if (detail.Tags != null && detail.Tags.Count > 0)
+                                    {
+                                        workService.AddAutomaticWorkTags(
+                                            match.Id,
+                                            detail.Tags,
+                                            AniTechou.Utilities.TagPolicy.FromExternalResult(detail),
+                                            "Bangumi");
+                                        workService.CleanTagsForAiTouchedWork(match.Id);
+                                    }
                                     if (string.IsNullOrEmpty(fullWork.CoverPath) && !string.IsNullOrEmpty(detail.CoverUrl))
                                         _ = workService.DownloadAndSaveCoverAsync(
                                             string.IsNullOrEmpty(detail.BangumiId) ? detail.CoverUrl

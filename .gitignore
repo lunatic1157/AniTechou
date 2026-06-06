@@ -28,5 +28,8 @@ desktop.ini
 ## [Config](file:///f:/AniTechou/AniTechou/.gitignore)
 config.json
 publish/
+publishwin-x64-self-contained/
 Installer/output/
+release/
+tmp/
 AniTechou-win-x64.zip

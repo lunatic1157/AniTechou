@@ -191,18 +191,19 @@
         </Grid>
 
         <Grid Grid.Row="3">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="MarkdownEditColumn" Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition x:Name="MarkdownPreviewColumn" Width="*"/>
+            </Grid.ColumnDefinitions>
 
             <!-- Markdown 编辑区域 -->
-            <Border Grid.Row="0"
+            <Border Grid.Column="0"
                     x:Name="MarkdownEditPanel"
                     Background="{DynamicResource Surface2Brush}"
                     BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource CardCornerRadius}">
+                    CornerRadius="{DynamicResource CardCornerRadius}"
+                    SizeChanged="MarkdownSplitPanel_SizeChanged">
                 <TextBox x:Name="MarkdownEditBox"
                          AcceptsReturn="True"
                          TextWrapping="Wrap"
@@ -232,16 +233,19 @@
                 </TextBox>
             </Border>
 
-            <GridSplitter Grid.Row="1" x:Name="MarkdownSplitter" Height="4"
+            <GridSplitter Grid.Column="1" x:Name="MarkdownSplitter" Width="4"
                           Background="{DynamicResource BorderSubtleBrush}"
-                          HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
+                          HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                          DragCompleted="MarkdownSplitter_DragCompleted"
+                          PreviewMouseLeftButtonUp="MarkdownSplitter_MouseLeftButtonUp"/>
 
             <!-- Markdown 预览区域 -->
-            <Border Grid.Row="2"
+            <Border Grid.Column="2"
                     x:Name="MarkdownPreviewPanel"
                     Background="{DynamicResource Surface1Brush}"
                     BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource CardCornerRadius}">
+                    CornerRadius="{DynamicResource CardCornerRadius}"
+                    SizeChanged="MarkdownSplitPanel_SizeChanged">
                 <FlowDocumentScrollViewer x:Name="MarkdownPreviewViewer"
                                           VerticalScrollBarVisibility="Auto"
                                           Padding="10"

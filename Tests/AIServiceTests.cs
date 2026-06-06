@@ -97,4 +97,59 @@ public class AIServiceTests
         var prompt = AIService.GetDefaultSystemPrompt();
         Assert.Contains("USER_COLLECTION_CONTEXT", prompt);
     }
+
+    [Fact]
+    public void GetDefaultSystemPrompt_RequiresRecommendationCategoryAndReason()
+    {
+        var prompt = AIService.GetDefaultSystemPrompt();
+
+        Assert.Contains("recommendationCategory", prompt);
+        Assert.Contains("recommendationReason", prompt);
+        Assert.Contains("相似推荐", prompt);
+        Assert.Contains("口味推荐", prompt);
+        Assert.Contains("拓展推荐", prompt);
+        Assert.Contains("补课推荐", prompt);
+    }
+
+    [Fact]
+    public void BuildRecommendationPrompt_IncludesFourCategoriesAndLocalProfileSignals()
+    {
+        var prompt = AIService.BuildRecommendationPrompt(
+            "根据我的收藏推荐",
+            "【外部搜索】真实作品数据",
+            "【用户画像】高评分作品: 葬送的芙莉莲(9.5); 常见普通标签: 治愈(2); 人员标签: 导演:斋藤圭一郎(1); 类型偏好: Anime(3)");
+
+        Assert.Contains("相似推荐", prompt);
+        Assert.Contains("口味推荐", prompt);
+        Assert.Contains("拓展推荐", prompt);
+        Assert.Contains("补课推荐", prompt);
+        Assert.Contains("高评分作品", prompt);
+        Assert.Contains("常见普通标签", prompt);
+        Assert.Contains("人员标签", prompt);
+        Assert.Contains("类型偏好", prompt);
+        Assert.Contains("葬送的芙莉莲", prompt);
+    }
+
+    [Fact]
+    public void ExcludeExistingWorks_RemovesWorksAlreadyInLocalCollection()
+    {
+        var candidates = new List<AIWorkSearchResult>
+        {
+            new AIWorkSearchResult { title = "奇巧计程车", originalTitle = "ODDTAXI", type = "Anime" },
+            new AIWorkSearchResult { title = "未收藏新作", originalTitle = "", type = "Anime" },
+            new AIWorkSearchResult { title = "死亡笔记", originalTitle = "", type = "Manga" }
+        };
+        var localWorks = new List<WorkService.WorkCardData>
+        {
+            new WorkService.WorkCardData { Title = "ODDTAXI", OriginalTitle = "", Type = "Anime" },
+            new WorkService.WorkCardData { Title = "死亡笔记", OriginalTitle = "", Type = "Anime" }
+        };
+
+        var filtered = AIService.ExcludeExistingWorks(candidates, localWorks);
+
+        Assert.Equal(2, filtered.Count);
+        Assert.DoesNotContain(filtered, w => w.title == "奇巧计程车");
+        Assert.Contains(filtered, w => w.title == "未收藏新作");
+        Assert.Contains(filtered, w => w.title == "死亡笔记" && w.type == "Manga");
+    }
 }

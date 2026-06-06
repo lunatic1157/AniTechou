@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Web;
 using AniTechou.Services;
+using AniTechou.Utilities;
 
 namespace AniTechou.Services.SearchProviders
 {
@@ -21,13 +22,7 @@ namespace AniTechou.Services.SearchProviders
 
         public BangumiSearchProvider()
         {
-            _httpClient = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(15)
-            };
-            _httpClient.DefaultRequestHeaders.Add("User-Agent",
-                "AniTechou/1.0 (https://github.com/lunatic1157/AniTechou)");
-            _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+            _httpClient = NetworkClientFactory.CreateHttpClient(TimeSpan.FromSeconds(15));
         }
 
         public async Task<List<ExternalSearchResult>> SearchAsync(string query, string typeHint = null)
@@ -162,13 +157,6 @@ namespace AniTechou.Services.SearchProviders
             if (item.TryGetProperty("eps", out var eps))
                 result.Episodes = eps.GetInt32().ToString();
 
-            // 评分
-            if (item.TryGetProperty("rating", out var rating))
-            {
-                if (rating.TryGetProperty("score", out var score))
-                    result.Tags.Add($"评分:{score.GetDouble():F1}");
-            }
-
             // 标签
             if (item.TryGetProperty("tags", out var tags))
             {
@@ -180,6 +168,7 @@ namespace AniTechou.Services.SearchProviders
                 }
             }
 
+            result.Tags = TagPolicy.NormalizeAutomaticTags(result.Tags, TagPolicy.FromExternalResult(result));
             return result;
         }
 
@@ -331,6 +320,7 @@ namespace AniTechou.Services.SearchProviders
                 }
             }
 
+            result.Tags = TagPolicy.NormalizeAutomaticTags(result.Tags, TagPolicy.FromExternalResult(result));
             return result;
         }
 
@@ -426,8 +416,12 @@ namespace AniTechou.Services.SearchProviders
         /// </summary>
         private static void AddTagIfNew(ExternalSearchResult result, string tag)
         {
-            if (!result.Tags.Contains(tag) && result.Tags.Count < 15)
-                result.Tags.Add(tag);
+            var normalizedTags = TagPolicy.NormalizeAutomaticTags(new[] { tag }, TagPolicy.FromExternalResult(result));
+            foreach (var normalized in normalizedTags)
+            {
+                if (!result.Tags.Contains(normalized, StringComparer.OrdinalIgnoreCase) && result.Tags.Count < 15)
+                    result.Tags.Add(normalized);
+            }
         }
 
         private static string SafeGetString(JsonElement element, string property)

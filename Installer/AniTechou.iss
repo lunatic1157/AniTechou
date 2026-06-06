@@ -1,5 +1,5 @@
 #ifndef MyAppVersion
-#define MyAppVersion "0.9.4"
+#define MyAppVersion "0.9.5"
 #endif
 #define MyAppName "AniTechou"
 #define MyAppPublisher "lunatic1157"
@@ -22,7 +22,7 @@ WizardStyle=modern
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=output
-OutputBaseFilename=AniTechou-Setup-v0.9.4
+OutputBaseFilename=AniTechou-Setup-v0.9.5
 SetupIconFile=..\Assets\Icon\AniTechou.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
