@@ -5,8 +5,8 @@
 - [x] `AniTechou.csproj` version: `0.9.5`
 - [x] `AniTechou.csproj` assembly/file version: `0.9.5.0`
 - [x] `Installer/AniTechou.iss` `MyAppVersion`: `0.9.5`
-- [ ] Git tag: `v0.9.5`
-- [ ] GitHub Release title: `AniTechou v0.9.5`
+- [x] Git tag: `v0.9.5`
+- [x] GitHub Release title: `AniTechou v0.9.5`
 
 ## Local Verification
 
@@ -47,12 +47,14 @@
 - [x] `docs/AI_COLLABORATION_ROADMAP.md`
 - [x] `docs/V0.9.5_NOTES_AND_DALIAN_PET.md`
 
-## GitHub Actions Pending User Confirmation
+## GitHub Release Actions
 
-- [ ] Stage intended files only.
-- [ ] Commit v0.9.5 changes.
-- [ ] Push to `origin/main`.
-- [ ] Create tag `v0.9.5`.
-- [ ] Create GitHub Release using `docs/GITHUB_RELEASE_DRAFT_v0.9.5.md`.
-- [ ] Upload release asset:
+- [x] Stage intended files only.
+- [x] Commit v0.9.5 changes.
+- [x] Push to `origin/main`.
+- [x] Create tag `v0.9.5`.
+- [x] Create GitHub Release using `docs/GITHUB_RELEASE_DRAFT_v0.9.5.md`.
+- [x] Upload release asset:
   - `Installer/output/AniTechou-Setup-v0.9.5.exe`
+- [x] Verify published Release:
+  - https://github.com/lunatic1157/AniTechou/releases/tag/v0.9.5
